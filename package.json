@@ -67,7 +67,7 @@
         "fastify-plugin": "^5.1.0",
         "ioredis": "^5.11.0",
         "node-cron": "^4.2.1",
-        "resend": "^6.12.3"
+        "resend": "^6.12.4"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
