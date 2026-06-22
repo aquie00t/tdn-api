@@ -25,7 +25,7 @@ jobs:
             new_release_version: ${{ steps.release.outputs.new_release_version }}
         steps:
             - name: Checkout Repository
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
               with:
                   # Full history required for semantic-release to analyze all commits
                   fetch-depth: 0
@@ -50,7 +50,7 @@ jobs:
         if: ${{ needs.release.outputs.new_release_published == 'true' }}
         steps:
             - name: Checkout Repository
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v4
