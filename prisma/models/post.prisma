@@ -14,11 +14,11 @@ enum Category {
 }
 
 model Post {
-  id        String   @id @default(uuid())
-  content   String   @db.Text
-  type      PostType @default(COMMUNITY)
+  id        String     @id @default(uuid())
+  content   String     @db.Text
+  type      PostType   @default(COMMUNITY)
   category  Category[] @map("category")
-  mediaUrls String[] @map("media_urls")
+  mediaUrls String[]   @map("media_urls")
 
   authorId String @map("author_id")
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -41,10 +41,11 @@ model Post {
 }
 
 model Tag {
-  id        String   @id @default(uuid())
-  name      String   @unique
+  id        String    @id @default(uuid())
+  name      String    @unique
   posts     Post[]
-  createdAt DateTime @default(now()) @map("created_at")
+  articles  Article[]
+  createdAt DateTime  @default(now()) @map("created_at")
 
   @@index([name])
   @@map("tags")

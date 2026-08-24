@@ -1,0 +1,74 @@
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Article {
+  id      String  @id @default(uuid())
+  slug    String  @unique
+  title   String  @db.VarChar(160)
+  body    String  @db.Text
+  excerpt String? @db.VarChar(300)
+
+  // Storage key (e.g. "articles/covers/<userId>/<uuid>.png"), never a full URL.
+  // The CDN base is prefixed at response time, exactly like Profile.avatarUrl.
+  coverImageKey String? @map("cover_image_key")
+  coverImageAlt String? @map("cover_image_alt") @db.VarChar(160)
+
+  status             ArticleStatus @default(DRAFT)
+  publishedAt        DateTime?     @map("published_at")
+  readingTimeMinutes Int           @default(1) @map("reading_time_minutes")
+
+  category Category[] @map("category")
+
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  tags      Tag[]
+  likes     ArticleLike[]
+  bookmarks ArticleBookmark[]
+
+  // NOTE: `comments Comment[]` lands with the polymorphic comment migration.
+  // Comment has no articleId yet, so the back-relation cannot exist today.
+
+  likeCount Int @default(0) @map("like_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([authorId, status])
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([category])
+  @@map("articles")
+}
+
+model ArticleLike {
+  id        String @id @default(uuid())
+  articleId String @map("article_id")
+  userId    String @map("user_id")
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([articleId, userId])
+  @@index([userId])
+  @@map("article_likes")
+}
+
+model ArticleBookmark {
+  id        String @id @default(uuid())
+  articleId String @map("article_id")
+  userId    String @map("user_id")
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([articleId, userId])
+  @@index([userId])
+  @@map("article_bookmarks")
+}

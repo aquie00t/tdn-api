@@ -15,6 +15,9 @@ import type { PostProps } from "@core/domain/interfaces/post-props.interface";
 import { TokenType } from "@core/domain/enums/token-type.enum";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import { PostType } from "@core/domain/enums/post-type.enum";
+import { Article } from "@core/domain/entities/article.entity";
+import type { ArticleProps } from "@core/domain/interfaces/article-props.interface";
+import { ArticleStatus } from "@core/domain/enums/article-status.enum";
 
 export function buildUser(overrides: Partial<UserProps> = {}): User {
     return User.with({
@@ -116,6 +119,35 @@ export function buildPost(overrides: Partial<PostProps> = {}): Post {
         content: "Test post content",
         type: PostType.COMMUNITY,
         mediaUrls: [],
+        author: {
+            id: "user-1",
+            username: "testuser",
+        },
+        tags: [],
+        categories: [],
+        likeCount: 0,
+        commentCount: 0,
+        isLiked: false,
+        isBookmarked: false,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+        updatedAt: new Date("2024-01-01T00:00:00Z"),
+        ...overrides,
+    });
+}
+
+
+export function buildArticle(overrides: Partial<ArticleProps> = {}): Article {
+    return Article.with({
+        id: "article-1",
+        slug: "test-article-1a2b3c4d",
+        title: "Test article",
+        body: "# Heading\n\nSome markdown body for tests.",
+        excerpt: "Some markdown body for tests.",
+        coverImageKey: null,
+        coverImageAlt: null,
+        status: ArticleStatus.DRAFT,
+        publishedAt: null,
+        readingTimeMinutes: 1,
         author: {
             id: "user-1",
             username: "testuser",
