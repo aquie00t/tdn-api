@@ -71,7 +71,7 @@
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@types/node": "^25.9.2",
+        "@types/node": "^26.2.0",
         "@vitest/coverage-v8": "4.1.8",
         "cross-env": "^10.1.0",
         "dotenv": "^17.4.2",
