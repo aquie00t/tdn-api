@@ -21,7 +21,7 @@
         "test:e2e": "cross-env NODE_ENV=test vitest run --config vitest.e2e.config.ts",
         "test:coverage": "vitest run --config vitest.unit.config.ts --coverage",
         "migrate-bots": "cross-env DOTENV_CONFIG_PATH=.env.production tsx scripts/migrate-bots.ts",
-        "db:deploy": "prisma deploy",
+        "db:deploy": "prisma migrate deploy",
         "db:generate": "prisma generate",
         "db:studio": "prisma studio"
     },
@@ -62,7 +62,7 @@
         "@sinclair/typebox": "^0.34.49",
         "argon2": "^0.44.0",
         "awilix": "^13.0.3",
-        "axios": "^1.17.0",
+        "axios": "^1.18.0",
         "fastify": "^5.8.5",
         "fastify-plugin": "^5.1.0",
         "ioredis": "^5.11.0",
@@ -90,22 +90,6 @@
         "typescript-eslint": "^8.60.1",
         "vite": "8.0.16",
         "vitest": "^4.1.8"
-    },
-    "pnpm": {
-        "overrides": {
-            "hono": "4.12.18",
-            "@hono/node-server": "1.19.13",
-            "fast-xml-parser": "^5.5.7",
-            "lodash": "4.17.23",
-            "effect": "3.20.0",
-            "picomatch": "^4.0.4",
-            "yaml": "^2.8.3",
-            "brace-expansion": "^5.0.5",
-            "fast-jwt": "6.2.4",
-            "fast-uri": ">=3.1.2",
-            "vite": "8.0.16",
-            "ws": ">=8.20.1"
-        }
     },
     "engines": {
         "node": ">25"
