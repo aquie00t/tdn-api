@@ -25,4 +25,9 @@ export enum NotificationType {
      *
      */
     COMMENT_LIKE = "COMMENT_LIKE",
+
+    /**
+     * A reply to one of the user's comments
+     */
+    COMMENT_REPLY = "COMMENT_REPLY",
 }

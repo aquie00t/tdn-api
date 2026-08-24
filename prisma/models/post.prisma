@@ -98,11 +98,15 @@ model Comment {
   content   String   @db.Text
   mediaUrls String[] @default([]) @map("media_urls")
 
-  postId   String @map("post_id")
-  authorId String @map("author_id")
+  // Exactly one of postId / articleId is set, enforced by a CHECK constraint
+  // added in the migration: Prisma cannot express one.
+  postId    String? @map("post_id")
+  articleId String? @map("article_id")
+  authorId  String  @map("author_id")
 
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  article Article? @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  author  User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   parentId String?
   parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
@@ -117,6 +121,8 @@ model Comment {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([postId])
+  @@index([articleId])
+  @@index([parentId])
   @@index([authorId])
   @@map("comments")
 }

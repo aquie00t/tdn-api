@@ -42,9 +42,16 @@ export class DeleteCommentUseCase {
                 );
             }
 
+            const target = comment.target;
+
             await ctx.commentRepository.delete(input.commentId);
 
-            await ctx.postRepository.decrementCommentsCount(comment.postId);
+            // Articles derive their comment count from a relation count, so
+            // there is no counter to maintain. Posts keep the existing
+            // behaviour, drift and all: fixing that is a separate change.
+            if (target.type === "POST") {
+                await ctx.postRepository.decrementCommentsCount(target.id);
+            }
         });
 
         try {

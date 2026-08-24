@@ -11,6 +11,11 @@ import type { LikeCommentUseCase } from "@core/use-cases/comment/like-comment/li
 import type { UnlikeCommentUseCase } from "@core/use-cases/comment/unlike-comment/unlike-comment.usecase";
 import { CommentPrismaMapper } from "@infrastructure/persistence/mappers/comment-prisma.mapper";
 import type {
+    ArticleCommentParams,
+    CreateArticleCommentBody,
+    GetArticleCommentsQuery,
+} from "@typings/schemas/article/article-comment.schema";
+import type {
     CreateCommentBody,
     CreateCommentParams,
 } from "@typings/schemas/comment/create-comment.schema";
@@ -51,7 +56,7 @@ export class CommentController {
 
         const comment = await this.createCommentUseCase.execute({
             content,
-            postId,
+            target: { type: "POST", id: postId },
             authorId: userId,
             parentId,
             mediaUrls,
@@ -64,6 +69,81 @@ export class CommentController {
                 userId,
             ),
             meta: { timestamp: new Date().toISOString() },
+        });
+    }
+
+    /**
+     * Creates a comment on an article.
+     *
+     * Shares the comment use case with posts; only the target differs, which
+     * is why replies, likes, bookmarks and deletion all keep working through
+     * the existing /comments/:commentId routes.
+     *
+     * @param request - Request carrying the article id and the comment body
+     * @param reply - The Fastify reply object
+     * @returns A 201 response containing the created comment
+     */
+    async createForArticle(
+        request: FastifyRequest<{
+            Params: ArticleCommentParams;
+            Body: CreateArticleCommentBody;
+        }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        const userId = request.user.id;
+        const { articleId } = request.params;
+        const { content, parentId, mediaUrls } = request.body;
+
+        const comment = await this.createCommentUseCase.execute({
+            content,
+            target: { type: "ARTICLE", id: articleId },
+            authorId: userId,
+            parentId,
+            mediaUrls,
+        });
+
+        return reply.status(201).send({
+            data: CommentPrismaMapper.toResponse(
+                comment,
+                request.server.config.R2_PUBLIC_URL,
+                userId,
+            ),
+            meta: { timestamp: new Date().toISOString() },
+        });
+    }
+
+    /**
+     * Lists the top-level comments of an article.
+     *
+     * @param request - Request carrying the article id and pagination
+     * @param reply - The Fastify reply object
+     * @returns A 200 response containing the page of comments
+     */
+    async getArticleComments(
+        request: FastifyRequest<{
+            Params: ArticleCommentParams;
+            Querystring: GetArticleCommentsQuery;
+        }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        const { articleId } = request.params;
+        const { page = 1, limit = 10 } = request.query;
+        const currentUserId = request.user?.id;
+
+        const comments = await this.getPostCommentsUseCase.execute({
+            target: { type: "ARTICLE", id: articleId },
+            page,
+            limit,
+            currentUserId,
+        });
+
+        return reply.status(200).send({
+            data: CommentPrismaMapper.toListResponse(
+                comments,
+                request.server.config.R2_PUBLIC_URL,
+                currentUserId,
+            ),
+            meta: { currentPage: page, limit },
         });
     }
 
@@ -96,7 +176,7 @@ export class CommentController {
         const cdnUrl = request.server.config.R2_PUBLIC_URL;
 
         const comments = await this.getPostCommentsUseCase.execute({
-            postId,
+            target: { type: "POST", id: postId },
             page,
             limit,
             currentUserId,

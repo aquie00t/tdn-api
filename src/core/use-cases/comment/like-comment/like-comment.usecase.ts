@@ -55,7 +55,9 @@ export class LikeCommentUseCase {
                         type: NotificationType.COMMENT_LIKE,
                         issuerId: input.userId,
                         commentId: input.commentId,
-                        postId: comment.postId,
+                        postId: comment.postId ?? undefined,
+                        articleId: comment.articleId ?? undefined,
+                        referenceId: input.commentId,
                     },
                 );
             }

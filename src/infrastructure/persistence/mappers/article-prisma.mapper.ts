@@ -15,6 +15,7 @@ export type ArticleWithRelations = Prisma.ArticleGetPayload<{
         tags: true;
         likes: true;
         bookmarks: true;
+        _count: { select: { comments: true } };
     };
 }>;
 
@@ -88,6 +89,10 @@ export class ArticlePrismaMapper {
             createdAt: dbArticle.createdAt,
             updatedAt: dbArticle.updatedAt,
             likeCount: dbArticle.likeCount,
+            // Derived rather than denormalized: a counter column would drift
+            // the way posts.comment_count does, since the reply subtree is
+            // removed by a database cascade the application never sees.
+            commentCount: dbArticle._count?.comments ?? 0,
             isLiked: Boolean(dbArticle.likes && dbArticle.likes.length > 0),
             isBookmarked: Boolean(
                 dbArticle.bookmarks && dbArticle.bookmarks.length > 0,

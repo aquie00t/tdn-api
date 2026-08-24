@@ -1,8 +1,9 @@
 /**
- * Comment entity representing a user comment on a post
+ * Comment entity representing a user comment on a post or an article
  * Supports nested comments through optional parent-child relationships
  */
 import type { CommentProps } from "@core/domain/interfaces/comment-props.interface";
+import type { CommentTarget } from "@core/ports/repositories/comment.repository";
 
 export class Comment {
     /**
@@ -37,10 +38,32 @@ export class Comment {
 
     /**
      * Gets the ID of the post this comment belongs to
-     * @returns The post ID
+     * @returns The post ID, or null when the comment belongs to an article
      */
-    public get postId(): string {
+    public get postId(): string | null {
         return this.props.postId;
+    }
+
+    /**
+     * Gets the ID of the article this comment belongs to
+     * @returns The article ID, or null when the comment belongs to a post
+     */
+    public get articleId(): string | null {
+        return this.props.articleId;
+    }
+
+    /**
+     * Gets what this comment is attached to.
+     *
+     * Callers branch on this rather than on which id happens to be null, so the
+     * two-nullable-columns representation stays inside the entity.
+     *
+     * @returns The comment target
+     */
+    public get target(): CommentTarget {
+        return this.props.postId !== null
+            ? { type: "POST", id: this.props.postId }
+            : { type: "ARTICLE", id: this.props.articleId as string };
     }
 
     /**
@@ -76,7 +99,11 @@ export class Comment {
     }
 
     /**
-     * Factory method to create a new comment
+     * Factory method to create a new comment on a post.
+     *
+     * Retained as a delegate to createForPost so existing post comment code
+     * and its tests keep working unchanged.
+     *
      * @param content - The text content of the comment
      * @param postId - The ID of the post this comment belongs to
      * @param authorId - The ID of the user who authored this comment
@@ -91,9 +118,61 @@ export class Comment {
         parentId: string | null = null,
         mediaUrls: string[] = [],
     ): Comment {
+        return Comment.createForPost(
+            content,
+            postId,
+            authorId,
+            parentId,
+            mediaUrls,
+        );
+    }
+
+    /**
+     * Factory method to create a comment on a post
+     * @param content - The text content of the comment
+     * @param postId - The ID of the post this comment belongs to
+     * @param authorId - The ID of the user who authored this comment
+     * @param parentId - Optional parent comment ID for nested comments
+     * @param mediaUrls - Optional array of media URLs attached to the comment
+     * @returns A new Comment instance targeting a post
+     */
+    public static createForPost(
+        content: string,
+        postId: string,
+        authorId: string,
+        parentId: string | null = null,
+        mediaUrls: string[] = [],
+    ): Comment {
         return new Comment({
             content,
             postId,
+            articleId: null,
+            authorId,
+            parentId,
+            mediaUrls,
+        });
+    }
+
+    /**
+     * Factory method to create a comment on an article
+     * @param content - The text content of the comment
+     * @param articleId - The ID of the article this comment belongs to
+     * @param authorId - The ID of the user who authored this comment
+     * @param parentId - Optional parent comment ID for nested comments
+     * @param mediaUrls - Optional array of media URLs attached to the comment
+     * @returns A new Comment instance targeting an article
+     */
+    public static createForArticle(
+        content: string,
+        articleId: string,
+        authorId: string,
+        parentId: string | null = null,
+        mediaUrls: string[] = [],
+    ): Comment {
+        return new Comment({
+            content,
+            postId: null,
+            articleId,
             authorId,
             parentId,
             mediaUrls,

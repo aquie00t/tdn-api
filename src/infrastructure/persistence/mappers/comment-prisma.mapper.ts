@@ -18,7 +18,19 @@ export type CommentWithRelations = Prisma.CommentGetPayload<{
 export interface CommentResponse {
     id: string;
     content: string;
-    postId: string;
+
+    /**
+     * The post this comment belongs to, or null when it belongs to an article.
+     *
+     * Nullable in lockstep with the response schema: fast-json-stringify
+     * coerces rather than rejects, so a schema that still promised a string
+     * would emit a wrong value instead of failing loudly.
+     */
+    postId: string | null;
+
+    /** The article this comment belongs to, or null when it belongs to a post */
+    articleId: string | null;
+
     mediaUrls: string[];
     parentId: string | null;
     createdAt: Date;
@@ -47,6 +59,7 @@ export class CommentPrismaMapper {
             id: dbComment.id,
             content: dbComment.content,
             postId: dbComment.postId,
+            articleId: dbComment.articleId,
             authorId: dbComment.authorId,
             parentId: dbComment.parentId,
             mediaUrls: dbComment.mediaUrls,
@@ -75,6 +88,7 @@ export class CommentPrismaMapper {
             id: comment.id,
             content: comment.content,
             postId: comment.postId,
+            articleId: comment.articleId,
             parentId: comment.parentId,
             mediaUrls: comment.mediaUrls,
             createdAt: comment.createdAt,

@@ -71,7 +71,7 @@ describe("CreateCommentUseCase", () => {
         await expect(
             useCase.execute({
                 content: "Hello",
-                postId: "post-1",
+                target: { type: "POST" as const, id: "post-1" },
                 authorId: "user-1",
             }),
         ).rejects.toThrow(NotFoundError);
@@ -84,7 +84,7 @@ describe("CreateCommentUseCase", () => {
         await expect(
             useCase.execute({
                 content: "Reply",
-                postId: "post-1",
+                target: { type: "POST" as const, id: "post-1" },
                 authorId: "user-1",
                 parentId: "parent-1",
             }),
@@ -100,7 +100,7 @@ describe("CreateCommentUseCase", () => {
         await expect(
             useCase.execute({
                 content: "Reply",
-                postId: "post-1",
+                target: { type: "POST" as const, id: "post-1" },
                 authorId: "user-1",
                 parentId: "parent-1",
             }),
@@ -117,7 +117,7 @@ describe("CreateCommentUseCase", () => {
 
         const result = await useCase.execute({
             content: "Hello",
-            postId: "post-1",
+            target: { type: "POST" as const, id: "post-1" },
             authorId: "commenter-user",
         });
 
@@ -143,7 +143,7 @@ describe("CreateCommentUseCase", () => {
 
         await useCase.execute({
             content: "My own post comment",
-            postId: "post-1",
+            target: { type: "POST" as const, id: "post-1" },
             authorId: "user-1",
         });
 
@@ -154,7 +154,7 @@ describe("CreateCommentUseCase", () => {
     it("should create reply, increment repliesCount and notify parent comment author", async () => {
         const parentComment = buildComment({
             id: "parent-1",
-            postId: "post-1",
+            target: { type: "POST" as const, id: "post-1" },
             authorId: "parent-author",
         });
         const savedComment = buildComment({ id: "reply-1" });
@@ -171,7 +171,7 @@ describe("CreateCommentUseCase", () => {
 
         await useCase.execute({
             content: "Reply",
-            postId: "post-1",
+            target: { type: "POST" as const, id: "post-1" },
             authorId: "user-1",
             parentId: "parent-1",
         });
@@ -190,7 +190,7 @@ describe("CreateCommentUseCase", () => {
     it("should not send notification when replying to own comment", async () => {
         const parentComment = buildComment({
             id: "parent-1",
-            postId: "post-1",
+            target: { type: "POST" as const, id: "post-1" },
             authorId: "user-1",
         });
         const savedComment = buildComment({ id: "reply-1" });
@@ -207,7 +207,7 @@ describe("CreateCommentUseCase", () => {
 
         await useCase.execute({
             content: "Self reply",
-            postId: "post-1",
+            target: { type: "POST" as const, id: "post-1" },
             authorId: "user-1",
             parentId: "parent-1",
         });

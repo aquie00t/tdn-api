@@ -70,6 +70,7 @@ export function buildComment(overrides: Partial<CommentProps> = {}): Comment {
         id: "comment-1",
         content: "Test comment",
         postId: "post-1",
+        articleId: null,
         authorId: "user-1",
         parentId: null,
         createdAt: new Date("2024-01-01T00:00:00Z"),

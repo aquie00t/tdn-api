@@ -4,6 +4,23 @@
  */
 import type { Comment } from "@core/domain/entities/comment.entity";
 
+/** What a comment can be attached to. */
+export type CommentTargetType = "POST" | "ARTICLE";
+
+/**
+ * A comment target: the kind of thing being commented on, and its id.
+ *
+ * Callers pass this instead of a bare id so a post id can never be read as an
+ * article id by a signature that takes both.
+ */
+export interface CommentTarget {
+    /** Whether the comment hangs off a post or an article */
+    type: CommentTargetType;
+
+    /** Identifier of the post or article */
+    id: string;
+}
+
 export interface ICommentRepository {
     /**
      * Creates a new comment and increments the post's comment count
@@ -22,6 +39,10 @@ export interface ICommentRepository {
 
     /**
      * Retrieves top-level comments for a post (where parentId is null)
+     *
+     * @deprecated Prefer findTopLevelByTarget; kept so the post comment path
+     * is untouched by the polymorphic change, and removed once that path moves
+     * over.
      * @param postId - The ID of the post to get comments for
      * @param limit - Maximum number of comments to return
      * @param offset - Number of comments to skip for pagination
@@ -34,6 +55,28 @@ export interface ICommentRepository {
         offset: number,
         currentUserId?: string,
     ): Promise<Comment[]>;
+
+    /**
+     * Retrieves top-level comments for a post or an article
+     * @param target - What the comments are attached to
+     * @param limit - Maximum number of comments to return
+     * @param offset - Number of comments to skip for pagination
+     * @param currentUserId - Optional ID of the current user for like/bookmark status
+     * @returns Promise that resolves to an array of top-level comments
+     */
+    findTopLevelByTarget(
+        target: CommentTarget,
+        limit: number,
+        offset: number,
+        currentUserId?: string,
+    ): Promise<Comment[]>;
+
+    /**
+     * Counts the comments attached to a post or an article, replies included
+     * @param target - What the comments are attached to
+     * @returns Promise that resolves to the number of comments
+     */
+    countByTarget(target: CommentTarget): Promise<number>;
 
     /**
      * Retrieves replies for a specific parent comment

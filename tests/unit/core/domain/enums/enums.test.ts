@@ -74,8 +74,12 @@ describe("Domain Enums", () => {
             expect(NotificationType.COMMENT_LIKE).toBe("COMMENT_LIKE");
         });
 
-        it("should have exactly 5 values", () => {
-            expect(Object.keys(NotificationType)).toHaveLength(5);
+        it("should have COMMENT_REPLY value", () => {
+            expect(NotificationType.COMMENT_REPLY).toBe("COMMENT_REPLY");
+        });
+
+        it("should have exactly 6 values", () => {
+            expect(Object.keys(NotificationType)).toHaveLength(6);
         });
     });
 
