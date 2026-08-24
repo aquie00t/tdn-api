@@ -2,6 +2,7 @@ import {
     randomInt,
     createHash,
     randomBytes,
+    randomUUID,
     timingSafeEqual as cryptoTimingSafeEqual,
 } from "crypto";
 import type { CryptoPort } from "@core/ports/services/crypto.port";
@@ -9,6 +10,10 @@ import type { CryptoPort } from "@core/ports/services/crypto.port";
 export class CryptoService implements CryptoPort {
     generateRandomHex(bytes: number): string {
         return randomBytes(bytes).toString("hex");
+    }
+
+    generateUuid(): string {
+        return randomUUID();
     }
 
     generateOtp(length: number = 8): string {

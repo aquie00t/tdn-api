@@ -7,6 +7,8 @@ import type { DeleteArticleUseCase } from "@core/use-cases/article/delete-articl
 import type { GetArticlesUseCase } from "@core/use-cases/article/get-articles";
 import type { GetArticleUseCase } from "@core/use-cases/article/get-article";
 import type { GetMyArticlesUseCase } from "@core/use-cases/article/get-my-articles";
+import type { UploadArticleCoverUseCase } from "@core/use-cases/article/upload-article-cover";
+import { NoMediaProvidedError } from "@core/errors";
 import { ArticlePrismaMapper } from "@infrastructure/persistence/mappers/article-prisma.mapper";
 import type { CreateArticleBody } from "@typings/schemas/article/create-article.schema";
 import type { UpdateArticleBody } from "@typings/schemas/article/update-article.schema";
@@ -33,6 +35,7 @@ export class ArticleController {
      * @param getArticlesUseCase - Use case for the public article list
      * @param getArticleUseCase - Use case for reading one article by slug
      * @param getMyArticlesUseCase - Use case for an author's own articles
+     * @param uploadArticleCoverUseCase - Use case for storing a cover image
      */
     constructor(
         private readonly createArticleUseCase: CreateArticleUseCase,
@@ -43,6 +46,7 @@ export class ArticleController {
         private readonly getArticlesUseCase: GetArticlesUseCase,
         private readonly getArticleUseCase: GetArticleUseCase,
         private readonly getMyArticlesUseCase: GetMyArticlesUseCase,
+        private readonly uploadArticleCoverUseCase: UploadArticleCoverUseCase,
     ) {}
 
     /**
@@ -279,6 +283,49 @@ export class ArticleController {
                 this.cdnUrl(request),
                 viewerId,
             ),
+            meta: { timestamp: new Date().toISOString() },
+        });
+    }
+
+    /**
+     * Stores a cover image and returns the key the article body accepts.
+     *
+     * Only the bytes are passed on: the multipart part's mimetype and filename
+     * are both client-controlled and neither is forwarded anywhere.
+     *
+     * @param request - A multipart request carrying exactly one file
+     * @param reply - The Fastify reply object
+     * @returns A 200 response with the storage key and its public URL
+     */
+    async uploadCover(
+        request: FastifyRequest,
+        reply: FastifyReply,
+    ): Promise<void> {
+        if (!request.isMultipart()) {
+            throw new NoMediaProvidedError(
+                "Please send a multipart/form-data request with one image file.",
+            );
+        }
+
+        const file = await request.file();
+
+        if (!file) {
+            throw new NoMediaProvidedError("No cover image was provided.");
+        }
+
+        const fileBuffer = await file.toBuffer();
+
+        const coverImageKey = await this.uploadArticleCoverUseCase.execute({
+            userId: request.user.id,
+            fileBuffer,
+            truncated: file.file.truncated,
+        });
+
+        return reply.status(200).send({
+            data: {
+                coverImageKey,
+                coverImageUrl: this.cdnUrl(request) + "/" + coverImageKey,
+            },
             meta: { timestamp: new Date().toISOString() },
         });
     }

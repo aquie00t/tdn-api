@@ -64,6 +64,7 @@ import { DeleteArticleUseCase } from "@core/use-cases/article/delete-article";
 import { GetArticlesUseCase } from "@core/use-cases/article/get-articles";
 import { GetArticleUseCase } from "@core/use-cases/article/get-article";
 import { GetMyArticlesUseCase } from "@core/use-cases/article/get-my-articles";
+import { UploadArticleCoverUseCase } from "@core/use-cases/article/upload-article-cover";
 
 /**
  * Dependency injection module for use cases
@@ -452,4 +453,9 @@ export const useCasesModule = {
      * Use case for an author's own article list
      */
     getMyArticlesUseCase: asClass(GetMyArticlesUseCase).singleton(),
+
+    /**
+     * Use case for storing an article cover image
+     */
+    uploadArticleCoverUseCase: asClass(UploadArticleCoverUseCase).singleton(),
 };

@@ -27,6 +27,13 @@ export interface CryptoPort {
     generateRandomHex(bytes: number): string;
 
     /**
+     * Generates a random UUID.
+     *
+     * @returns A version 4 UUID string.
+     */
+    generateUuid(): string;
+
+    /**
      * Compares two strings in constant time to prevent timing attacks.
      *
      * @param a - First string to compare.
