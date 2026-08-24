@@ -1,3 +1,15 @@
+# [1.1.0](https://github.com/the-developer-network/tdn-api/compare/v1.0.5...v1.1.0) (2026-08-24)
+
+
+### Bug Fixes
+
+* **db:** restore foreign keys that were never created ([#206](https://github.com/the-developer-network/tdn-api/issues/206)) ([3f185a3](https://github.com/the-developer-network/tdn-api/commit/3f185a30ef4a2693f7e817f133880bc9eb7e74b1))
+
+
+### Features
+
+* **article:** add Article schema, domain entity and repository ([#205](https://github.com/the-developer-network/tdn-api/issues/205)) ([99dbb2c](https://github.com/the-developer-network/tdn-api/commit/99dbb2c7b35ed7292fa72011316a044b4501d7b6))
+
 ## [1.0.5](https://github.com/the-developer-network/tdn-api/compare/v1.0.4...v1.0.5) (2026-08-24)
 
 
