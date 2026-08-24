@@ -22,6 +22,20 @@ import {
     updateArticleBodySchema,
     type UpdateArticleBody,
 } from "@typings/schemas/article/update-article.schema";
+import {
+    getArticlesQuerySchema,
+    GetArticlesResponseSchema,
+    type GetArticlesQuery,
+    type GetArticlesResponse,
+} from "@typings/schemas/article/get-articles.schema";
+import {
+    getArticleParamsSchema,
+    type GetArticleParams,
+} from "@typings/schemas/article/get-article.schema";
+import {
+    getMyArticlesQuerySchema,
+    type GetMyArticlesQuery,
+} from "@typings/schemas/article/get-my-articles.schema";
 
 /**
  * Registers the article write endpoints.
@@ -34,6 +48,59 @@ import {
  */
 export function articleRoutes(fastify: FastifyInstance): void {
     const { articleController } = fastify.diContainer.cradle;
+
+    // Read routes are declared first for readability only: find-my-way scores
+    // the static "me" segment above the ":slug" parameter regardless of order.
+    fastify.get<{
+        Querystring: GetArticlesQuery;
+        Reply: { 200: GetArticlesResponse };
+    }>(
+        "/articles",
+        {
+            onRequest: [fastify.optionalAuthenticate],
+            schema: {
+                querystring: getArticlesQuerySchema,
+                response: { 200: GetArticlesResponseSchema },
+                tags: ["Article"],
+            },
+            config: { rateLimit: RateLimitPolicies.PUBLIC },
+        },
+        articleController.list.bind(articleController),
+    );
+
+    fastify.get<{
+        Querystring: GetMyArticlesQuery;
+        Reply: { 200: GetArticlesResponse };
+    }>(
+        "/articles/me",
+        {
+            onRequest: [fastify.authenticate],
+            schema: {
+                querystring: getMyArticlesQuerySchema,
+                response: { 200: GetArticlesResponseSchema },
+                tags: ["Article"],
+            },
+            config: { rateLimit: RateLimitPolicies.STANDARD },
+        },
+        articleController.mine.bind(articleController),
+    );
+
+    fastify.get<{
+        Params: GetArticleParams;
+        Reply: { 200: ArticleResponse };
+    }>(
+        "/articles/:slug",
+        {
+            onRequest: [fastify.optionalAuthenticate],
+            schema: {
+                params: getArticleParamsSchema,
+                response: { 200: ArticleResponseSchema },
+                tags: ["Article"],
+            },
+            config: { rateLimit: RateLimitPolicies.PUBLIC },
+        },
+        articleController.detail.bind(articleController),
+    );
 
     fastify.post<{ Body: CreateArticleBody; Reply: { 201: ArticleResponse } }>(
         "/articles",
