@@ -33,5 +33,6 @@ export * from "./common/bad-request.error";
 export * from "./common/conflict.error";
 export * from "./common/custom.error";
 export * from "./common/not-found.error";
+export * from "./common/payload-too-large.error";
 export * from "./common/forbidden.error";
 export * from "./common/translation-failed.error";

@@ -36,6 +36,7 @@ import {
     getMyArticlesQuerySchema,
     type GetMyArticlesQuery,
 } from "@typings/schemas/article/get-my-articles.schema";
+import { UploadCoverResponseSchema } from "@typings/schemas/article/upload-cover.schema";
 
 /**
  * Registers the article write endpoints.
@@ -115,6 +116,21 @@ export function articleRoutes(fastify: FastifyInstance): void {
             config: { rateLimit: RateLimitPolicies.SENSITIVE },
         },
         articleController.create.bind(articleController),
+    );
+
+    // No body schema: declaring one would make Fastify try to validate a
+    // multipart stream. The file is validated by its bytes in the use case.
+    fastify.post(
+        "/articles/cover",
+        {
+            onRequest: [fastify.authenticate],
+            schema: {
+                response: { 200: UploadCoverResponseSchema },
+                tags: ["Article"],
+            },
+            config: { rateLimit: RateLimitPolicies.SENSITIVE },
+        },
+        articleController.uploadCover.bind(articleController),
     );
 
     fastify.patch<{
