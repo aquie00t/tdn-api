@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/the-developer-network/tdn-api/compare/v1.3.0...v1.4.0) (2026-08-24)
+
+
+### Features
+
+* **article:** add cover image upload ([#209](https://github.com/the-developer-network/tdn-api/issues/209)) ([91de09a](https://github.com/the-developer-network/tdn-api/commit/91de09a071b18141596331ab34d6e8f37df50e1a))
+
 # [1.3.0](https://github.com/the-developer-network/tdn-api/compare/v1.2.0...v1.3.0) (2026-08-24)
 
 
