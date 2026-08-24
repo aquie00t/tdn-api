@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/the-developer-network/tdn-api/compare/v1.1.0...v1.2.0) (2026-08-24)
+
+
+### Features
+
+* **article:** add the article write path ([#207](https://github.com/the-developer-network/tdn-api/issues/207)) ([5802945](https://github.com/the-developer-network/tdn-api/commit/58029459c2271a383c7934be84dbbb9c2e056c56))
+
 # [1.1.0](https://github.com/the-developer-network/tdn-api/compare/v1.0.5...v1.1.0) (2026-08-24)
 
 
