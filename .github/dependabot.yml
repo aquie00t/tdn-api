@@ -6,12 +6,56 @@ updates:
           interval: "weekly"
           day: "monday"
           time: "09:00"
-      open-pull-requests-limit: 5
+      open-pull-requests-limit: 10
       commit-message:
           prefix: "chore"
       labels:
           - "dependencies"
           - "dependabot"
+      # Grouping serves two purposes here:
+      # 1. Every PR touches pnpm-lock.yaml — ungrouped PRs invalidate each
+      #    other's lockfile as soon as one merges (ERR_PNPM_OUTDATED_LOCKFILE).
+      # 2. Peer-coupled packages (vitest/@vitest/coverage-v8, prisma/@prisma/*)
+      #    must move in the same commit or the install/test step breaks.
+      groups:
+          prisma:
+              patterns:
+                  - "prisma"
+                  - "@prisma/*"
+          # @vitest/coverage-v8 carries an exact peer dependency on vitest
+          vitest:
+              patterns:
+                  - "vitest"
+                  - "@vitest/*"
+                  - "vite"
+          fastify:
+              patterns:
+                  - "fastify"
+                  - "fastify-plugin"
+                  - "@fastify/*"
+          linting:
+              patterns:
+                  - "eslint"
+                  - "@eslint/*"
+                  - "typescript-eslint"
+                  - "eslint-config-prettier"
+                  - "prettier"
+                  - "globals"
+          types:
+              patterns:
+                  - "@types/*"
+          # Everything else: one PR for patch/minor, majors stay separate
+          production-dependencies:
+              dependency-type: "production"
+              update-types:
+                  - "minor"
+                  - "patch"
+          development-dependencies:
+              dependency-type: "development"
+              update-types:
+                  - "minor"
+                  - "patch"
+
     - package-ecosystem: "github-actions"
       directory: "/"
       schedule:
@@ -24,6 +68,11 @@ updates:
       labels:
           - "dependencies"
           - "dependabot"
+      groups:
+          github-actions:
+              patterns:
+                  - "*"
+
     - package-ecosystem: "docker"
       directory: "/"
       schedule:
@@ -36,3 +85,13 @@ updates:
       labels:
           - "dependencies"
           - "dependabot"
+      # The Node base image is pinned to match engines.node / .nvmrc —
+      # a major bump needs those updated in the same PR, so review manually.
+      ignore:
+          - dependency-name: "node"
+            update-types:
+                - "version-update:semver-major"
+      groups:
+          docker:
+              patterns:
+                  - "*"
