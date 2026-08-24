@@ -23,7 +23,8 @@
         "migrate-bots": "cross-env DOTENV_CONFIG_PATH=.env.production tsx scripts/migrate-bots.ts",
         "db:deploy": "prisma migrate deploy",
         "db:generate": "prisma generate",
-        "db:studio": "prisma studio"
+        "db:studio": "prisma studio",
+        "db:repair-fks": "tsx scripts/repair-foreign-keys.ts"
     },
     "keywords": [
         "tdn-api",
