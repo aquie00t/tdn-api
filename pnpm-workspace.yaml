@@ -17,6 +17,7 @@ overrides:
   fast-uri: '>=3.1.5' # was >=3.1.2, below the patched range
   vite: 8.0.16 # kept exact: mirrors the devDependency
   ws: '>=8.21.0' # was >=8.20.1, below the patched range
+  deepmerge-ts: '>=8.0.0' # GHSA DoS via recursive graphs; @prisma/config pins 7.1.5 exactly
 
 allowBuilds:
   '@prisma/engines': true
