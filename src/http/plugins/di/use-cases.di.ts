@@ -56,6 +56,11 @@ import { GetTrendsUseCase } from "@core/use-cases/post/get-trends";
 import { SearchTagsUseCase } from "@core/use-cases/tag/search-tag";
 import { GetSuggestedUsersUseCase } from "@core/use-cases/profile/get-suggested-users";
 import { TranslateUseCase } from "@core/use-cases/translate";
+import { CreateArticleUseCase } from "@core/use-cases/article/create-article";
+import { UpdateArticleUseCase } from "@core/use-cases/article/update-article";
+import { PublishArticleUseCase } from "@core/use-cases/article/publish-article";
+import { ArchiveArticleUseCase } from "@core/use-cases/article/archive-article";
+import { DeleteArticleUseCase } from "@core/use-cases/article/delete-article";
 
 /**
  * Dependency injection module for use cases
@@ -404,4 +409,29 @@ export const useCasesModule = {
     searchTagsUseCase: asClass(SearchTagsUseCase).singleton(),
     getSuggestedUsersUseCase: asClass(GetSuggestedUsersUseCase).singleton(),
     translateUseCase: asClass(TranslateUseCase).singleton(),
+
+    /**
+     * Use case for creating a draft article
+     */
+    createArticleUseCase: asClass(CreateArticleUseCase).singleton(),
+
+    /**
+     * Use case for editing an article
+     */
+    updateArticleUseCase: asClass(UpdateArticleUseCase).singleton(),
+
+    /**
+     * Use case for publishing an article
+     */
+    publishArticleUseCase: asClass(PublishArticleUseCase).singleton(),
+
+    /**
+     * Use case for archiving an article
+     */
+    archiveArticleUseCase: asClass(ArchiveArticleUseCase).singleton(),
+
+    /**
+     * Use case for deleting an article
+     */
+    deleteArticleUseCase: asClass(DeleteArticleUseCase).singleton(),
 };

@@ -11,6 +11,7 @@ import { CommentController } from "@controllers/comment.controller";
 import { BookmarkController } from "@controllers/bookmark.controller";
 import { TrendController } from "@controllers/trend.controller";
 import { TranslationController } from "@controllers/translation.controller";
+import { ArticleController } from "@controllers/article.controller";
 
 /**
  * Dependency injection module for controllers
@@ -57,4 +58,5 @@ export const controllersModule = {
     bookmarkController: asClass(BookmarkController).singleton(),
     trendController: asClass(TrendController).singleton(),
     translationController: asClass(TranslationController).singleton(),
+    articleController: asClass(ArticleController).singleton(),
 };

@@ -25,6 +25,9 @@ export * from "./post/invalid-media-type.error";
 export * from "./post/media-limit-exceeded.error";
 export * from "./post/no-media-provided.error";
 
+// Article errors
+export * from "./article/invalid-article-state.error";
+
 // Common HTTP errors
 export * from "./common/bad-request.error";
 export * from "./common/conflict.error";

@@ -16,6 +16,7 @@ import type { BookmarkController } from "@controllers/bookmark.controller";
 import type { TrendController } from "@controllers/trend.controller";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { TranslationController } from "@controllers/translation.controller";
+import type { ArticleController } from "@controllers/article.controller";
 /**
  * Fastify Awilix cradle interface for dependency injection
  * Defines all injectable services and components available in the application
@@ -75,6 +76,9 @@ declare module "@fastify/awilix" {
 
         /** Controller for translation operations */
         translationController: TranslationController;
+
+        /** Controller for article write operations */
+        articleController: ArticleController;
     }
 }
 
