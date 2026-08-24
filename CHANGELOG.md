@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/the-developer-network/tdn-api/compare/v1.0.2...v1.0.3) (2026-08-24)
+
+
+### Bug Fixes
+
+* **deps:** raise lodash override above GHSA-r5fr-rjxr-66jc ([#198](https://github.com/the-developer-network/tdn-api/issues/198)) ([ade9307](https://github.com/the-developer-network/tdn-api/commit/ade93076b14ae550d7efec061c813a1bf2e23cb0)), closes [#187](https://github.com/the-developer-network/tdn-api/issues/187)
+
 ## [1.0.2](https://github.com/the-developer-network/tdn-api/compare/v1.0.1...v1.0.2) (2026-08-24)
 
 
