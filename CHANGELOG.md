@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/the-developer-network/tdn-api/compare/v1.0.3...v1.0.4) (2026-08-24)
+
+
+### Bug Fixes
+
+* **deps:** override deepmerge-ts to a patched version ([#203](https://github.com/the-developer-network/tdn-api/issues/203)) ([5abad44](https://github.com/the-developer-network/tdn-api/commit/5abad44b0f40e4445454cf03c725b8591ec60db7))
+
 ## [1.0.3](https://github.com/the-developer-network/tdn-api/compare/v1.0.2...v1.0.3) (2026-08-24)
 
 
