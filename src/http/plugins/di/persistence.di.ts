@@ -13,6 +13,7 @@ import { PrismaBookmarkRepository } from "@infrastructure/persistence/repositori
 import { PrismaCommentRepository } from "@infrastructure/persistence/repositories/prisma-comment.repository";
 import { PrismaCommentBookmarkRepository } from "@infrastructure/persistence/repositories/prisma-comment-bookmark.repository";
 import { PrismaTagRepository } from "@infrastructure/persistence/repositories/prisma-tag.repository";
+import { PrismaArticleRepository } from "@infrastructure/persistence/repositories/prisma-article.repository";
 
 /**
  * Dependency injection module for persistence layer
@@ -104,4 +105,9 @@ export const persistenceModule = {
     ).singleton(),
     /* Tags act as their own trends/categories in the modern architecture, so we can omit a separate category repository. --- IGNORE --- */
     tagRepository: asClass(PrismaTagRepository).singleton(),
+
+    /**
+     * Article repository for managing long-form article persistence
+     */
+    articleRepository: asClass(PrismaArticleRepository).singleton(),
 };
