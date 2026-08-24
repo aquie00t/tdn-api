@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/the-developer-network/tdn-api/compare/v1.0.4...v1.0.5) (2026-08-24)
+
+
+### Bug Fixes
+
+* **deps:** bump @fastify/swagger-ui to 6.x for the @fastify/static advisory ([#204](https://github.com/the-developer-network/tdn-api/issues/204)) ([60a05d2](https://github.com/the-developer-network/tdn-api/commit/60a05d2d1334d544d9b816ff1150231a77ef45ba))
+
 ## [1.0.4](https://github.com/the-developer-network/tdn-api/compare/v1.0.3...v1.0.4) (2026-08-24)
 
 
