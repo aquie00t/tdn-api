@@ -50,13 +50,11 @@ export class PrismaTagRepository implements ITagRepository {
         });
 
         return rawTags
-            .map(
-                (tag): TrendItem => ({
-                    tag: tag.name,
-                    postCount: tag.posts.length,
-                    category: null,
-                }),
-            )
+            .map((tag): TrendItem => ({
+                tag: tag.name,
+                postCount: tag.posts.length,
+                category: null,
+            }))
             .sort((a, b) => b.postCount - a.postCount)
             .slice(0, limit);
     }
@@ -83,12 +81,10 @@ export class PrismaTagRepository implements ITagRepository {
             take: limit,
         });
 
-        return rawTags.map(
-            (tag): TagSearchItem => ({
-                name: tag.name,
-                postCount: tag._count.posts,
-                category: null,
-            }),
-        );
+        return rawTags.map((tag): TagSearchItem => ({
+            name: tag.name,
+            postCount: tag._count.posts,
+            category: null,
+        }));
     }
 }
