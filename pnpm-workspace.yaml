@@ -1,3 +1,23 @@
+# pnpm 11 reads overrides from here, NOT from the "pnpm" field in package.json.
+# Keeping them in package.json makes pnpm ignore them silently (they only show
+# up as a warning), which leaves the pinned advisories unpatched in the tree.
+#
+# Security floors: use ">=" rather than an exact pin. An exact pin both blocks
+# the next patch release and forces a downgrade of whatever dependabot merged.
+overrides:
+  hono: '>=4.12.25' # GHSA advisory, was pinned at 4.12.18
+  '@hono/node-server': 1.19.13
+  fast-xml-parser: ^5.5.7
+  lodash: 4.17.23
+  effect: 3.20.0
+  picomatch: ^4.0.4
+  yaml: ^2.8.3
+  brace-expansion: '>=5.0.9' # was ^5.0.5, below the patched range
+  fast-jwt: 6.2.4
+  fast-uri: '>=3.1.5' # was >=3.1.2, below the patched range
+  vite: 8.0.16 # kept exact: mirrors the devDependency
+  ws: '>=8.21.0' # was >=8.20.1, below the patched range
+
 allowBuilds:
   '@prisma/engines': true
   argon2: true
