@@ -42,11 +42,11 @@ jobs:
             - name: Set up Node.js
               uses: actions/setup-node@v6
               with:
-                  node-version: "24"
+                  node-version-file: ".nvmrc"
                   cache: "pnpm"
 
             - name: Install Dependencies
-              run: pnpm install
+              run: pnpm install --frozen-lockfile
 
             - name: Generate Prisma Client
               run: pnpm prisma generate
@@ -60,8 +60,12 @@ jobs:
             - name: Run Build
               run: pnpm build
 
+            # Advisory-driven: a new CVE published upstream can turn an unrelated
+            # PR red without anything in it changing. Reported, but not blocking —
+            # security.yml runs dependency-review on PRs and a weekly scan.
             - name: Audit Dependencies
               run: pnpm audit --audit-level=high
+              continue-on-error: true
 
     test-unit:
         name: Unit Tests
@@ -77,11 +81,11 @@ jobs:
             - name: Set up Node.js
               uses: actions/setup-node@v6
               with:
-                  node-version: "24"
+                  node-version-file: ".nvmrc"
                   cache: "pnpm"
 
             - name: Install Dependencies
-              run: pnpm install
+              run: pnpm install --frozen-lockfile
 
             - name: Generate Prisma Client
               run: pnpm prisma generate
@@ -122,11 +126,11 @@ jobs:
             - name: Set up Node.js
               uses: actions/setup-node@v6
               with:
-                  node-version: "24"
+                  node-version-file: ".nvmrc"
                   cache: "pnpm"
 
             - name: Install Dependencies
-              run: pnpm install
+              run: pnpm install --frozen-lockfile
 
             - name: Generate Prisma Client
               run: pnpm prisma generate
@@ -174,11 +178,11 @@ jobs:
             - name: Set up Node.js
               uses: actions/setup-node@v6
               with:
-                  node-version: "24"
+                  node-version-file: ".nvmrc"
                   cache: "pnpm"
 
             - name: Install Dependencies
-              run: pnpm install
+              run: pnpm install --frozen-lockfile
 
             - name: Generate Prisma Client
               run: pnpm prisma generate
