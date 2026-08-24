@@ -61,6 +61,9 @@ import { UpdateArticleUseCase } from "@core/use-cases/article/update-article";
 import { PublishArticleUseCase } from "@core/use-cases/article/publish-article";
 import { ArchiveArticleUseCase } from "@core/use-cases/article/archive-article";
 import { DeleteArticleUseCase } from "@core/use-cases/article/delete-article";
+import { GetArticlesUseCase } from "@core/use-cases/article/get-articles";
+import { GetArticleUseCase } from "@core/use-cases/article/get-article";
+import { GetMyArticlesUseCase } from "@core/use-cases/article/get-my-articles";
 
 /**
  * Dependency injection module for use cases
@@ -434,4 +437,19 @@ export const useCasesModule = {
      * Use case for deleting an article
      */
     deleteArticleUseCase: asClass(DeleteArticleUseCase).singleton(),
+
+    /**
+     * Use case for the public article list
+     */
+    getArticlesUseCase: asClass(GetArticlesUseCase).singleton(),
+
+    /**
+     * Use case for reading a single article by slug
+     */
+    getArticleUseCase: asClass(GetArticleUseCase).singleton(),
+
+    /**
+     * Use case for an author's own article list
+     */
+    getMyArticlesUseCase: asClass(GetMyArticlesUseCase).singleton(),
 };

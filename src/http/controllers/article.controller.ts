@@ -4,10 +4,16 @@ import type { UpdateArticleUseCase } from "@core/use-cases/article/update-articl
 import type { PublishArticleUseCase } from "@core/use-cases/article/publish-article";
 import type { ArchiveArticleUseCase } from "@core/use-cases/article/archive-article";
 import type { DeleteArticleUseCase } from "@core/use-cases/article/delete-article";
+import type { GetArticlesUseCase } from "@core/use-cases/article/get-articles";
+import type { GetArticleUseCase } from "@core/use-cases/article/get-article";
+import type { GetMyArticlesUseCase } from "@core/use-cases/article/get-my-articles";
 import { ArticlePrismaMapper } from "@infrastructure/persistence/mappers/article-prisma.mapper";
 import type { CreateArticleBody } from "@typings/schemas/article/create-article.schema";
 import type { UpdateArticleBody } from "@typings/schemas/article/update-article.schema";
 import type { ArticleIdParams } from "@typings/schemas/article/article-params.schema";
+import type { GetArticlesQuery } from "@typings/schemas/article/get-articles.schema";
+import type { GetArticleParams } from "@typings/schemas/article/get-article.schema";
+import type { GetMyArticlesQuery } from "@typings/schemas/article/get-my-articles.schema";
 
 /**
  * Controller for article write operations.
@@ -24,6 +30,9 @@ export class ArticleController {
      * @param publishArticleUseCase - Use case for publishing an article
      * @param archiveArticleUseCase - Use case for archiving an article
      * @param deleteArticleUseCase - Use case for deleting an article
+     * @param getArticlesUseCase - Use case for the public article list
+     * @param getArticleUseCase - Use case for reading one article by slug
+     * @param getMyArticlesUseCase - Use case for an author's own articles
      */
     constructor(
         private readonly createArticleUseCase: CreateArticleUseCase,
@@ -31,6 +40,9 @@ export class ArticleController {
         private readonly publishArticleUseCase: PublishArticleUseCase,
         private readonly archiveArticleUseCase: ArchiveArticleUseCase,
         private readonly deleteArticleUseCase: DeleteArticleUseCase,
+        private readonly getArticlesUseCase: GetArticlesUseCase,
+        private readonly getArticleUseCase: GetArticleUseCase,
+        private readonly getMyArticlesUseCase: GetMyArticlesUseCase,
     ) {}
 
     /**
@@ -166,6 +178,109 @@ export class ArticleController {
         });
 
         return reply.status(204).send();
+    }
+
+    /**
+     * Returns a page of published articles.
+     *
+     * @param request - Request carrying the pagination and filter query
+     * @param reply - The Fastify reply object
+     * @returns A 200 response with the page and its counts
+     */
+    async list(
+        request: FastifyRequest<{ Querystring: GetArticlesQuery }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        const currentUserId = request.user?.id;
+        const { page = 1, limit = 10 } = request.query;
+
+        const result = await this.getArticlesUseCase.execute({
+            ...request.query,
+            page,
+            limit,
+            currentUserId,
+        });
+
+        return reply.status(200).send({
+            data: ArticlePrismaMapper.toListResponse(
+                result.articles,
+                this.cdnUrl(request),
+                currentUserId,
+            ),
+            meta: {
+                total: result.total,
+                currentPage: page,
+                limit,
+                totalPages: Math.ceil(result.total / limit),
+            },
+        });
+    }
+
+    /**
+     * Returns the authenticated author's own articles, drafts included.
+     *
+     * The author is read from the token, so this cannot be pointed at another
+     * user by changing a parameter.
+     *
+     * @param request - Request carrying the pagination and status query
+     * @param reply - The Fastify reply object
+     * @returns A 200 response with the page and its counts
+     */
+    async mine(
+        request: FastifyRequest<{ Querystring: GetMyArticlesQuery }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        const authorId = request.user.id;
+        const { page = 1, limit = 10, status } = request.query;
+
+        const result = await this.getMyArticlesUseCase.execute({
+            authorId,
+            page,
+            limit,
+            status,
+        });
+
+        return reply.status(200).send({
+            data: ArticlePrismaMapper.toListResponse(
+                result.articles,
+                this.cdnUrl(request),
+                authorId,
+            ),
+            meta: {
+                total: result.total,
+                currentPage: page,
+                limit,
+                totalPages: Math.ceil(result.total / limit),
+            },
+        });
+    }
+
+    /**
+     * Returns a single article by slug.
+     *
+     * @param request - Request carrying the slug
+     * @param reply - The Fastify reply object
+     * @returns A 200 response with the article
+     */
+    async detail(
+        request: FastifyRequest<{ Params: GetArticleParams }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        const viewerId = request.user?.id;
+
+        const article = await this.getArticleUseCase.execute({
+            slug: request.params.slug,
+            viewerId,
+        });
+
+        return reply.status(200).send({
+            data: ArticlePrismaMapper.toResponse(
+                article,
+                this.cdnUrl(request),
+                viewerId,
+            ),
+            meta: { timestamp: new Date().toISOString() },
+        });
     }
 
     /**
