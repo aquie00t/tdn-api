@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/the-developer-network/tdn-api/compare/v1.0.1...v1.0.2) (2026-08-24)
+
+
+### Bug Fixes
+
+* **deps:** apply pnpm overrides via pnpm-workspace.yaml ([#184](https://github.com/the-developer-network/tdn-api/issues/184)) ([cd9ef14](https://github.com/the-developer-network/tdn-api/commit/cd9ef148ec8bf7f0f50f0fb3b2036c80bc824e2b)), closes [#154](https://github.com/the-developer-network/tdn-api/issues/154) [#155](https://github.com/the-developer-network/tdn-api/issues/155)
+
 ## [1.0.1](https://github.com/the-developer-network/tdn-api/compare/v1.0.0...v1.0.1) (2026-05-18)
 
 
