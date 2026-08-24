@@ -88,8 +88,8 @@
         "tsx": "^4.22.3",
         "typescript": "^6.0.3",
         "typescript-eslint": "^8.60.1",
-        "vite": "8.0.16",
-        "vitest": "^4.1.8"
+        "vite": "8.2.2",
+        "vitest": "^4.1.11"
     },
     "engines": {
         "node": ">25"
