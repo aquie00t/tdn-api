@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/the-developer-network/tdn-api/compare/v1.4.0...v1.5.0) (2026-08-25)
+
+
+### Features
+
+* **article:** add comments on articles ([#211](https://github.com/the-developer-network/tdn-api/issues/211)) ([da44a3b](https://github.com/the-developer-network/tdn-api/commit/da44a3b08ae041a8851a068b28aabc7f86168691))
+
 # [1.4.0](https://github.com/the-developer-network/tdn-api/compare/v1.3.0...v1.4.0) (2026-08-24)
 
 
