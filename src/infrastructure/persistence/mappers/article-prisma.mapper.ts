@@ -48,6 +48,14 @@ export interface ArticleResponse {
 }
 
 /**
+ * The shape list endpoints return: everything except the markdown body.
+ *
+ * Declared as an Omit rather than a hand-written twin so a field added to the
+ * detail response cannot be forgotten here.
+ */
+export type ArticleSummaryResponse = Omit<ArticleResponse, "body">;
+
+/**
  * Mapper responsible for transforming Article data across layers.
  *
  * The markdown body passes through untouched in every direction. The API never
@@ -127,26 +135,30 @@ export class ArticlePrismaMapper {
     }
 
     /**
-     * Maps a domain entity to the public API response.
+     * Maps a domain entity to the list-sized response, without the body.
      *
-     * The cover image is stored as a storage key and only becomes a URL here,
+     * List endpoints return this shape: an article body can be 100 KB, and a
+     * page of fifty of them is megabytes of markdown nobody rendered. The
+     * cover image is stored as a storage key and only becomes a URL here,
      * which is what keeps arbitrary client-supplied URLs out of the database.
+     *
+     * Every shared field lives here rather than in both builders, so the
+     * summary and the detail shape cannot drift apart.
      *
      * @param article - The Article domain entity
      * @param cdnUrl - CDN base URL, without a trailing slash
      * @param currentUserId - Viewer used to resolve the isMe flag
-     * @returns A response object safe to serialize
+     * @returns A response object safe to serialize, minus the markdown body
      */
-    static toResponse(
+    static toSummaryResponse(
         article: Article,
         cdnUrl: string,
         currentUserId?: string,
-    ): ArticleResponse {
+    ): ArticleSummaryResponse {
         return {
             id: article.id,
             slug: article.slug,
             title: article.title,
-            body: article.body,
             excerpt: article.excerpt,
             coverImageUrl: article.coverImageKey
                 ? `${cdnUrl}/${article.coverImageKey}`
@@ -182,20 +194,42 @@ export class ArticlePrismaMapper {
     }
 
     /**
-     * Maps a list of domain entities to public API responses.
+     * Maps a domain entity to the full API response, body included.
+     *
+     * Used by the detail endpoint and by create, update, publish and archive,
+     * where the caller is working with one article and wants its markdown.
+     *
+     * @param article - The Article domain entity
+     * @param cdnUrl - CDN base URL, without a trailing slash
+     * @param currentUserId - Viewer used to resolve the isMe flag
+     * @returns A response object safe to serialize
+     */
+    static toResponse(
+        article: Article,
+        cdnUrl: string,
+        currentUserId?: string,
+    ): ArticleResponse {
+        return {
+            ...this.toSummaryResponse(article, cdnUrl, currentUserId),
+            body: article.body,
+        };
+    }
+
+    /**
+     * Maps a list of domain entities to list-sized API responses.
      *
      * @param articles - The Article domain entities
      * @param cdnUrl - CDN base URL, without a trailing slash
      * @param currentUserId - Viewer used to resolve the isMe flag
-     * @returns The response objects
+     * @returns The response objects, without their markdown bodies
      */
     static toListResponse(
         articles: Article[],
         cdnUrl: string,
         currentUserId?: string,
-    ): ArticleResponse[] {
+    ): ArticleSummaryResponse[] {
         return articles.map((article) =>
-            this.toResponse(article, cdnUrl, currentUserId),
+            this.toSummaryResponse(article, cdnUrl, currentUserId),
         );
     }
 }

@@ -120,6 +120,22 @@ describe("GET /articles", () => {
         expect(body.data.map((a) => a.id)).toContain(published.id);
     });
 
+    it("should not carry the markdown body in list items", async () => {
+        const response = await request({
+            method: "GET",
+            url: "/articles?limit=50",
+        });
+        const [first] = parseBody<ListEnvelope>(response).data;
+
+        // A body can be 100 KB; a page of fifty would be megabytes no list
+        // view renders. The summary keeps what a card needs instead.
+        expect(first).toBeDefined();
+        expect(first).not.toHaveProperty("body");
+        expect(first).toHaveProperty("excerpt");
+        expect(first).toHaveProperty("coverImageUrl");
+        expect(first).toHaveProperty("readingTimeMinutes");
+    });
+
     it("should never include drafts or archived articles", async () => {
         const response = await request({
             method: "GET",
@@ -196,6 +212,19 @@ describe("GET /articles/:slug", () => {
         expect(response.statusCode).toBe(200);
         expect(body.data.id).toBe(published.id);
         expect(body.data.author.isMe).toBe(false);
+    });
+
+    it("should carry the full markdown body, unlike the list", async () => {
+        const response = await request({
+            method: "GET",
+            url: `/articles/${published.slug}`,
+        });
+        const body = parseBody<{ data: { body: string } }>(response);
+
+        expect(response.statusCode).toBe(200);
+        expect(body.data).toHaveProperty("body");
+        expect(typeof body.data.body).toBe("string");
+        expect(body.data.body.length).toBeGreaterThan(0);
     });
 
     it("should hide a draft from a guest", async () => {
@@ -287,6 +316,17 @@ describe("GET /articles/me", () => {
         expect(ids).toContain(draft.id);
         expect(ids).toContain(published.id);
         expect(ids).toContain(archived.id);
+    });
+
+    it("should not carry the markdown body either", async () => {
+        const response = await authRequest(authorToken, {
+            method: "GET",
+            url: "/articles/me?limit=50",
+        });
+        const [first] = parseBody<ListEnvelope>(response).data;
+
+        expect(first).toBeDefined();
+        expect(first).not.toHaveProperty("body");
     });
 
     it("should filter by status", async () => {
