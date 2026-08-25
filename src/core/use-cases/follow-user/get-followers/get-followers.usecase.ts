@@ -1,4 +1,6 @@
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
+import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
+import { NotFoundError } from "@core/errors";
 import type { GetFollowersUseCaseOutput } from "./get-followers-usecase.output";
 import type { GetFollowersUseCaseInput } from "./get-followers-usecase.input";
 /**
@@ -12,8 +14,12 @@ export class GetFollowersUseCase {
      * Creates a new instance of GetFollowersUseCase.
      *
      * @param followUserRepository - Repository for managing follow relationships
+     * @param profileRepository - Repository used to resolve the username
      */
-    constructor(private readonly followUserRepository: IFollowRepository) {}
+    constructor(
+        private readonly followUserRepository: IFollowRepository,
+        private readonly profileRepository: IProfileRepository,
+    ) {}
 
     /**
      * Executes the get followers use case.
@@ -23,10 +29,16 @@ export class GetFollowersUseCase {
     async execute(
         input: GetFollowersUseCaseInput,
     ): Promise<GetFollowersUseCaseOutput[]> {
-        const { targetId, currentUserId, limit, offset } = input;
+        const { username, currentUserId, limit, offset } = input;
+
+        const profile = await this.profileRepository.findByUsername(username);
+
+        // Same error the controller's profile lookup used to raise, so an
+        // unknown username keeps answering 404 rather than an empty 200.
+        if (!profile) throw new NotFoundError("Profile not found.");
 
         const followers = await this.followUserRepository.getFollowers(
-            targetId,
+            profile.userId,
             limit,
             offset,
         );

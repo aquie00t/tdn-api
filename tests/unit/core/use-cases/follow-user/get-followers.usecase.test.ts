@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GetFollowersUseCase } from "@core/use-cases/follow-user/get-followers/get-followers.usecase";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
+import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
+import { NotFoundError } from "@core/errors";
+import { buildProfile } from "../../../helpers/mock-factories";
 
 const buildFollowerEntry = (userId: string) => ({
     userId,
@@ -16,9 +19,10 @@ describe("GetFollowersUseCase", () => {
         IFollowRepository,
         "getFollowers" | "checkIsFollowingBulk"
     >;
+    let profileRepo: Pick<IProfileRepository, "findByUsername">;
 
     const baseInput = {
-        targetId: "user-1",
+        username: "testuser",
         limit: 10,
         offset: 0,
         currentUserId: undefined,
@@ -29,7 +33,15 @@ describe("GetFollowersUseCase", () => {
             getFollowers: vi.fn(),
             checkIsFollowingBulk: vi.fn(),
         };
-        useCase = new GetFollowersUseCase(followRepo as IFollowRepository);
+        profileRepo = {
+            findByUsername: vi
+                .fn()
+                .mockResolvedValue(buildProfile({ userId: "user-1" })),
+        };
+        useCase = new GetFollowersUseCase(
+            followRepo as IFollowRepository,
+            profileRepo as IProfileRepository,
+        );
     });
 
     it("should return empty array when user has no followers", async () => {
@@ -95,5 +107,24 @@ describe("GetFollowersUseCase", () => {
         const other = result.find((r) => r.userId === "user-2");
         expect(me?.isMe).toBe(true);
         expect(other?.isMe).toBe(false);
+    });
+
+    it("should resolve the username to a user id before listing", async () => {
+        vi.mocked(followRepo.getFollowers).mockResolvedValue([]);
+
+        await useCase.execute(baseInput);
+
+        expect(profileRepo.findByUsername).toHaveBeenCalledWith("testuser");
+        expect(followRepo.getFollowers).toHaveBeenCalledWith("user-1", 10, 0);
+    });
+
+    it("should throw NotFoundError for an unknown username", async () => {
+        vi.mocked(profileRepo.findByUsername).mockResolvedValue(null);
+
+        // The controller used to raise this via a full profile load; the
+        // endpoint must keep answering 404 rather than an empty 200.
+        await expect(useCase.execute(baseInput)).rejects.toThrow(NotFoundError);
+
+        expect(followRepo.getFollowers).not.toHaveBeenCalled();
     });
 });
