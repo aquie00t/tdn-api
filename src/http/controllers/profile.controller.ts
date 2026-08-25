@@ -189,10 +189,8 @@ export class ProfileController {
         const { limit, offset } = request.query;
         const currentUserId = request.user?.id;
 
-        const { profile } = await this.getProfileUseCase.execute(username);
-
         const followers = await this.getFollowersUseCase.execute({
-            targetId: profile.userId,
+            username,
             currentUserId,
             limit,
             offset,
@@ -220,10 +218,8 @@ export class ProfileController {
         const { limit, offset } = request.query;
         const currentUserId = request.user?.id;
 
-        const { profile } = await this.getProfileUseCase.execute(username);
-
         const following = await this.getFollowingUseCase.execute({
-            targetId: profile.userId,
+            username,
             currentUserId,
             limit,
             offset,

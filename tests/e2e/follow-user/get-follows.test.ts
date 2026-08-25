@@ -80,6 +80,20 @@ describe("GET Follow Lists", () => {
     });
 
     describe("GET /profiles/:username/followers - Get User Followers", () => {
+        it("should return 404 for an unknown username", async () => {
+            // Username resolution moved into the use case; an unknown user
+            // must still be a 404 rather than a silently empty 200.
+            const response = await request({
+                method: "GET",
+                url: "/profiles/no_such_user_xyz/followers",
+            });
+
+            expect(response.statusCode).toBe(404);
+            expect(parseBody<{ title: string }>(response).title).toBe(
+                "NotFoundError",
+            );
+        });
+
         it("should return 200 with followers array and correct item shape", async () => {
             const response = await request({
                 method: "GET",
@@ -171,6 +185,20 @@ describe("GET Follow Lists", () => {
     });
 
     describe("GET /profiles/:username/following - Get User Following", () => {
+        it("should return 404 for an unknown username", async () => {
+            // Username resolution moved into the use case; an unknown user
+            // must still be a 404 rather than a silently empty 200.
+            const response = await request({
+                method: "GET",
+                url: "/profiles/no_such_user_xyz/following",
+            });
+
+            expect(response.statusCode).toBe(404);
+            expect(parseBody<{ title: string }>(response).title).toBe(
+                "NotFoundError",
+            );
+        });
+
         it("should return 200 with following array and correct item shape", async () => {
             const response = await request({
                 method: "GET",

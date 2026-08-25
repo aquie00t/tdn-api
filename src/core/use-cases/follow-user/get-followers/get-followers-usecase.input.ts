@@ -3,9 +3,13 @@
  */
 export interface GetFollowersUseCaseInput {
     /**
-     * The ID of the user whose followers are being retrieved. This is a required field.
+     * The username of the user whose followers are being retrieved.
+     *
+     * Resolved to a user id inside the use case. The controller used to do
+     * this by loading the whole profile, which also computed post and article
+     * counts that this endpoint never reads.
      */
-    targetId: string;
+    username: string;
     /**
      * The ID of the current user making the request. This is optional and is used to determine follow status for each follower. If provided, the response will indicate whether the current user follows each listed follower and whether any listed follower is the same as the current user.
      */
