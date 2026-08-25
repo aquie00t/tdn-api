@@ -17,7 +17,10 @@ export class GetTrendsUseCase {
 
     async execute(input: GetTrendsInput): Promise<GetTrendsOutput> {
         const limit = input.limit ?? 10;
-        const cacheKey = `trends:top:limit:${limit}:window:${TREND_WINDOW_DAYS}`;
+        // Versioned so entries cached before articleCount existed are not
+        // served after a deploy: the response schema requires the field, and a
+        // stale entry without it fails serialization rather than degrading.
+        const cacheKey = `trends:v2:top:limit:${limit}:window:${TREND_WINDOW_DAYS}`;
 
         const cached = await this.cacheService.get(cacheKey);
         if (cached) {

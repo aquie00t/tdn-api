@@ -55,7 +55,7 @@ describe("GetTrendsUseCase", () => {
         await useCase.execute({ limit: 5 });
 
         expect(cacheService.get).toHaveBeenCalledWith(
-            "trends:top:limit:5:window:7",
+            "trends:v2:top:limit:5:window:7",
         );
     });
 
@@ -63,7 +63,7 @@ describe("GetTrendsUseCase", () => {
         await useCase.execute({});
 
         expect(cacheService.get).toHaveBeenCalledWith(
-            "trends:top:limit:10:window:7",
+            "trends:v2:top:limit:10:window:7",
         );
         expect(tagRepository.findTrending).toHaveBeenCalledWith(
             expect.objectContaining({ limit: 10, windowDays: 7 }),
@@ -74,7 +74,7 @@ describe("GetTrendsUseCase", () => {
         await useCase.execute({ limit: 10 });
 
         expect(cacheService.set).toHaveBeenCalledWith(
-            "trends:top:limit:10:window:7",
+            "trends:v2:top:limit:10:window:7",
             JSON.stringify(mockTrends),
             300,
         );
