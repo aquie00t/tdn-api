@@ -1,3 +1,11 @@
+## [1.7.1](https://github.com/the-developer-network/tdn-api/compare/v1.7.0...v1.7.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **article:** reject cover uploads carrying more than one file ([#216](https://github.com/the-developer-network/tdn-api/issues/216)) ([2eaeb15](https://github.com/the-developer-network/tdn-api/commit/2eaeb15ac391919b9f16981a523a57dfc512be0c))
+* **test:** repair the unterminated string in the cover upload suite ([#217](https://github.com/the-developer-network/tdn-api/issues/217)) ([e4655ab](https://github.com/the-developer-network/tdn-api/commit/e4655ab98fb0b673b5db986fd64ed8b7f051089a)), closes [#216](https://github.com/the-developer-network/tdn-api/issues/216)
+
 # [1.7.0](https://github.com/the-developer-network/tdn-api/compare/v1.6.0...v1.7.0) (2026-08-25)
 
 
