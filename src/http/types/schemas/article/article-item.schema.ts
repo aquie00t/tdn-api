@@ -39,6 +39,17 @@ export const ArticleItemSchema = FBType.Object({
 
 export type ArticleItem = Static<typeof ArticleItemSchema>;
 
+/**
+ * The shape list endpoints return.
+ *
+ * A body can be 100 KB, so a page of fifty articles would be megabytes of
+ * markdown that no list view renders. Derived with Omit rather than written
+ * out again, so a field added above appears here automatically.
+ */
+export const ArticleSummarySchema = FBType.Omit(ArticleItemSchema, ["body"]);
+
+export type ArticleSummary = Static<typeof ArticleSummarySchema>;
+
 /** Envelope shared by create, update, publish and archive. */
 export const ArticleResponseSchema = ResponseSchema(ArticleItemSchema);
 export type ArticleResponse = Static<typeof ArticleResponseSchema>;

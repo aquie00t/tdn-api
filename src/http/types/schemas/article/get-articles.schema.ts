@@ -1,6 +1,6 @@
 import { Type, type Static } from "@fastify/type-provider-typebox";
 import { PostCategory } from "@core/domain/enums/post-category-enum";
-import { ArticleItemSchema } from "./article-item.schema";
+import { ArticleSummarySchema } from "./article-item.schema";
 
 export const getArticlesQuerySchema = Type.Object({
     page: Type.Optional(Type.Number({ minimum: 1, default: 1 })),
@@ -17,7 +17,7 @@ export type GetArticlesQuery = Static<typeof getArticlesQuerySchema>;
 
 /** Paginated envelope, hand-rolled because it carries counts rather than a timestamp. */
 export const GetArticlesResponseSchema = Type.Object({
-    data: Type.Array(ArticleItemSchema),
+    data: Type.Array(ArticleSummarySchema),
     meta: Type.Object({
         total: Type.Number(),
         currentPage: Type.Number(),
