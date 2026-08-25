@@ -48,22 +48,16 @@ function multipartMany(count: number): Buffer {
     for (let i = 0; i < count; i++) {
         parts.push(
             Buffer.from(
-                `--${BOUNDARY}
-` +
-                    `Content-Disposition: form-data; name="file"; filename="cover${i}.png"
-` +
-                    `Content-Type: image/png
-
-`,
+                `--${BOUNDARY}\r\n` +
+                    `Content-Disposition: form-data; name="file"; filename="cover${i}.png"\r\n` +
+                    `Content-Type: image/png\r\n\r\n`,
             ),
             Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, i]),
-            Buffer.from("
-"),
+            Buffer.from("\r\n"),
         );
     }
 
-    parts.push(Buffer.from(`--${BOUNDARY}--
-`));
+    parts.push(Buffer.from(`--${BOUNDARY}--\r\n`));
     return Buffer.concat(parts);
 }
 
