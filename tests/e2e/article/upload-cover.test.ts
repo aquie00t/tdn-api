@@ -39,6 +39,34 @@ const MULTIPART_HEADERS = {
     "content-type": `multipart/form-data; boundary=${BOUNDARY}`,
 };
 
+/**
+ * Builds a multipart body carrying several files under the same field name.
+ */
+function multipartMany(count: number): Buffer {
+    const parts: Buffer[] = [];
+
+    for (let i = 0; i < count; i++) {
+        parts.push(
+            Buffer.from(
+                `--${BOUNDARY}
+` +
+                    `Content-Disposition: form-data; name="file"; filename="cover${i}.png"
+` +
+                    `Content-Type: image/png
+
+`,
+            ),
+            Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, i]),
+            Buffer.from("
+"),
+        );
+    }
+
+    parts.push(Buffer.from(`--${BOUNDARY}--
+`));
+    return Buffer.concat(parts);
+}
+
 beforeAll(async () => {
     await request({ method: "POST", url: "/auth/register", payload: user });
     const login = await request({
@@ -114,6 +142,34 @@ describe("POST /articles/cover", () => {
         });
 
         expect(response.statusCode).toBe(415);
+    });
+
+    it("should reject a request carrying more than one file", async () => {
+        // An article holds exactly one cover. Taking the first part and
+        // discarding the rest would answer 200 and leave the client with no
+        // way to know which image was stored.
+        const response = await authRequest(accessToken, {
+            method: "POST",
+            url: "/articles/cover",
+            headers: MULTIPART_HEADERS,
+            payload: multipartMany(3),
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(parseBody<ErrorEnvelope>(response).title).toBe(
+            "MediaLimitExceededError",
+        );
+    });
+
+    it("should reject even two files", async () => {
+        const response = await authRequest(accessToken, {
+            method: "POST",
+            url: "/articles/cover",
+            headers: MULTIPART_HEADERS,
+            payload: multipartMany(2),
+        });
+
+        expect(response.statusCode).toBe(400);
     });
 
     it("should reject an empty file", async () => {
