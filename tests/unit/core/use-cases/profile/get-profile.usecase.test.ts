@@ -3,6 +3,7 @@ import { GetProfileUseCase } from "@core/use-cases/profile/get-profile";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
+import type { IArticleRepository } from "@core/ports/repositories/article.repository";
 import { NotFoundError } from "@core/errors";
 import { buildProfile } from "../../../helpers/mock-factories";
 
@@ -11,6 +12,10 @@ describe("GetProfileUseCase", () => {
     let profileRepository: Pick<IProfileRepository, "findByUsername">;
     let followRepository: Pick<IFollowRepository, "checkIsFollowing">;
     let postRepository: Pick<IPostRepository, "countByUserId">;
+    let articleRepository: Pick<
+        IArticleRepository,
+        "countPublishedByAuthorId"
+    >;
 
     beforeEach(() => {
         profileRepository = {
@@ -22,10 +27,14 @@ describe("GetProfileUseCase", () => {
         postRepository = {
             countByUserId: vi.fn().mockResolvedValue(0),
         };
+        articleRepository = {
+            countPublishedByAuthorId: vi.fn().mockResolvedValue(0),
+        };
         useCase = new GetProfileUseCase(
             profileRepository as IProfileRepository,
             followRepository as IFollowRepository,
             postRepository as IPostRepository,
+            articleRepository as IArticleRepository,
         );
     });
 
@@ -157,5 +166,73 @@ describe("GetProfileUseCase", () => {
         const result = await useCase.execute("testuser", "user-1");
 
         expect(result.profile).toBe(profile);
+    });
+
+    describe("articleCount", () => {
+        it("should return the published article count for the profile owner", async () => {
+            const profile = buildProfile({ userId: "user-1" });
+            vi.mocked(profileRepository.findByUsername).mockResolvedValue(
+                profile,
+            );
+            vi.mocked(
+                articleRepository.countPublishedByAuthorId,
+            ).mockResolvedValue(7);
+
+            const result = await useCase.execute("testuser");
+
+            expect(result.articleCount).toBe(7);
+            expect(
+                articleRepository.countPublishedByAuthorId,
+            ).toHaveBeenCalledWith("user-1");
+        });
+
+        it("should report the same count to the owner and to a guest", async () => {
+            const profile = buildProfile({ userId: "user-1" });
+            vi.mocked(profileRepository.findByUsername).mockResolvedValue(
+                profile,
+            );
+            vi.mocked(
+                articleRepository.countPublishedByAuthorId,
+            ).mockResolvedValue(3);
+
+            const asOwner = await useCase.execute("testuser", "user-1");
+            const asGuest = await useCase.execute("testuser");
+            const asStranger = await useCase.execute("testuser", "user-2");
+
+            // Published-only, so it cannot vary by viewer. A count that grew
+            // for the owner would leak how much unpublished work exists.
+            expect(asOwner.isMe).toBe(true);
+            expect(asOwner.articleCount).toBe(3);
+            expect(asGuest.articleCount).toBe(3);
+            expect(asStranger.articleCount).toBe(3);
+        });
+
+        it("should count articles alongside posts, not instead of them", async () => {
+            const profile = buildProfile({ userId: "user-1" });
+            vi.mocked(profileRepository.findByUsername).mockResolvedValue(
+                profile,
+            );
+            vi.mocked(postRepository.countByUserId).mockResolvedValue(12);
+            vi.mocked(
+                articleRepository.countPublishedByAuthorId,
+            ).mockResolvedValue(4);
+
+            const result = await useCase.execute("testuser");
+
+            expect(result.postCount).toBe(12);
+            expect(result.articleCount).toBe(4);
+        });
+
+        it("should not query articles when the profile does not exist", async () => {
+            vi.mocked(profileRepository.findByUsername).mockResolvedValue(null);
+
+            await expect(useCase.execute("nobody")).rejects.toThrow(
+                NotFoundError,
+            );
+
+            expect(
+                articleRepository.countPublishedByAuthorId,
+            ).not.toHaveBeenCalled();
+        });
     });
 });

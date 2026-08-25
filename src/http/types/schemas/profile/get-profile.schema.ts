@@ -15,6 +15,7 @@ export const ProfileItemSchema = FBType.Object({
     followersCount: FBType.Number(),
     followingCount: FBType.Number(),
     postCount: FBType.Number(),
+    articleCount: FBType.Number(),
     isMe: FBType.Boolean(),
     isFollowing: FBType.Boolean(),
 });

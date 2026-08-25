@@ -123,7 +123,7 @@ export class ProfileController {
 
         const currentUserId = request.user?.id;
 
-        const { profile, isMe, isFollowing, postCount } =
+        const { profile, isMe, isFollowing, postCount, articleCount } =
             await this.getProfileUseCase.execute(username, currentUserId);
 
         const profileData = ProfilePrismaMapper.toResponse(profile);
@@ -134,6 +134,7 @@ export class ProfileController {
                 isMe,
                 isFollowing,
                 postCount,
+                articleCount,
                 avatarUrl: this.getFullImageUrl(profileData.avatarUrl),
                 bannerUrl: this.getFullImageUrl(profileData.bannerUrl),
             },

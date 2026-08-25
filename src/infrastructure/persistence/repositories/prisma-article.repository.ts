@@ -281,6 +281,21 @@ export class PrismaArticleRepository implements IArticleRepository {
     }
 
     /**
+     * Counts the published articles written by one author.
+     *
+     * A single count query rather than a list read: the composite index on
+     * (author_id, status) covers it exactly.
+     *
+     * @param authorId - The author whose articles are counted
+     * @returns The number of published articles
+     */
+    async countPublishedByAuthorId(authorId: string): Promise<number> {
+        return await this.prisma.article.count({
+            where: { authorId, status: ArticleStatus.PUBLISHED },
+        });
+    }
+
+    /**
      * Deletes an article. Likes, bookmarks and tag links cascade in the schema.
      *
      * @param id - The identifier of the article to delete
