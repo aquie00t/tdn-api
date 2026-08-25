@@ -12,7 +12,7 @@ import type { LikeArticleUseCase } from "@core/use-cases/article/like-article";
 import type { UnlikeArticleUseCase } from "@core/use-cases/article/unlike-article";
 import type { SaveArticleBookmarkUseCase } from "@core/use-cases/article/save-article-bookmark";
 import type { RemoveArticleBookmarkUseCase } from "@core/use-cases/article/remove-article-bookmark";
-import { NoMediaProvidedError } from "@core/errors";
+import { MediaLimitExceededError, NoMediaProvidedError } from "@core/errors";
 import { ArticlePrismaMapper } from "@infrastructure/persistence/mappers/article-prisma.mapper";
 import type { CreateArticleBody } from "@typings/schemas/article/create-article.schema";
 import type { UpdateArticleBody } from "@typings/schemas/article/update-article.schema";
@@ -319,13 +319,26 @@ export class ArticleController {
             );
         }
 
-        const file = await request.file();
+        // Iterated rather than taking request.file(), which silently keeps the
+        // first part and discards the rest: a client that uploaded three
+        // images would get a 200 and no way to know which one was stored.
+        const parts = request.files();
+        const first = await parts.next();
 
-        if (!file) {
+        if (first.done) {
             throw new NoMediaProvidedError("No cover image was provided.");
         }
 
+        const file = first.value;
         const fileBuffer = await file.toBuffer();
+
+        // An article holds exactly one cover, so a second file is a request
+        // the API cannot honour. Checked before anything is stored.
+        if (!(await parts.next()).done) {
+            throw new MediaLimitExceededError(
+                "An article takes exactly one cover image.",
+            );
+        }
 
         const coverImageKey = await this.uploadArticleCoverUseCase.execute({
             userId: request.user.id,
