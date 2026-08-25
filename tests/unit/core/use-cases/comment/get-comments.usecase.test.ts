@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GetPostCommentsUseCase } from "@core/use-cases/comment/get-post-comments/get-post-comments.usecase";
+import { GetCommentsUseCase } from "@core/use-cases/comment/get-comments/get-comments.usecase";
 import { NotFoundError } from "@core/errors";
 import type { ICommentRepository } from "@core/ports/repositories/comment.repository";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
@@ -13,8 +13,8 @@ const buildPost = (): Post => ({ id: "post-1" }) as unknown as Post;
 const POST_TARGET = { type: "POST" as const, id: "post-1" };
 const ARTICLE_TARGET = { type: "ARTICLE" as const, id: "article-1" };
 
-describe("GetPostCommentsUseCase", () => {
-    let useCase: GetPostCommentsUseCase;
+describe("GetCommentsUseCase", () => {
+    let useCase: GetCommentsUseCase;
     let postRepo: Pick<IPostRepository, "findById">;
     let articleRepo: Pick<IArticleRepository, "findById">;
     let commentRepo: Pick<ICommentRepository, "findTopLevelByTarget">;
@@ -24,7 +24,7 @@ describe("GetPostCommentsUseCase", () => {
         articleRepo = { findById: vi.fn() };
         commentRepo = { findTopLevelByTarget: vi.fn().mockResolvedValue([]) };
 
-        useCase = new GetPostCommentsUseCase(
+        useCase = new GetCommentsUseCase(
             commentRepo as ICommentRepository,
             postRepo as IPostRepository,
             articleRepo as IArticleRepository,

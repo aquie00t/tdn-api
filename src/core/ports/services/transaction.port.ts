@@ -7,6 +7,7 @@ import type { INotificationRepository } from "@core/ports/repositories/notificat
 import type { IBookmarkRepository } from "../repositories/bookmark.repository";
 import type { IVerificationTokenRepository } from "@core/ports/repositories/verification-token.repository";
 import type { IArticleRepository } from "@core/ports/repositories/article.repository";
+import type { IArticleLikeRepository } from "@core/ports/repositories/article-like.repository";
 
 /**
  * Provides transactional access to repositories within a single atomic operation.
@@ -36,6 +37,9 @@ export interface TransactionContext {
 
     /** Repository for article-related data operations within the transaction. */
     readonly articleRepository: IArticleRepository;
+
+    /** Repository for article like operations within the transaction. */
+    readonly articleLikeRepository: IArticleLikeRepository;
 }
 
 /**

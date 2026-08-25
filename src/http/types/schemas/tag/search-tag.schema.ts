@@ -16,6 +16,7 @@ export const SearchTagsResponseSchema = Type.Object({
         Type.Object({
             name: Type.String(),
             postCount: Type.Number(),
+            articleCount: Type.Number(),
             category: Type.Union([Type.String(), Type.Null()]),
         }),
     ),

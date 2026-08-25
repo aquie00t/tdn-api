@@ -3,7 +3,7 @@ import type { IArticleRepository } from "@core/ports/repositories/article.reposi
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import { NotFoundError } from "@core/errors";
 import type { Comment } from "@core/domain/entities/comment.entity";
-import type { GetPostCommentsUseCaseInput } from "./get-post-comments.input";
+import type { GetCommentsUseCaseInput } from "./get-comments.input";
 
 /**
  * Use case for listing the top-level comments of a post or an article.
@@ -12,7 +12,7 @@ import type { GetPostCommentsUseCaseInput } from "./get-post-comments.input";
  * be used to probe for content the caller could not otherwise see: an
  * unpublished article answers 404 here exactly as it does on its own endpoint.
  */
-export class GetPostCommentsUseCase {
+export class GetCommentsUseCase {
     /**
      * @param commentRepository - Repository for reading comments
      * @param postRepository - Repository used to verify a post target
@@ -31,7 +31,7 @@ export class GetPostCommentsUseCase {
      * @throws NotFoundError - When the target is missing or not visible
      */
     private async assertTargetVisible(
-        input: GetPostCommentsUseCaseInput,
+        input: GetCommentsUseCaseInput,
     ): Promise<void> {
         if (input.target.type === "POST") {
             const post = await this.postRepository.findById(input.target.id);
@@ -56,7 +56,7 @@ export class GetPostCommentsUseCase {
      * @returns The page of top-level comments
      * @throws NotFoundError if the target does not exist or is not visible
      */
-    async execute(input: GetPostCommentsUseCaseInput): Promise<Comment[]> {
+    async execute(input: GetCommentsUseCaseInput): Promise<Comment[]> {
         const page = input.page || 1;
         const limit = input.limit || 10;
         const offset = (page - 1) * limit;

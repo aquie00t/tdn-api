@@ -18,6 +18,7 @@ export const GetTrendsResponseSchema = Type.Object({
             Type.Object({
                 tag: Type.String(),
                 postCount: Type.Number(),
+                articleCount: Type.Number(),
                 category: Type.Union([Type.String(), Type.Null()]),
             }),
         ),

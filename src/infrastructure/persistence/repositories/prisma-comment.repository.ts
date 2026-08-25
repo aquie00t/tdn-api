@@ -90,13 +90,6 @@ export class PrismaCommentRepository implements ICommentRepository {
     }
 
     /**
-     * Retrieves top-level comments for a post (where parentId is null)
-     * @param postId - The ID of the post to get comments for
-     * @param limit - Maximum number of comments to return
-     * @param offset - Number of comments to skip for pagination
-     * @returns Promise that resolves to an array of top-level comments
-     */
-    /**
      * Translates a comment target into the matching where clause
      * @param target - What the comments are attached to
      * @returns A partial where clause selecting that target
@@ -164,46 +157,6 @@ export class PrismaCommentRepository implements ICommentRepository {
         return await this.prisma.comment.count({
             where: this.targetWhere(target),
         });
-    }
-
-    async findTopLevelByPostId(
-        postId: string,
-        limit: number,
-        offset: number,
-        currentUserId?: string,
-    ): Promise<Comment[]> {
-        const rawComments = await this.prisma.comment.findMany({
-            where: {
-                postId: postId,
-                parentId: null,
-            },
-            skip: offset,
-            take: limit,
-            orderBy: { createdAt: "desc" },
-            include: {
-                author: {
-                    select: {
-                        id: true,
-                        username: true,
-                        profile: {
-                            select: { avatarUrl: true, fullName: true },
-                        },
-                    },
-                },
-                likes: currentUserId
-                    ? { where: { userId: currentUserId } }
-                    : false,
-                bookmarks: currentUserId
-                    ? { where: { userId: currentUserId } }
-                    : false,
-            },
-        });
-
-        return rawComments.map((raw) =>
-            CommentPrismaMapper.toDomainComment(
-                raw as unknown as CommentWithRelations,
-            ),
-        );
     }
 
     /**
