@@ -1,3 +1,16 @@
+# [1.7.0](https://github.com/the-developer-network/tdn-api/compare/v1.6.0...v1.7.0) (2026-08-25)
+
+
+### Features
+
+* **article:** drop the markdown body from list responses ([#213](https://github.com/the-developer-network/tdn-api/issues/213)) ([628d897](https://github.com/the-developer-network/tdn-api/commit/628d897b13134a4040e7ae7624953661df31f569))
+* **profile:** expose published articleCount on the profile response ([#214](https://github.com/the-developer-network/tdn-api/issues/214)) ([1b030bf](https://github.com/the-developer-network/tdn-api/commit/1b030bf95b89604187df3c65b34ea27e663c9cf9))
+
+
+### Performance Improvements
+
+* **profile:** resolve follower list targets without loading the full profile ([#215](https://github.com/the-developer-network/tdn-api/issues/215)) ([b855269](https://github.com/the-developer-network/tdn-api/commit/b8552692844d8fe191d7c3f9f81ef514d0343277))
+
 # [1.6.0](https://github.com/the-developer-network/tdn-api/compare/v1.5.0...v1.6.0) (2026-08-25)
 
 
