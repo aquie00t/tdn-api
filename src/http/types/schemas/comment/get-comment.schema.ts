@@ -13,7 +13,12 @@ export const CommentAuthorSchema = FBType.Object({
 export const CommentItemSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
     content: FBType.String(),
-    postId: FBType.String({ format: "uuid" }),
+    // Nullable in lockstep with CommentResponse. fast-json-stringify coerces a
+    // value that does not match its schema instead of rejecting it, so leaving
+    // this as a plain string would emit a wrong postId for an article comment
+    // rather than failing.
+    postId: FBType.Union([FBType.String({ format: "uuid" }), FBType.Null()]),
+    articleId: FBType.Union([FBType.String({ format: "uuid" }), FBType.Null()]),
     parentId: FBType.Union([FBType.String({ format: "uuid" }), FBType.Null()]),
     mediaUrls: FBType.Array(FBType.String()),
     createdAt: FBType.String(),

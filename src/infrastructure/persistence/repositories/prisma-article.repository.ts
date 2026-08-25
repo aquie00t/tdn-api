@@ -31,6 +31,7 @@ type ArticleRelationInclude = {
     tags: true;
     likes: { where: { userId: string } } | false;
     bookmarks: { where: { userId: string } } | false;
+    _count: { select: { comments: true } };
 };
 
 /**
@@ -73,6 +74,7 @@ export class PrismaArticleRepository implements IArticleRepository {
             bookmarks: currentUserId
                 ? ({ where: { userId: currentUserId } } as const)
                 : (false as const),
+            _count: { select: { comments: true } } as const,
         };
     }
 

@@ -28,9 +28,7 @@ model Article {
   tags      Tag[]
   likes     ArticleLike[]
   bookmarks ArticleBookmark[]
-
-  // NOTE: `comments Comment[]` lands with the polymorphic comment migration.
-  // Comment has no articleId yet, so the back-relation cannot exist today.
+  comments  Comment[]
 
   likeCount Int @default(0) @map("like_count")
 

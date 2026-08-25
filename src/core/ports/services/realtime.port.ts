@@ -15,6 +15,12 @@ export interface RealtimeNotificationPayload {
     postId?: string;
 
     commentId?: string;
+
+    /** Article the notification points at, when it concerns an article */
+    articleId?: string;
+
+    /** Identifier of the resource the client should deep-link to */
+    referenceId?: string;
 }
 
 /**

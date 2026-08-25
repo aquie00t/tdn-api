@@ -26,6 +26,7 @@ export * from "./post/media-limit-exceeded.error";
 export * from "./post/no-media-provided.error";
 
 // Article errors
+export * from "./article/article-not-published.error";
 export * from "./article/invalid-article-state.error";
 
 // Common HTTP errors

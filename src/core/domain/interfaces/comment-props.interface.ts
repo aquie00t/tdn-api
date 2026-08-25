@@ -14,9 +14,19 @@ export interface CommentProps {
     content: string;
 
     /**
-     * ID of the post this comment belongs to
+     * ID of the post this comment belongs to.
+     *
+     * Null when the comment belongs to an article instead. Exactly one of
+     * postId and articleId is set; the database enforces it with a CHECK
+     * constraint.
      */
-    postId: string;
+    postId: string | null;
+
+    /**
+     * ID of the article this comment belongs to, or null when it belongs to a
+     * post.
+     */
+    articleId: string | null;
 
     /**
      * ID of the user who authored this comment

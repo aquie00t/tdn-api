@@ -3,7 +3,10 @@
  * Handles database operations for comments and nested comment relationships
  */
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
-import type { ICommentRepository } from "@core/ports/repositories/comment.repository";
+import type {
+    ICommentRepository,
+    CommentTarget,
+} from "@core/ports/repositories/comment.repository";
 import type { Comment } from "@core/domain/entities/comment.entity";
 import {
     CommentPrismaMapper,
@@ -29,6 +32,7 @@ export class PrismaCommentRepository implements ICommentRepository {
                 content: comment.content,
                 mediaUrls: comment.mediaUrls,
                 postId: comment.postId,
+                articleId: comment.articleId,
                 authorId: comment.authorId,
                 parentId: comment.parentId,
             },
@@ -92,6 +96,76 @@ export class PrismaCommentRepository implements ICommentRepository {
      * @param offset - Number of comments to skip for pagination
      * @returns Promise that resolves to an array of top-level comments
      */
+    /**
+     * Translates a comment target into the matching where clause
+     * @param target - What the comments are attached to
+     * @returns A partial where clause selecting that target
+     */
+    private targetWhere(target: CommentTarget): {
+        postId?: string;
+        articleId?: string;
+    } {
+        return target.type === "POST"
+            ? { postId: target.id }
+            : { articleId: target.id };
+    }
+
+    /**
+     * Retrieves top-level comments for a post or an article
+     * @param target - What the comments are attached to
+     * @param limit - Maximum number of comments to return
+     * @param offset - Number of comments to skip for pagination
+     * @param currentUserId - Optional ID of the current user for like/bookmark status
+     * @returns Promise that resolves to an array of top-level comments
+     */
+    async findTopLevelByTarget(
+        target: CommentTarget,
+        limit: number,
+        offset: number,
+        currentUserId?: string,
+    ): Promise<Comment[]> {
+        const rawComments = await this.prisma.comment.findMany({
+            where: { ...this.targetWhere(target), parentId: null },
+            skip: offset,
+            take: limit,
+            orderBy: { createdAt: "desc" },
+            include: {
+                author: {
+                    select: {
+                        id: true,
+                        username: true,
+                        profile: {
+                            select: { avatarUrl: true, fullName: true },
+                        },
+                    },
+                },
+                likes: currentUserId
+                    ? { where: { userId: currentUserId } }
+                    : false,
+                bookmarks: currentUserId
+                    ? { where: { userId: currentUserId } }
+                    : false,
+            },
+        });
+
+        return rawComments.map((raw) =>
+            CommentPrismaMapper.toDomainComment(
+                raw as unknown as CommentWithRelations,
+            ),
+        );
+    }
+
+    /**
+     * Counts the comments attached to a post or an article, replies included
+     * @param target - What the comments are attached to
+     * @returns Promise that resolves to the number of comments
+     */
+    async countByTarget(target: CommentTarget): Promise<number> {
+        return await this.prisma.comment.count({
+            where: this.targetWhere(target),
+        });
+    }
+
     async findTopLevelByPostId(
         postId: string,
         limit: number,
