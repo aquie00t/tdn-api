@@ -3,7 +3,7 @@ import type { CommentTarget } from "@core/ports/repositories/comment.repository"
 /**
  * Input for listing the top-level comments of a post or an article.
  */
-export interface GetPostCommentsUseCaseInput {
+export interface GetCommentsUseCaseInput {
     /** What the comments are attached to */
     target: CommentTarget;
 

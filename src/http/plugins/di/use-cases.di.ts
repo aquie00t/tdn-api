@@ -44,7 +44,7 @@ import { GetBookmarksUseCase } from "@core/use-cases/bookmark/get-bookmarks/get-
 import { DeleteCommentUseCase } from "@core/use-cases/comment/delete-comment/delete-comment.usecase";
 import { GetUserPostsUseCase } from "@core/use-cases/post/get-user-posts/get-user.posts.usecase";
 import { GetPostDetailUseCase } from "@core/use-cases/post/get-post-detail/get-post-detail.usecase";
-import { GetPostCommentsUseCase } from "@core/use-cases/comment/get-post-comments/get-post-comments.usecase";
+import { GetCommentsUseCase } from "@core/use-cases/comment/get-comments/get-comments.usecase";
 import { GetCommentUseCase } from "@core/use-cases/comment/get-comment/get-comment.usecase";
 import { GetCommentRepliesUseCase } from "@core/use-cases/comment/get-comment-replies/get-comment-replies.usecase";
 import { LikeCommentUseCase } from "@core/use-cases/comment/like-comment/like-comment.usecase";
@@ -65,6 +65,10 @@ import { GetArticlesUseCase } from "@core/use-cases/article/get-articles";
 import { GetArticleUseCase } from "@core/use-cases/article/get-article";
 import { GetMyArticlesUseCase } from "@core/use-cases/article/get-my-articles";
 import { UploadArticleCoverUseCase } from "@core/use-cases/article/upload-article-cover";
+import { LikeArticleUseCase } from "@core/use-cases/article/like-article";
+import { UnlikeArticleUseCase } from "@core/use-cases/article/unlike-article";
+import { SaveArticleBookmarkUseCase } from "@core/use-cases/article/save-article-bookmark";
+import { RemoveArticleBookmarkUseCase } from "@core/use-cases/article/remove-article-bookmark";
 
 /**
  * Dependency injection module for use cases
@@ -383,7 +387,7 @@ export const useCasesModule = {
     /**
      *
      */
-    getPostCommentsUseCase: asClass(GetPostCommentsUseCase).singleton(),
+    getCommentsUseCase: asClass(GetCommentsUseCase).singleton(),
     /**
      *
      */
@@ -458,4 +462,26 @@ export const useCasesModule = {
      * Use case for storing an article cover image
      */
     uploadArticleCoverUseCase: asClass(UploadArticleCoverUseCase).singleton(),
+
+    /**
+     * Use case for liking an article
+     */
+    likeArticleUseCase: asClass(LikeArticleUseCase).singleton(),
+
+    /**
+     * Use case for removing a like from an article
+     */
+    unlikeArticleUseCase: asClass(UnlikeArticleUseCase).singleton(),
+
+    /**
+     * Use case for bookmarking an article
+     */
+    saveArticleBookmarkUseCase: asClass(SaveArticleBookmarkUseCase).singleton(),
+
+    /**
+     * Use case for removing an article bookmark
+     */
+    removeArticleBookmarkUseCase: asClass(
+        RemoveArticleBookmarkUseCase,
+    ).singleton(),
 };

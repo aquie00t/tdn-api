@@ -3,8 +3,8 @@ import { SearchTagsUseCase } from "@core/use-cases/tag/search-tag";
 import type { ITagRepository } from "@core/ports/repositories/tag.repository";
 
 const mockTags = [
-    { name: "typescript", postCount: 42, category: "programming" },
-    { name: "typeorm", postCount: 10, category: null },
+    { name: "typescript", postCount: 42, articleCount: 3, category: "programming" },
+    { name: "typeorm", postCount: 10, articleCount: 0, category: null },
 ];
 
 describe("SearchTagsUseCase", () => {
@@ -42,9 +42,30 @@ describe("SearchTagsUseCase", () => {
         const result = await useCase.execute({ query: "type", limit: 10 });
 
         expect(result).toEqual([
-            { name: "typescript", postCount: 42, category: "programming" },
-            { name: "typeorm", postCount: 10, category: null },
+            { name: "typescript", postCount: 42, articleCount: 3, category: "programming" },
+            { name: "typeorm", postCount: 10, articleCount: 0, category: null },
         ]);
+    });
+
+    it("should carry articleCount through to the output", async () => {
+        // The response schema declares articleCount as required, and
+        // fast-json-stringify fails serialization when a required property is
+        // missing. This use case remaps repository rows into its own DTO, so a
+        // field dropped here surfaces as a 500 rather than a type error.
+        vi.mocked(tagRepository.search).mockResolvedValue(mockTags);
+
+        const result = await useCase.execute({ query: "type" });
+
+        expect(result[0]).toHaveProperty("articleCount", 3);
+        expect(result[1]).toHaveProperty("articleCount", 0);
+        for (const item of result) {
+            expect(Object.keys(item).sort()).toEqual([
+                "articleCount",
+                "category",
+                "name",
+                "postCount",
+            ]);
+        }
     });
 
     it("should pass limit to repository", async () => {

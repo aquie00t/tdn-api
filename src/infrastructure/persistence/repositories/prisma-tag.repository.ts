@@ -4,14 +4,15 @@ import type {
     TrendItem,
     TrendingParams,
 } from "@core/ports/repositories/tag.repository";
+import { ArticleStatus } from "@core/domain/enums";
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
 
 /**
  * Prisma implementation of the Tag repository.
  *
- * Provides database operations for Tag entities using Prisma ORM.
- * Implements the ITagRepository interface to ensure consistent
- * data access patterns across different persistence implementations.
+ * Tags are shared between posts and articles: one vocabulary, one autocomplete,
+ * one trend list. Both counts are computed by the database rather than by
+ * loading the related rows.
  */
 export class PrismaTagRepository implements ITagRepository {
     /**
@@ -22,11 +23,20 @@ export class PrismaTagRepository implements ITagRepository {
     constructor(private readonly prisma: PrismaTransactionalClient) {}
 
     /**
-     * Retrieves the most frequently used tags (trending) within a specified time window.
-     * Uses a "Twitter-style" trend algorithm where the tag itself represents the category.
+     * Retrieves the most frequently used tags within a time window.
      *
-     * @param params - The parameters containing the limit of tags to retrieve and the time window in days.
-     * @returns A promise that resolves to an array of trending tags (TrendItem).
+     * Only published articles are counted. A draft contributing to a public
+     * trend list would leak its existence, and it would also let anyone push a
+     * tag into the trends by writing an article they never publish.
+     *
+     * The counts are computed by the database. Ordering happens in memory
+     * because no single orderBy can express "posts plus articles"; what is
+     * fetched is two integers and a name per tag, and the candidate set is
+     * bounded by the window, so this is a different order of magnitude from
+     * the previous version which loaded every matching post row.
+     *
+     * @param params - The limit of tags to retrieve and the time window in days.
+     * @returns A promise that resolves to an array of trending tags.
      */
     async findTrending(params: TrendingParams): Promise<TrendItem[]> {
         const { limit, windowDays } = params;
@@ -35,16 +45,26 @@ export class PrismaTagRepository implements ITagRepository {
             Date.now() - windowDays * 24 * 60 * 60 * 1000,
         );
 
+        const postWindow = { createdAt: { gte: windowStart } };
+        const articleWindow = {
+            status: ArticleStatus.PUBLISHED,
+            publishedAt: { gte: windowStart },
+        };
+
         const rawTags = await this.prisma.tag.findMany({
             where: {
-                posts: {
-                    some: { createdAt: { gte: windowStart } },
-                },
+                OR: [
+                    { posts: { some: postWindow } },
+                    { articles: { some: articleWindow } },
+                ],
             },
-            include: {
-                posts: {
-                    where: { createdAt: { gte: windowStart } },
-                    select: { id: true },
+            select: {
+                name: true,
+                _count: {
+                    select: {
+                        posts: { where: postWindow },
+                        articles: { where: articleWindow },
+                    },
                 },
             },
         });
@@ -52,39 +72,61 @@ export class PrismaTagRepository implements ITagRepository {
         return rawTags
             .map((tag): TrendItem => ({
                 tag: tag.name,
-                postCount: tag.posts.length,
+                postCount: tag._count.posts,
+                articleCount: tag._count.articles,
                 category: null,
             }))
-            .sort((a, b) => b.postCount - a.postCount)
+            .sort(
+                (a, b) =>
+                    b.postCount +
+                    b.articleCount -
+                    (a.postCount + a.articleCount),
+            )
             .slice(0, limit);
     }
 
     /**
      * Searches for tags by name using a case-insensitive substring match.
-     * Results are ordered by the total number of posts associated with the tag, descending.
+     *
+     * Results are ordered by posts and published articles combined, which no
+     * single Prisma orderBy can express, so the ranking is applied to the
+     * matching set. That set is bounded by the search term.
      *
      * @param query - The search string to match against tag names.
      * @param limit - The maximum number of results to return (defaults to 10).
-     * @returns A promise that resolves to an array of matching tags (TagSearchItem).
+     * @returns A promise that resolves to an array of matching tags.
      */
     async search(query: string, limit = 10): Promise<TagSearchItem[]> {
         const rawTags = await this.prisma.tag.findMany({
             where: {
                 name: { contains: query, mode: "insensitive" },
             },
-            include: {
-                _count: { select: { posts: true } },
+            select: {
+                name: true,
+                _count: {
+                    select: {
+                        posts: true,
+                        articles: {
+                            where: { status: ArticleStatus.PUBLISHED },
+                        },
+                    },
+                },
             },
-            orderBy: {
-                posts: { _count: "desc" },
-            },
-            take: limit,
         });
 
-        return rawTags.map((tag): TagSearchItem => ({
-            name: tag.name,
-            postCount: tag._count.posts,
-            category: null,
-        }));
+        return rawTags
+            .map((tag): TagSearchItem => ({
+                name: tag.name,
+                postCount: tag._count.posts,
+                articleCount: tag._count.articles,
+                category: null,
+            }))
+            .sort(
+                (a, b) =>
+                    b.postCount +
+                    b.articleCount -
+                    (a.postCount + a.articleCount),
+            )
+            .slice(0, limit);
     }
 }

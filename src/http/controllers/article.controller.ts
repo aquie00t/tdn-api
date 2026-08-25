@@ -8,6 +8,10 @@ import type { GetArticlesUseCase } from "@core/use-cases/article/get-articles";
 import type { GetArticleUseCase } from "@core/use-cases/article/get-article";
 import type { GetMyArticlesUseCase } from "@core/use-cases/article/get-my-articles";
 import type { UploadArticleCoverUseCase } from "@core/use-cases/article/upload-article-cover";
+import type { LikeArticleUseCase } from "@core/use-cases/article/like-article";
+import type { UnlikeArticleUseCase } from "@core/use-cases/article/unlike-article";
+import type { SaveArticleBookmarkUseCase } from "@core/use-cases/article/save-article-bookmark";
+import type { RemoveArticleBookmarkUseCase } from "@core/use-cases/article/remove-article-bookmark";
 import { NoMediaProvidedError } from "@core/errors";
 import { ArticlePrismaMapper } from "@infrastructure/persistence/mappers/article-prisma.mapper";
 import type { CreateArticleBody } from "@typings/schemas/article/create-article.schema";
@@ -36,6 +40,10 @@ export class ArticleController {
      * @param getArticleUseCase - Use case for reading one article by slug
      * @param getMyArticlesUseCase - Use case for an author's own articles
      * @param uploadArticleCoverUseCase - Use case for storing a cover image
+     * @param likeArticleUseCase - Use case for liking an article
+     * @param unlikeArticleUseCase - Use case for removing a like
+     * @param saveArticleBookmarkUseCase - Use case for bookmarking an article
+     * @param removeArticleBookmarkUseCase - Use case for removing a bookmark
      */
     constructor(
         private readonly createArticleUseCase: CreateArticleUseCase,
@@ -47,6 +55,10 @@ export class ArticleController {
         private readonly getArticleUseCase: GetArticleUseCase,
         private readonly getMyArticlesUseCase: GetMyArticlesUseCase,
         private readonly uploadArticleCoverUseCase: UploadArticleCoverUseCase,
+        private readonly likeArticleUseCase: LikeArticleUseCase,
+        private readonly unlikeArticleUseCase: UnlikeArticleUseCase,
+        private readonly saveArticleBookmarkUseCase: SaveArticleBookmarkUseCase,
+        private readonly removeArticleBookmarkUseCase: RemoveArticleBookmarkUseCase,
     ) {}
 
     /**
@@ -328,6 +340,90 @@ export class ArticleController {
             },
             meta: { timestamp: new Date().toISOString() },
         });
+    }
+
+    /**
+     * Likes an article.
+     *
+     * @param request - Request identifying the article
+     * @param reply - The Fastify reply object
+     * @returns A 200 response with only a timestamp
+     */
+    async like(
+        request: FastifyRequest<{ Params: ArticleIdParams }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        await this.likeArticleUseCase.execute({
+            articleId: request.params.id,
+            userId: request.user.id,
+        });
+
+        return reply
+            .status(200)
+            .send({ meta: { timestamp: new Date().toISOString() } });
+    }
+
+    /**
+     * Removes the caller's like from an article.
+     *
+     * @param request - Request identifying the article
+     * @param reply - The Fastify reply object
+     * @returns A 200 response with only a timestamp
+     */
+    async unlike(
+        request: FastifyRequest<{ Params: ArticleIdParams }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        await this.unlikeArticleUseCase.execute({
+            articleId: request.params.id,
+            userId: request.user.id,
+        });
+
+        return reply
+            .status(200)
+            .send({ meta: { timestamp: new Date().toISOString() } });
+    }
+
+    /**
+     * Bookmarks an article for the caller.
+     *
+     * @param request - Request identifying the article
+     * @param reply - The Fastify reply object
+     * @returns A 200 response with only a timestamp
+     */
+    async bookmark(
+        request: FastifyRequest<{ Params: ArticleIdParams }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        await this.saveArticleBookmarkUseCase.execute({
+            articleId: request.params.id,
+            userId: request.user.id,
+        });
+
+        return reply
+            .status(200)
+            .send({ meta: { timestamp: new Date().toISOString() } });
+    }
+
+    /**
+     * Removes the caller's bookmark from an article.
+     *
+     * @param request - Request identifying the article
+     * @param reply - The Fastify reply object
+     * @returns A 200 response with only a timestamp
+     */
+    async removeBookmark(
+        request: FastifyRequest<{ Params: ArticleIdParams }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        await this.removeArticleBookmarkUseCase.execute({
+            articleId: request.params.id,
+            userId: request.user.id,
+        });
+
+        return reply
+            .status(200)
+            .send({ meta: { timestamp: new Date().toISOString() } });
     }
 
     /**

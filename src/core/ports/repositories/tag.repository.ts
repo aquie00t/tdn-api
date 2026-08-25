@@ -3,7 +3,18 @@
  */
 export interface TrendItem {
     tag: string;
+
+    /**
+     * Posts carrying this tag.
+     *
+     * Keeps its original post-only meaning so existing clients reading it are
+     * unaffected; articles are reported separately.
+     */
     postCount: number;
+
+    /** Published articles carrying this tag */
+    articleCount: number;
+
     category: string | null;
 }
 
@@ -12,7 +23,13 @@ export interface TrendItem {
  */
 export interface TagSearchItem {
     name: string;
+
+    /** Posts carrying this tag */
     postCount: number;
+
+    /** Published articles carrying this tag */
+    articleCount: number;
+
     category: string | null;
 }
 
@@ -31,13 +48,18 @@ export interface TrendingParams {
  */
 export interface ITagRepository {
     /**
-     * Returns the most-used tags within the given time window, ordered by post count.
+     * Returns the most-used tags within the given time window.
+     *
+     * Ordered by posts and published articles combined. Drafts never count:
+     * an unpublished article must not be able to push its tag into a public
+     * trend list.
+     *
      * @param params - Limit and window size in days.
      */
     findTrending(params: TrendingParams): Promise<TrendItem[]>;
 
     /**
-     * Searches tags by name prefix/substring, ordered by post count descending.
+     * Searches tags by name prefix/substring, ordered by combined usage.
      * @param query - The search string to match against tag names.
      * @param limit - Maximum number of results to return. Defaults to 10.
      */

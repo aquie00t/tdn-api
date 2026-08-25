@@ -4,7 +4,7 @@
  */
 import type { CreateCommentUseCase } from "@core/use-cases/comment/create-comment/create-comment.usecase";
 import type { DeleteCommentUseCase } from "@core/use-cases/comment/delete-comment/delete-comment.usecase";
-import type { GetPostCommentsUseCase } from "@core/use-cases/comment/get-post-comments/get-post-comments.usecase";
+import type { GetCommentsUseCase } from "@core/use-cases/comment/get-comments/get-comments.usecase";
 import type { GetCommentUseCase } from "@core/use-cases/comment/get-comment/get-comment.usecase";
 import type { GetCommentRepliesUseCase } from "@core/use-cases/comment/get-comment-replies/get-comment-replies.usecase";
 import type { LikeCommentUseCase } from "@core/use-cases/comment/like-comment/like-comment.usecase";
@@ -36,7 +36,7 @@ export class CommentController {
     constructor(
         private readonly createCommentUseCase: CreateCommentUseCase,
         private readonly deleteCommentUseCase: DeleteCommentUseCase,
-        private readonly getPostCommentsUseCase: GetPostCommentsUseCase,
+        private readonly getCommentsUseCase: GetCommentsUseCase,
         private readonly getCommentUseCase: GetCommentUseCase,
         private readonly getCommentRepliesUseCase: GetCommentRepliesUseCase,
         private readonly likeCommentUseCase: LikeCommentUseCase,
@@ -130,7 +130,7 @@ export class CommentController {
         const { page = 1, limit = 10 } = request.query;
         const currentUserId = request.user?.id;
 
-        const comments = await this.getPostCommentsUseCase.execute({
+        const comments = await this.getCommentsUseCase.execute({
             target: { type: "ARTICLE", id: articleId },
             page,
             limit,
@@ -175,7 +175,7 @@ export class CommentController {
         const currentUserId = request.user?.id;
         const cdnUrl = request.server.config.R2_PUBLIC_URL;
 
-        const comments = await this.getPostCommentsUseCase.execute({
+        const comments = await this.getCommentsUseCase.execute({
             target: { type: "POST", id: postId },
             page,
             limit,

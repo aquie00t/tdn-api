@@ -19,6 +19,7 @@ export class SearchTagsUseCase {
         return tags.map((tag) => ({
             name: tag.name,
             postCount: tag.postCount,
+            articleCount: tag.articleCount,
             category: tag.category,
         }));
     }

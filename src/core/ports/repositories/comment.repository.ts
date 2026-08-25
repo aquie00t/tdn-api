@@ -38,25 +38,6 @@ export interface ICommentRepository {
     findById(id: string, currentUserId?: string): Promise<Comment | null>;
 
     /**
-     * Retrieves top-level comments for a post (where parentId is null)
-     *
-     * @deprecated Prefer findTopLevelByTarget; kept so the post comment path
-     * is untouched by the polymorphic change, and removed once that path moves
-     * over.
-     * @param postId - The ID of the post to get comments for
-     * @param limit - Maximum number of comments to return
-     * @param offset - Number of comments to skip for pagination
-     * @param currentUserId - Optional ID of the current user for like/bookmark status
-     * @returns Promise that resolves to an array of top-level comments
-     */
-    findTopLevelByPostId(
-        postId: string,
-        limit: number,
-        offset: number,
-        currentUserId?: string,
-    ): Promise<Comment[]>;
-
-    /**
      * Retrieves top-level comments for a post or an article
      * @param target - What the comments are attached to
      * @param limit - Maximum number of comments to return
