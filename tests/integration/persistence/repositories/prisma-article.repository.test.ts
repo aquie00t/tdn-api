@@ -331,6 +331,68 @@ describe("PrismaArticleRepository (integration)", () => {
         });
     });
 
+    describe("countPublishedByAuthorId()", () => {
+        it("should count only published articles", async () => {
+            const { articles } = await articleRepo.findAll({
+                page: 1,
+                limit: 100,
+                authorId,
+            });
+
+            const count = await articleRepo.countPublishedByAuthorId(authorId);
+
+            expect(count).toBe(articles.length);
+            expect(count).toBeGreaterThan(0);
+        });
+
+        it("should not count a draft", async () => {
+            const before = await articleRepo.countPublishedByAuthorId(authorId);
+
+            await articleRepo.create(
+                makeArticle({ title: "Uncounted draft" }),
+            );
+
+            expect(await articleRepo.countPublishedByAuthorId(authorId)).toBe(
+                before,
+            );
+        });
+
+        it("should not count an archived article", async () => {
+            const before = await articleRepo.countPublishedByAuthorId(authorId);
+
+            const article = await articleRepo.create(
+                makeArticle({ title: "Soon archived" }),
+            );
+            article.publish();
+            await articleRepo.update(article);
+            expect(await articleRepo.countPublishedByAuthorId(authorId)).toBe(
+                before + 1,
+            );
+
+            article.archive();
+            await articleRepo.update(article);
+
+            expect(await articleRepo.countPublishedByAuthorId(authorId)).toBe(
+                before,
+            );
+        });
+
+        it("should not count another author's articles", async () => {
+            const forOther =
+                await articleRepo.countPublishedByAuthorId(otherUserId);
+
+            expect(forOther).toBe(0);
+        });
+
+        it("should return zero for an unknown author", async () => {
+            const count = await articleRepo.countPublishedByAuthorId(
+                "00000000-0000-4000-8000-000000000000",
+            );
+
+            expect(count).toBe(0);
+        });
+    });
+
     describe("delete()", () => {
         it("should remove the article and cascade its likes", async () => {
             const article = await articleRepo.create(

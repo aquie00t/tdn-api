@@ -101,6 +101,19 @@ export interface IArticleRepository {
     findById(id: string, currentUserId?: string): Promise<Article | null>;
 
     /**
+     * Counts the published articles written by one author.
+     *
+     * Published only, by design: this number is rendered on a public profile,
+     * and a total that included drafts would leak both the existence and the
+     * volume of unpublished work. An author's own draft count comes from the
+     * meta of GET /articles/me instead.
+     *
+     * @param authorId - The author whose articles are counted
+     * @returns The number of published articles
+     */
+    countPublishedByAuthorId(authorId: string): Promise<number>;
+
+    /**
      * Deletes an article. Likes, bookmarks and tag links cascade in the schema.
      *
      * @param id - The identifier of the article to delete

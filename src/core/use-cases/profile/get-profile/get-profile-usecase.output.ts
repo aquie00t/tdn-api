@@ -5,4 +5,7 @@ export interface GetProfileOutput {
     isMe: boolean;
     isFollowing: boolean;
     postCount: number;
+
+    /** Published articles written by this user; drafts are never counted */
+    articleCount: number;
 }

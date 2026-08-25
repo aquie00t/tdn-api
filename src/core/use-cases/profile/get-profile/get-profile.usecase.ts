@@ -2,6 +2,7 @@ import { NotFoundError } from "@core/errors/common/not-found.error";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
+import type { IArticleRepository } from "@core/ports/repositories/article.repository";
 import type { GetProfileOutput } from "./get-profile-usecase.output";
 
 /**
@@ -16,11 +17,14 @@ export class GetProfileUseCase {
      *
      * @param profileRepository - Repository for managing profile data
      * @param followUserRepository - Repository for managing follow relationships
+     * @param postRepository - Repository used to count the user's posts
+     * @param articleRepository - Repository used to count published articles
      */
     constructor(
         private readonly profileRepository: IProfileRepository,
         private readonly followUserRepository: IFollowRepository,
         private readonly postRepository: IPostRepository,
+        private readonly articleRepository: IArticleRepository,
     ) {}
 
     /**
@@ -47,7 +51,11 @@ export class GetProfileUseCase {
 
         const isMe = currentUserId ? profile.userId === currentUserId : false;
 
-        const [isFollowing, postCount] = await Promise.all([
+        // The article count is published-only and therefore identical for every
+        // viewer, including the owner. A viewer-dependent number would be
+        // unstable and would fork a code path that is otherwise the same for
+        // everyone.
+        const [isFollowing, postCount, articleCount] = await Promise.all([
             currentUserId && !isMe
                 ? this.followUserRepository.checkIsFollowing(
                       currentUserId,
@@ -55,6 +63,7 @@ export class GetProfileUseCase {
                   )
                 : Promise.resolve(false),
             this.postRepository.countByUserId(profile.userId),
+            this.articleRepository.countPublishedByAuthorId(profile.userId),
         ]);
 
         return {
@@ -62,6 +71,7 @@ export class GetProfileUseCase {
             isMe,
             isFollowing,
             postCount,
+            articleCount,
         };
     }
 }
