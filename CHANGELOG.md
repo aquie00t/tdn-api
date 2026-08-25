@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/the-developer-network/tdn-api/compare/v1.5.0...v1.6.0) (2026-08-25)
+
+
+### Features
+
+* **article:** add likes, bookmarks and tag integration ([#212](https://github.com/the-developer-network/tdn-api/issues/212)) ([bcf06bd](https://github.com/the-developer-network/tdn-api/commit/bcf06bd7254be427320dfcdecafddd6563931548))
+
 # [1.5.0](https://github.com/the-developer-network/tdn-api/compare/v1.4.0...v1.5.0) (2026-08-25)
 
 
