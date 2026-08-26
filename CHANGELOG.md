@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/the-developer-network/tdn-api/compare/v1.7.4...v1.8.0) (2026-08-26)
+
+
+### Features
+
+* **notification:** carry the whole deep-link target on every notification ([#221](https://github.com/the-developer-network/tdn-api/issues/221)) ([de8fbe3](https://github.com/the-developer-network/tdn-api/commit/de8fbe3a6e3a61ca96cd7b65fcca8844eeef9bce))
+
 ## [1.7.4](https://github.com/the-developer-network/tdn-api/compare/v1.7.3...v1.7.4) (2026-08-26)
 
 
