@@ -1,3 +1,10 @@
+## [1.7.2](https://github.com/the-developer-network/tdn-api/compare/v1.7.1...v1.7.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **build:** point tsc-alias at tsconfig.build.json ([#218](https://github.com/the-developer-network/tdn-api/issues/218)) ([3c11315](https://github.com/the-developer-network/tdn-api/commit/3c113157b5cf56c7a790bbb131853ac8e48dd119))
+
 ## [1.7.1](https://github.com/the-developer-network/tdn-api/compare/v1.7.0...v1.7.1) (2026-08-25)
 
 
