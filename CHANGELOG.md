@@ -1,3 +1,10 @@
+## [1.7.4](https://github.com/the-developer-network/tdn-api/compare/v1.7.3...v1.7.4) (2026-08-26)
+
+
+### Bug Fixes
+
+* **profile:** stop deleting the shared default banner on upload ([#220](https://github.com/the-developer-network/tdn-api/issues/220)) ([e41f272](https://github.com/the-developer-network/tdn-api/commit/e41f2720c6c77bd3b4bc878ef4d0d3ec8935c117))
+
 ## [1.7.3](https://github.com/the-developer-network/tdn-api/compare/v1.7.2...v1.7.3) (2026-08-26)
 
 
