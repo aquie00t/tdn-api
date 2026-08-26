@@ -1,3 +1,10 @@
+## [1.7.3](https://github.com/the-developer-network/tdn-api/compare/v1.7.2...v1.7.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* **bookmark:** include bookmarked articles in the saved list ([#219](https://github.com/the-developer-network/tdn-api/issues/219)) ([e6f8550](https://github.com/the-developer-network/tdn-api/commit/e6f85506ee9eff409f03073563713ef0470a8b02))
+
 ## [1.7.2](https://github.com/the-developer-network/tdn-api/compare/v1.7.1...v1.7.2) (2026-08-26)
 
 
