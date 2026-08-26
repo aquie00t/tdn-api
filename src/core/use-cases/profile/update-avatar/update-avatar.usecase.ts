@@ -3,8 +3,7 @@ import type { UpdateAvatarUseCaseInput } from "./update-avatar-usecase.input";
 import type { StoragePort } from "@core/ports/services/storage.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import { InvalidFileTypeError } from "@core/errors";
-
-const DEFAULT_AVATAR_KEY = "avatars/default_profile.png";
+import { isDefaultMediaKey } from "@core/domain/constants/default-media.constants";
 
 /**
  * Use case for updating a user's profile avatar.
@@ -64,7 +63,7 @@ export class UpdateAvatarUseCase {
             uploadedFilePath,
         );
 
-        if (oldAvatarUrl && !oldAvatarUrl.includes(DEFAULT_AVATAR_KEY)) {
+        if (oldAvatarUrl && !isDefaultMediaKey(oldAvatarUrl)) {
             try {
                 await this.storageService.delete(oldAvatarUrl);
             } catch (error) {
