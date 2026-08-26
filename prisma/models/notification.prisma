@@ -13,8 +13,20 @@ model Notification {
   recipientId String
   issuerId    String
 
-  type        NotificationType
+  type NotificationType
+
+  // Kept as the single "what this points at" id so existing clients keep
+  // working. It mirrors the most specific target below: comment, else
+  // article, else post.
   referenceId String?
+
+  // The content the client must open when the notification is tapped.
+  // At most one of postId / articleId is set - together with commentId they
+  // describe the whole destination: a comment notification carries both the
+  // comment and the post or article it lives under.
+  postId    String?
+  articleId String?
+  commentId String?
 
   isRead Boolean @default(false)
 
@@ -23,7 +35,16 @@ model Notification {
   recipient User @relation("ReceivedNotifications", fields: [recipientId], references: [id], onDelete: Cascade)
   issuer    User @relation("IssuedNotifications", fields: [issuerId], references: [id], onDelete: Cascade)
 
+  // Cascades keep notifications from outliving what they link to, so a tapped
+  // notification can never land on deleted content.
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  article Article? @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
   @@index([recipientId])
   @@index([createdAt])
+  @@index([postId])
+  @@index([articleId])
+  @@index([commentId])
   @@map("notifications")
 }

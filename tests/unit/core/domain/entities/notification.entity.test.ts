@@ -59,14 +59,70 @@ describe("Notification Entity", () => {
             expect(n.avatarUrl).toBeUndefined();
         });
 
-        it("should set referenceId when provided", () => {
+        it("should carry the post target and mirror it onto referenceId", () => {
             const n = Notification.create(
                 "recipient-1",
                 "issuer-1",
                 NotificationType.LIKE,
-                "post-42",
+                { postId: "post-42" },
             );
+            expect(n.postId).toBe("post-42");
             expect(n.referenceId).toBe("post-42");
+            expect(n.articleId).toBeUndefined();
+            expect(n.commentId).toBeUndefined();
+        });
+
+        it("should carry the article target and mirror it onto referenceId", () => {
+            const n = Notification.create(
+                "recipient-1",
+                "issuer-1",
+                NotificationType.LIKE,
+                { articleId: "article-7" },
+            );
+            expect(n.articleId).toBe("article-7");
+            expect(n.referenceId).toBe("article-7");
+            expect(n.postId).toBeUndefined();
+        });
+
+        it("should keep both the comment and the post it lives under", () => {
+            const n = Notification.create(
+                "recipient-1",
+                "issuer-1",
+                NotificationType.COMMENT_LIKE,
+                { commentId: "comment-9", postId: "post-42" },
+            );
+            expect(n.commentId).toBe("comment-9");
+            expect(n.postId).toBe("post-42");
+        });
+
+        it("should prefer the comment id for referenceId over its parent", () => {
+            const n = Notification.create(
+                "recipient-1",
+                "issuer-1",
+                NotificationType.COMMENT_REPLY,
+                { commentId: "comment-9", articleId: "article-7" },
+            );
+            expect(n.referenceId).toBe("comment-9");
+        });
+
+        it("should leave every target id undefined for a follow", () => {
+            const n = Notification.create(
+                "recipient-1",
+                "issuer-1",
+                NotificationType.FOLLOW,
+            );
+            expect(n.postId).toBeUndefined();
+            expect(n.articleId).toBeUndefined();
+            expect(n.commentId).toBeUndefined();
+        });
+
+        it("should leave id undefined until the notification is persisted", () => {
+            const n = Notification.create(
+                "recipient-1",
+                "issuer-1",
+                NotificationType.FOLLOW,
+            );
+            expect(n.id).toBeUndefined();
         });
 
         it("should leave referenceId undefined when not provided", () => {

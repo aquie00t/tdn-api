@@ -9,6 +9,9 @@ export interface PrismaNotificationItem {
     recipientId: string;
     issuerId: string;
     referenceId: string | null;
+    postId: string | null;
+    articleId: string | null;
+    commentId: string | null;
     isRead: boolean;
     issuer: {
         username: string;
@@ -16,6 +19,11 @@ export interface PrismaNotificationItem {
             avatarUrl: string;
         } | null;
     };
+    // Articles are read by slug, so the slug travels with the notification and
+    // the client never has to resolve an article id into a URL.
+    article: {
+        slug: string;
+    } | null;
 }
 
 export class NotificationPrismaMapper {
@@ -27,10 +35,15 @@ export class NotificationPrismaMapper {
      */
     public static toDomain(item: PrismaNotificationItem): Notification {
         return Notification.with({
+            id: item.id,
             recipientId: item.recipientId,
             issuerId: item.issuerId,
             type: item.type as unknown as CoreNotificationType,
             referenceId: item.referenceId || undefined,
+            postId: item.postId || undefined,
+            articleId: item.articleId || undefined,
+            commentId: item.commentId || undefined,
+            articleSlug: item.article?.slug,
             username: item.issuer.username,
             avatarUrl: item.issuer.profile?.avatarUrl ?? "",
             createdAt: item.createdAt,
@@ -50,16 +63,22 @@ export class NotificationPrismaMapper {
         notification: Notification,
         cdnUrl: string,
     ): {
+        id?: string;
         avatarUrl: string;
         createdAt: Date;
         type: CoreNotificationType;
         recipientId: string;
         issuerId: string;
         referenceId?: string;
+        postId?: string;
+        articleId?: string;
+        articleSlug?: string;
+        commentId?: string;
         username: string;
         isRead: boolean;
     } {
         return {
+            id: notification.id,
             avatarUrl: notification.avatarUrl
                 ? notification.avatarUrl.startsWith("http")
                     ? notification.avatarUrl
@@ -72,6 +91,10 @@ export class NotificationPrismaMapper {
             recipientId: notification.recipientId,
             issuerId: notification.issuerId,
             referenceId: notification.referenceId,
+            postId: notification.postId,
+            articleId: notification.articleId,
+            articleSlug: notification.articleSlug,
+            commentId: notification.commentId,
             username: notification.username || "",
             isRead: notification.isRead,
         };
@@ -87,12 +110,18 @@ export class NotificationPrismaMapper {
         issuerId: string;
         type: NotificationType;
         referenceId?: string | null;
+        postId?: string | null;
+        articleId?: string | null;
+        commentId?: string | null;
     } {
         return {
             recipientId: notification.recipientId,
             issuerId: notification.issuerId,
             type: notification.type as unknown as NotificationType,
             referenceId: notification.referenceId || null,
+            postId: notification.postId || null,
+            articleId: notification.articleId || null,
+            commentId: notification.commentId || null,
         };
     }
 }

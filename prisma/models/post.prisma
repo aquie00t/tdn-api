@@ -23,10 +23,11 @@ model Post {
   authorId String @map("author_id")
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
-  tags         Tag[]
-  likes        PostLike[]
-  bookmarks    PostBookmark[]
-  comments     Comment[]
+  tags          Tag[]
+  likes         PostLike[]
+  bookmarks     PostBookmark[]
+  comments      Comment[]
+  notifications Notification[]
   commentCount Int            @default(0)
   likeCount    Int            @default(0)
 
@@ -112,8 +113,9 @@ model Comment {
   parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies  Comment[] @relation("CommentReplies")
 
-  likes      CommentLike[]
-  bookmarks  CommentBookmark[]
+  likes         CommentLike[]
+  bookmarks     CommentBookmark[]
+  notifications Notification[]
   likeCount  Int               @default(0) @map("like_count")
   replyCount Int               @default(0) @map("reply_count")
 

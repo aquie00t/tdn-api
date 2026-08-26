@@ -128,4 +128,46 @@ describe("LikeCommentUseCase", () => {
             }),
         );
     });
+
+    it("should persist the comment and the post it lives under", async () => {
+        vi.mocked(txCommentRepo.findById).mockResolvedValue(
+            buildComment({ authorId: "comment-author", postId: "post-1" }),
+        );
+        vi.mocked(txCommentRepo.hasUserLiked).mockResolvedValue(false);
+        vi.mocked(txCommentRepo.addLike).mockResolvedValue(undefined);
+        vi.mocked(txCommentRepo.incrementLikeCount).mockResolvedValue(
+            undefined,
+        );
+
+        await useCase.execute({ commentId: "comment-1", userId: "user-1" });
+
+        const [notification] = vi.mocked(txNotificationRepo.create).mock
+            .calls[0];
+        expect(notification.commentId).toBe("comment-1");
+        expect(notification.postId).toBe("post-1");
+        expect(notification.referenceId).toBe("comment-1");
+        expect(notification.articleId).toBeUndefined();
+    });
+
+    it("should persist the article a liked comment lives under", async () => {
+        vi.mocked(txCommentRepo.findById).mockResolvedValue(
+            buildComment({
+                authorId: "comment-author",
+                postId: null,
+                articleId: "article-7",
+            }),
+        );
+        vi.mocked(txCommentRepo.hasUserLiked).mockResolvedValue(false);
+        vi.mocked(txCommentRepo.addLike).mockResolvedValue(undefined);
+        vi.mocked(txCommentRepo.incrementLikeCount).mockResolvedValue(
+            undefined,
+        );
+
+        await useCase.execute({ commentId: "comment-1", userId: "user-1" });
+
+        const [notification] = vi.mocked(txNotificationRepo.create).mock
+            .calls[0];
+        expect(notification.articleId).toBe("article-7");
+        expect(notification.postId).toBeUndefined();
+    });
 });

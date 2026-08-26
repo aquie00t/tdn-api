@@ -111,6 +111,21 @@ describe("LikePostUseCase", () => {
         );
     });
 
+    it("should persist the liked post on the notification so it can be opened", async () => {
+        vi.mocked(mockCtx.postRepository.findById).mockResolvedValue(
+            buildPost({ id: "post-1", author: { id: "author-1" } }),
+        );
+
+        await useCase.execute({ postId: "post-1", userId: "liker-99" });
+
+        const [notification] = vi.mocked(mockCtx.notificationRepository.create)
+            .mock.calls[0];
+        expect(notification.postId).toBe("post-1");
+        expect(notification.referenceId).toBe("post-1");
+        expect(notification.articleId).toBeUndefined();
+        expect(notification.commentId).toBeUndefined();
+    });
+
     it("should not create notification when user likes their own post", async () => {
         vi.mocked(mockCtx.postRepository.findById).mockResolvedValue(
             buildPost({ author: { id: "user-1" } }),

@@ -44,6 +44,11 @@ export class LikeCommentUseCase {
                     comment.authorId,
                     input.userId,
                     NotificationType.COMMENT_LIKE,
+                    {
+                        commentId: input.commentId,
+                        postId: comment.postId ?? undefined,
+                        articleId: comment.articleId ?? undefined,
+                    },
                 );
 
                 await ctx.notificationRepository.create(notification);

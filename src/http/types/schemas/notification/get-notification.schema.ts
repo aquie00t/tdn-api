@@ -3,12 +3,22 @@ import { Type as FBType, type Static } from "@fastify/type-provider-typebox";
 import { MetaOnlyResponseSchema } from "../create-response-schema";
 
 const NotificationItemSchema = FBType.Object({
+    id: FBType.String({ format: "uuid" }),
     recipientId: FBType.String({ format: "uuid" }),
     issuerId: FBType.String({ format: "uuid" }),
     username: FBType.Optional(FBType.String()),
     type: FBType.String(),
     avatarUrl: FBType.Optional(FBType.String()),
+    // The most specific target id, kept for clients written against the old
+    // shape. New clients should read the explicit ids below.
     referenceId: FBType.Optional(FBType.String()),
+    // Where tapping the notification leads. A comment notification carries the
+    // comment plus the post or article it lives under; a follow carries none of
+    // them and leads to the issuer's profile via `username`.
+    postId: FBType.Optional(FBType.String({ format: "uuid" })),
+    articleId: FBType.Optional(FBType.String({ format: "uuid" })),
+    articleSlug: FBType.Optional(FBType.String()),
+    commentId: FBType.Optional(FBType.String({ format: "uuid" })),
     createdAt: FBType.String(),
     isRead: FBType.Boolean(),
 });

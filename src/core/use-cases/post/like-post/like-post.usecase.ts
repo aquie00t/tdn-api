@@ -51,6 +51,7 @@ export class LikePostUseCase {
                     post.author.id,
                     input.userId,
                     NotificationType.LIKE,
+                    { postId: input.postId },
                 );
 
                 await ctx.notificationRepository.create(notification);
@@ -62,6 +63,7 @@ export class LikePostUseCase {
                         type: NotificationType.LIKE,
                         issuerId: input.userId,
                         postId: input.postId,
+                        referenceId: input.postId,
                     },
                 );
             }

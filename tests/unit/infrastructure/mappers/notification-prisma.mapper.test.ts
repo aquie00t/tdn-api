@@ -19,11 +19,15 @@ function makePrismaItem(
         recipientId: "user-1",
         issuerId: "user-2",
         referenceId: null,
+        postId: null,
+        articleId: null,
+        commentId: null,
         isRead: false,
         issuer: {
             username: "follower",
             profile: { avatarUrl: "uploads/avatar.jpg" },
         },
+        article: null,
         ...overrides,
     };
 }
@@ -66,6 +70,46 @@ describe("NotificationPrismaMapper", () => {
             );
 
             expect(result.avatarUrl).toBe("");
+        });
+
+        it("should map the id so a single notification can be addressed", () => {
+            const result = NotificationPrismaMapper.toDomain(makePrismaItem());
+
+            expect(result.id).toBe("notif-1");
+        });
+
+        it("should map the deep-link target of a comment notification", () => {
+            const result = NotificationPrismaMapper.toDomain(
+                makePrismaItem({
+                    type: "COMMENT_LIKE" as PrismaNotificationItem["type"],
+                    referenceId: "comment-9",
+                    commentId: "comment-9",
+                    postId: "post-42",
+                }),
+            );
+
+            expect(result.commentId).toBe("comment-9");
+            expect(result.postId).toBe("post-42");
+            expect(result.articleId).toBeUndefined();
+        });
+
+        it("should map the article slug so the client can build its URL", () => {
+            const result = NotificationPrismaMapper.toDomain(
+                makePrismaItem({
+                    referenceId: "article-7",
+                    articleId: "article-7",
+                    article: { slug: "clean-architecture-in-practice" },
+                }),
+            );
+
+            expect(result.articleId).toBe("article-7");
+            expect(result.articleSlug).toBe("clean-architecture-in-practice");
+        });
+
+        it("should leave articleSlug undefined when no article is linked", () => {
+            const result = NotificationPrismaMapper.toDomain(makePrismaItem());
+
+            expect(result.articleSlug).toBeUndefined();
         });
 
         it("should map referenceId when present", () => {
@@ -157,6 +201,40 @@ describe("NotificationPrismaMapper", () => {
 
             expect(result.referenceId).toBeUndefined();
         });
+
+        it("should expose the notification id", () => {
+            const entity = NotificationPrismaMapper.toDomain(makePrismaItem());
+            const result = NotificationPrismaMapper.toResponse(entity, CDN);
+
+            expect(result.id).toBe("notif-1");
+        });
+
+        it("should expose the whole destination of a comment notification", () => {
+            const entity = NotificationPrismaMapper.toDomain(
+                makePrismaItem({
+                    type: "COMMENT_REPLY" as PrismaNotificationItem["type"],
+                    referenceId: "comment-9",
+                    commentId: "comment-9",
+                    articleId: "article-7",
+                    article: { slug: "clean-architecture-in-practice" },
+                }),
+            );
+            const result = NotificationPrismaMapper.toResponse(entity, CDN);
+
+            expect(result.commentId).toBe("comment-9");
+            expect(result.articleId).toBe("article-7");
+            expect(result.articleSlug).toBe("clean-architecture-in-practice");
+            expect(result.postId).toBeUndefined();
+        });
+
+        it("should leave the destination empty for a follow notification", () => {
+            const entity = NotificationPrismaMapper.toDomain(makePrismaItem());
+            const result = NotificationPrismaMapper.toResponse(entity, CDN);
+
+            expect(result.postId).toBeUndefined();
+            expect(result.articleId).toBeUndefined();
+            expect(result.commentId).toBeUndefined();
+        });
     });
 
     describe("toPrisma", () => {
@@ -182,6 +260,21 @@ describe("NotificationPrismaMapper", () => {
             const result = NotificationPrismaMapper.toPrisma(entity);
 
             expect(result.referenceId).toBeNull();
+        });
+
+        it("should persist the target ids of a comment notification", () => {
+            const entity = NotificationPrismaMapper.toDomain(
+                makePrismaItem({
+                    referenceId: "comment-9",
+                    commentId: "comment-9",
+                    postId: "post-42",
+                }),
+            );
+            const result = NotificationPrismaMapper.toPrisma(entity);
+
+            expect(result.commentId).toBe("comment-9");
+            expect(result.postId).toBe("post-42");
+            expect(result.articleId).toBeNull();
         });
 
         it("should pass referenceId through when present", () => {
