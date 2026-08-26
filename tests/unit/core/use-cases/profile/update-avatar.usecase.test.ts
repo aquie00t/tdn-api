@@ -4,8 +4,7 @@ import type { IProfileRepository } from "@core/ports/repositories/profile.reposi
 import type { StoragePort } from "@core/ports/services/storage.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import { InvalidFileTypeError } from "@core/errors";
-
-const DEFAULT_AVATAR_KEY = "avatars/default_profile.png";
+import { DEFAULT_AVATAR_KEY } from "@core/domain/constants/default-media.constants";
 
 describe("UpdateAvatarUseCase", () => {
     let useCase: UpdateAvatarUseCase;

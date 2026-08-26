@@ -4,8 +4,7 @@ import type { IProfileRepository } from "@core/ports/repositories/profile.reposi
 import type { StoragePort } from "@core/ports/services/storage.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import { InvalidFileTypeError } from "@core/errors";
-
-const DEFAULT_BANNER_KEY = "banners/default_banner.jpeg";
+import { DEFAULT_BANNER_KEY } from "@core/domain/constants/default-media.constants";
 
 describe("UpdateBannerUseCase", () => {
     let useCase: UpdateBannerUseCase;
@@ -86,6 +85,26 @@ describe("UpdateBannerUseCase", () => {
     it("should not call storageService.delete when old banner is the default", async () => {
         vi.mocked(profileRepository.findBannerByUserId).mockResolvedValue(
             `https://cdn.example.com/${DEFAULT_BANNER_KEY}`,
+        );
+
+        await useCase.execute(baseInput);
+
+        expect(storageService.delete).not.toHaveBeenCalled();
+    });
+
+    it("should not call storageService.delete for the schema default banner key", async () => {
+        vi.mocked(profileRepository.findBannerByUserId).mockResolvedValue(
+            DEFAULT_BANNER_KEY,
+        );
+
+        await useCase.execute(baseInput);
+
+        expect(storageService.delete).not.toHaveBeenCalled();
+    });
+
+    it("should not call storageService.delete when the default banner carries a cache-busting query", async () => {
+        vi.mocked(profileRepository.findBannerByUserId).mockResolvedValue(
+            `https://cdn.example.com/${DEFAULT_BANNER_KEY}?v=1`,
         );
 
         await useCase.execute(baseInput);
