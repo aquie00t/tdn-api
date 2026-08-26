@@ -25,10 +25,11 @@ model Article {
   authorId String @map("author_id")
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
-  tags      Tag[]
-  likes     ArticleLike[]
-  bookmarks ArticleBookmark[]
-  comments  Comment[]
+  tags          Tag[]
+  likes         ArticleLike[]
+  bookmarks     ArticleBookmark[]
+  comments      Comment[]
+  notifications Notification[]
 
   likeCount Int @default(0) @map("like_count")
 

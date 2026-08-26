@@ -69,6 +69,97 @@ describe("PrismaNotificationRepository (integration)", () => {
         });
     });
 
+    describe("deep-link targets", () => {
+        it("should persist the post a notification points at", async () => {
+            const post = await prisma.post.create({
+                data: { content: "Target post", authorId: recipientId },
+            });
+
+            await notifRepo.create(
+                Notification.create(
+                    recipientId,
+                    issuerId,
+                    NotificationType.LIKE,
+                    { postId: post.id },
+                ),
+            );
+
+            const [latest] = await notifRepo.findAllByUserId({
+                userId: recipientId,
+                take: 1,
+                skip: 0,
+            });
+
+            expect(latest.postId).toBe(post.id);
+            expect(latest.referenceId).toBe(post.id);
+            expect(latest.id).toBeDefined();
+
+            await prisma.post.delete({ where: { id: post.id } });
+        });
+
+        it("should resolve the article slug so the client can build a URL", async () => {
+            const article = await prisma.article.create({
+                data: {
+                    slug: "notification-target-article",
+                    title: "Notification target",
+                    body: "body",
+                    authorId: recipientId,
+                },
+            });
+            const comment = await prisma.comment.create({
+                data: {
+                    content: "A comment",
+                    articleId: article.id,
+                    authorId: recipientId,
+                },
+            });
+
+            await notifRepo.create(
+                Notification.create(
+                    recipientId,
+                    issuerId,
+                    NotificationType.COMMENT_REPLY,
+                    { commentId: comment.id, articleId: article.id },
+                ),
+            );
+
+            const [latest] = await notifRepo.findAllByUserId({
+                userId: recipientId,
+                take: 1,
+                skip: 0,
+            });
+
+            expect(latest.commentId).toBe(comment.id);
+            expect(latest.articleId).toBe(article.id);
+            expect(latest.articleSlug).toBe("notification-target-article");
+            expect(latest.referenceId).toBe(comment.id);
+
+            await prisma.article.delete({ where: { id: article.id } });
+        });
+
+        it("should drop the notification when its target is deleted", async () => {
+            const post = await prisma.post.create({
+                data: { content: "Doomed post", authorId: recipientId },
+            });
+
+            await notifRepo.create(
+                Notification.create(
+                    recipientId,
+                    issuerId,
+                    NotificationType.LIKE,
+                    { postId: post.id },
+                ),
+            );
+
+            await prisma.post.delete({ where: { id: post.id } });
+
+            const orphans = await prisma.notification.count({
+                where: { postId: post.id },
+            });
+            expect(orphans).toBe(0);
+        });
+    });
+
     describe("getUnreadCount()", () => {
         it("should return count of unread notifications", async () => {
             const count = await notifRepo.getUnreadCount(recipientId);
@@ -103,7 +194,6 @@ describe("PrismaNotificationRepository (integration)", () => {
                     recipientId,
                     issuerId,
                     NotificationType.LIKE,
-                    "post_100",
                 ),
             );
 
@@ -117,7 +207,6 @@ describe("PrismaNotificationRepository (integration)", () => {
                     recipientId,
                     issuerId,
                     NotificationType.LIKE,
-                    "post_101",
                 ),
             );
 

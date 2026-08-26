@@ -106,6 +106,17 @@ describe("article like and bookmark use cases", () => {
             );
         });
 
+        it("should persist the liked article on the notification", async () => {
+            await useCase.execute({ articleId: ARTICLE, userId: READER });
+
+            const [notification] = vi.mocked(notificationRepo.create).mock
+                .calls[0];
+            expect(notification.articleId).toBe(ARTICLE);
+            expect(notification.referenceId).toBe(ARTICLE);
+            expect(notification.postId).toBeUndefined();
+            expect(notification.commentId).toBeUndefined();
+        });
+
         it("should not notify when the author likes their own article", async () => {
             await useCase.execute({ articleId: ARTICLE, userId: AUTHOR });
 

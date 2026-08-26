@@ -40,19 +40,19 @@ export class CreateCommentUseCase {
      * @param ctx - The transactional repositories
      * @param target - What is being commented on
      * @param commenterId - The user attempting to comment
-     * @returns The id of the user who owns the target
+     * @returns The owner of the target, plus its slug when it is an article
      * @throws NotFoundError - When the target does not exist or is not visible
      * @throws ArticleNotPublishedError - When the author's own article is not published
      */
-    private async resolveTargetAuthor(
+    private async resolveTarget(
         ctx: TransactionContext,
         target: CommentTarget,
         commenterId: string,
-    ): Promise<string> {
+    ): Promise<{ authorId: string; slug?: string }> {
         if (target.type === "POST") {
             const post = await ctx.postRepository.findById(target.id);
             if (!post) throw new NotFoundError("Post not found.");
-            return post.author.id;
+            return { authorId: post.author.id };
         }
 
         const article = await ctx.articleRepository.findById(target.id);
@@ -67,7 +67,7 @@ export class CreateCommentUseCase {
             );
         }
 
-        return article.author.id;
+        return { authorId: article.author.id, slug: article.slug };
     }
 
     /**
@@ -81,11 +81,8 @@ export class CreateCommentUseCase {
     async execute(input: CreateCommentUseCaseInput): Promise<Comment> {
         return await this.transactionService.runInTransaction(async (ctx) => {
             const { target } = input;
-            const targetAuthorId = await this.resolveTargetAuthor(
-                ctx,
-                target,
-                input.authorId,
-            );
+            const { authorId: targetAuthorId, slug: targetSlug } =
+                await this.resolveTarget(ctx, target, input.authorId);
 
             let notifyUserId: string | null = null;
             let notificationType = NotificationType.COMMENT;
@@ -157,7 +154,12 @@ export class CreateCommentUseCase {
                     notifyUserId,
                     input.authorId,
                     notificationType,
-                    savedComment.id,
+                    {
+                        commentId: savedComment.id,
+                        postId: target.type === "POST" ? target.id : undefined,
+                        articleId:
+                            target.type === "ARTICLE" ? target.id : undefined,
+                    },
                 );
 
                 await ctx.notificationRepository.create(notification);
@@ -171,6 +173,7 @@ export class CreateCommentUseCase {
                         postId: target.type === "POST" ? target.id : undefined,
                         articleId:
                             target.type === "ARTICLE" ? target.id : undefined,
+                        articleSlug: targetSlug,
                         commentId: savedComment.id,
                         referenceId: savedComment.id,
                     },

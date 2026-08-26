@@ -131,6 +131,13 @@ describe("CreateCommentUseCase", () => {
             "new-notification",
             expect.objectContaining({ type: "COMMENT" }),
         );
+
+        const [notification] = vi.mocked(txNotificationRepo.create).mock
+            .calls[0];
+        expect(notification.commentId).toBe("new-comment-1");
+        expect(notification.postId).toBe("post-1");
+        expect(notification.referenceId).toBe("new-comment-1");
+        expect(notification.articleId).toBeUndefined();
     });
 
     it("should not send notification when commenter is the post author", async () => {

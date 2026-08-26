@@ -204,6 +204,47 @@ describe("CreateCommentUseCase (article target)", () => {
                 postId: undefined,
             }),
         );
+
+        const [notification] = vi.mocked(txNotificationRepo.create).mock
+            .calls[0];
+        expect(notification.articleId).toBe("article-1");
+        expect(notification.postId).toBeUndefined();
+    });
+
+    it("should persist the new comment as the notification target", async () => {
+        vi.mocked(txCommentRepo.create).mockResolvedValueOnce(
+            buildComment({
+                id: "new-comment-9",
+                postId: null,
+                articleId: "article-1",
+                authorId: COMMENTER,
+            }),
+        );
+
+        await useCase.execute({
+            content: "Nice piece",
+            target: ARTICLE_TARGET,
+            authorId: COMMENTER,
+        });
+
+        const [notification] = vi.mocked(txNotificationRepo.create).mock
+            .calls[0];
+        expect(notification.commentId).toBe("new-comment-9");
+        expect(notification.referenceId).toBe("new-comment-9");
+    });
+
+    it("should send the article slug so the client can build the URL", async () => {
+        await useCase.execute({
+            content: "Nice piece",
+            target: ARTICLE_TARGET,
+            authorId: COMMENTER,
+        });
+
+        expect(realtimeSvc.emitToUser).toHaveBeenCalledWith(
+            AUTHOR,
+            "new-notification",
+            expect.objectContaining({ articleSlug: expect.any(String) }),
+        );
     });
 
     it("should populate referenceId with the new comment", async () => {

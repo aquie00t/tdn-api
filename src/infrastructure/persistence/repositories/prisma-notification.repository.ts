@@ -66,6 +66,13 @@ export class PrismaNotificationRepository implements INotificationRepository {
                         },
                     },
                 },
+                // Resolved on read rather than denormalised: an article slug
+                // changes with its title, and a stale one would 404.
+                article: {
+                    select: {
+                        slug: true,
+                    },
+                },
             },
         });
 
