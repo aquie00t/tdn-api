@@ -13,6 +13,7 @@ import type { RemoveCommentBookmarkUseCase } from "@core/use-cases/bookmark/remo
 import type { CommentActionParams } from "@typings/schemas/comment/like-comment.schema";
 import { PostPrismaMapper } from "@infrastructure/persistence/mappers/post-prisma.mapper";
 import { CommentPrismaMapper } from "@infrastructure/persistence/mappers/comment-prisma.mapper";
+import { ArticlePrismaMapper } from "@infrastructure/persistence/mappers/article-prisma.mapper";
 
 export class BookmarkController {
     constructor(
@@ -104,12 +105,18 @@ export class BookmarkController {
             cdnUrl,
             userId,
         );
+        const articles = ArticlePrismaMapper.toListResponse(
+            result.articles,
+            cdnUrl,
+            userId,
+        );
 
         return reply.status(200).send({
-            data: { posts, comments },
+            data: { posts, comments, articles },
             meta: {
                 postTotal: result.postTotal,
                 commentTotal: result.commentTotal,
+                articleTotal: result.articleTotal,
                 page: page ?? 1,
                 timestamp: new Date().toISOString(),
             },
