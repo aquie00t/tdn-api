@@ -19,24 +19,36 @@ export class PrismaFollowUserRepository implements IFollowRepository {
         return follow !== null;
     }
 
-    async followUser(followerId: string, followingId: string): Promise<void> {
-        await this.prisma.follow.create({
-            data: {
+    async followUser(
+        followerId: string,
+        followingId: string,
+    ): Promise<boolean> {
+        // createMany with skipDuplicates compiles to ON CONFLICT DO NOTHING,
+        // so concurrent follows settle in the database instead of racing:
+        // create() would raise P2002 on the composite primary key for the
+        // request that lost, and that surfaced as a 500.
+        const result = await this.prisma.follow.createMany({
+            data: [{ followerId, followingId }],
+            skipDuplicates: true,
+        });
+
+        return result.count > 0;
+    }
+
+    async unfollowUser(
+        followerId: string,
+        followingId: string,
+    ): Promise<boolean> {
+        // deleteMany rather than delete: deleting a row that is already gone
+        // is the expected outcome of a double tap, not P2025.
+        const result = await this.prisma.follow.deleteMany({
+            where: {
                 followerId,
                 followingId,
             },
         });
-    }
 
-    async unfollowUser(followerId: string, followingId: string): Promise<void> {
-        await this.prisma.follow.delete({
-            where: {
-                followerId_followingId: {
-                    followerId,
-                    followingId,
-                },
-            },
-        });
+        return result.count > 0;
     }
 
     async getFollowers(

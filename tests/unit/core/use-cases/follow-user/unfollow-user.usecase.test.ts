@@ -11,15 +11,14 @@ describe("UnfollowUserUseCase", () => {
     let useCase: UnfollowUserUseCase;
     let followRepo: Pick<
         IFollowRepository,
-        "checkIsFollowing" | "unfollowUser" | "getFollowersCount"
+        "unfollowUser" | "getFollowersCount"
     >;
     let profileRepo: Pick<IProfileRepository, "findByUserId">;
     let notificationRepo: Pick<INotificationRepository, "deleteByTarget">;
 
     beforeEach(() => {
         followRepo = {
-            checkIsFollowing: vi.fn(),
-            unfollowUser: vi.fn(),
+            unfollowUser: vi.fn().mockResolvedValue(true),
             getFollowersCount: vi.fn().mockResolvedValue(10),
         };
         profileRepo = { findByUserId: vi.fn() };
@@ -54,8 +53,7 @@ describe("UnfollowUserUseCase", () => {
         vi.mocked(profileRepo.findByUserId).mockResolvedValue(
             buildProfile({ userId: "user-2" }),
         );
-        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(true);
-        vi.mocked(followRepo.unfollowUser).mockResolvedValue(undefined);
+        vi.mocked(followRepo.unfollowUser).mockResolvedValue(true);
 
         const result = await useCase.execute({
             currentUserId: "user-1",
@@ -69,23 +67,22 @@ describe("UnfollowUserUseCase", () => {
         expect(result.followersCount).toBe(10);
     });
 
-    it("should skip unfollow when not currently following (idempotent)", async () => {
+    it("should stay quiet when there was nothing to unfollow (idempotent)", async () => {
         vi.mocked(profileRepo.findByUserId).mockResolvedValue(
             buildProfile({ userId: "user-2" }),
         );
-        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(false);
+        vi.mocked(followRepo.unfollowUser).mockResolvedValue(false);
 
-        await useCase.execute({ currentUserId: "user-1", targetId: "user-2" });
-
-        expect(followRepo.unfollowUser).not.toHaveBeenCalled();
+        await expect(
+            useCase.execute({ currentUserId: "user-1", targetId: "user-2" }),
+        ).resolves.toBeDefined();
     });
 
     it("should take the follow notification back with the follow", async () => {
         vi.mocked(profileRepo.findByUserId).mockResolvedValue(
             buildProfile({ userId: "user-2" }),
         );
-        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(true);
-        vi.mocked(followRepo.unfollowUser).mockResolvedValue(undefined);
+        vi.mocked(followRepo.unfollowUser).mockResolvedValue(true);
 
         await useCase.execute({ currentUserId: "user-1", targetId: "user-2" });
 
@@ -100,7 +97,7 @@ describe("UnfollowUserUseCase", () => {
         vi.mocked(profileRepo.findByUserId).mockResolvedValue(
             buildProfile({ userId: "user-2" }),
         );
-        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(false);
+        vi.mocked(followRepo.unfollowUser).mockResolvedValue(false);
 
         await useCase.execute({ currentUserId: "user-1", targetId: "user-2" });
 
@@ -111,7 +108,7 @@ describe("UnfollowUserUseCase", () => {
         vi.mocked(profileRepo.findByUserId).mockResolvedValue(
             buildProfile({ userId: "user-2" }),
         );
-        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(false);
+        vi.mocked(followRepo.unfollowUser).mockResolvedValue(false);
         vi.mocked(followRepo.getFollowersCount).mockResolvedValue(5);
 
         const result = await useCase.execute({

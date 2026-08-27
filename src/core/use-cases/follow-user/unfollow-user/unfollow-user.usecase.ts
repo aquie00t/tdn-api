@@ -44,17 +44,16 @@ export class UnfollowUserUseCase {
         if (currentUserId === targetProfile.userId) {
             throw new BadRequestError("You cannot unfollow yourself.");
         }
-        const isFollowing = await this.followUserRepository.checkIsFollowing(
+
+        // Same as following: the delete itself reports whether there was
+        // anything to remove, so two overlapping unfollows cannot turn into a
+        // missing-record failure.
+        const removed = await this.followUserRepository.unfollowUser(
             currentUserId,
             targetProfile.userId,
         );
 
-        if (isFollowing) {
-            await this.followUserRepository.unfollowUser(
-                currentUserId,
-                targetProfile.userId,
-            );
-
+        if (removed) {
             // The follow notification goes with the follow: leaving it behind
             // tells the target someone follows them who no longer does, and
             // re-following would stack a second one on top.
