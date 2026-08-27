@@ -56,7 +56,8 @@ export const RateLimitPolicies = {
  * (provided in the `Authorization` header as `Bot <token>`) are checked against the
  * database for validity and may be allow-listed.
  *
- * If the rate limit is exceeded, a `TooManyRequestsError` is thrown.
+ * If the rate limit is exceeded, the limiter is handed a `TooManyRequestsError`,
+ * which reaches the client as the same RFC 7807 document every other error uses.
  *
  * @param fastify - The Fastify instance to register the rate limit plugin on.
  */
@@ -81,9 +82,14 @@ function rateLimitPlugin(fastify: FastifyInstance): void {
 
             return user !== null;
         },
-        errorResponseBuilder: (): never => {
-            throw new TooManyRequestsError();
-        },
+        // @fastify/rate-limit does `throw errorResponseBuilder(req, ctx)`: it
+        // throws whatever this returns. So it has to be an Error carrying a
+        // statusCode - a plain problem-document object would be thrown without
+        // one and the error handler would render it as a 500 instead of a 429.
+        errorResponseBuilder: (_request, context): TooManyRequestsError =>
+            new TooManyRequestsError(
+                `Too many requests, please try again in ${context.after}.`,
+            ),
     });
 }
 

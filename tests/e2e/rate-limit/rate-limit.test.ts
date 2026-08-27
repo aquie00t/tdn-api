@@ -79,10 +79,18 @@ describe("Rate Limit Policies", () => {
                 type: string;
                 title: string;
                 status: number;
+                detail: string;
+                instance: string;
             }>(res);
             expect(body.type).toBe("about:blank");
             expect(body.title).toBe("TooManyRequestsError");
             expect(body.status).toBe(429);
+            expect(body.instance).toBe("/api/v1/auth/login");
+            // The limiter knows how long the window has left, so the client
+            // can say when to try again instead of guessing.
+            expect(body.detail).toMatch(
+                /^Too many requests, please try again in .+\.$/,
+            );
         });
 
         it("should still return 429 on the 5th request (continueExceeding resets the window)", async () => {
@@ -96,6 +104,22 @@ describe("Rate Limit Policies", () => {
             });
 
             expect(res.statusCode).toBe(429);
+        });
+
+        it("should keep the limiter's own headers on the rejected response", async () => {
+            const res = await request({
+                method: "POST",
+                url: "/auth/login",
+                payload: {
+                    identifier: "nobody@rate-limit-test.com",
+                    password: "wrongpassword",
+                },
+            });
+
+            expect(res.statusCode).toBe(429);
+            expect(res.headers["retry-after"]).toBeDefined();
+            expect(res.headers["x-ratelimit-limit"]).toBeDefined();
+            expect(res.headers["x-ratelimit-reset"]).toBeDefined();
         });
     });
 
@@ -116,12 +140,18 @@ describe("Rate Limit Policies", () => {
         it("should return 429 on the 6th request", async () => {
             const res = await request({ method: "POST", url: "/auth/refresh" });
             expect(res.statusCode).toBe(429);
+
+            // Every tier answers through the same builder, so a 429 is a
+            // problem document here exactly as it is under STRICT.
+            const body = parseBody<{ title: string; status: number }>(res);
+            expect(body.title).toBe("TooManyRequestsError");
+            expect(body.status).toBe(429);
         });
     });
 
     describe("Bot token allowlist", () => {
         it("should bypass rate limits with a valid bot token even after STRICT limit is exceeded", async () => {
-            // /auth/login already has 5 requests above (all rejected after 4th).
+            // /auth/login already has 6 requests above (all rejected after 4th).
             // Requests with a valid bot token should bypass the limit entirely.
             for (let i = 0; i < 3; i++) {
                 const res = await request({
