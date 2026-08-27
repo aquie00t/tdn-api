@@ -42,10 +42,73 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    migrate:
+        name: Apply Database Migrations
+        runs-on: ubuntu-latest
+        needs: release
+        # Only when semantic-release cut a version, and before the image that
+        # expects the new schema becomes pullable.
+        if: ${{ needs.release.outputs.new_release_published == 'true' }}
+        # Gives the run a deployment record, and a place to hang required
+        # reviewers on if this should ever need approval.
+        environment: production
+        env:
+            # Deliberately no NODE_ENV=production here: pnpm would then skip
+            # devDependencies, and the Prisma CLI this job runs is one. The
+            # datasource url comes from the step env either way - prisma.config
+            # reads process.env.DATABASE_URL, and the .env file it looks for
+            # does not exist on a runner.
+            HUSKY: "0"
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v7
+
+            - name: Verify the database URL is configured
+              # Without this the job would fail deeper in, with a Prisma error
+              # that does not say the secret is the thing that is missing.
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+              run: |
+                  if [ -z "$DATABASE_URL" ]; then
+                    echo "::error::The DATABASE_URL secret is not set. Migrations cannot be applied, so the release would ship code ahead of its schema."
+                    exit 1
+                  fi
+
+            - name: Install pnpm
+              uses: pnpm/action-setup@v6
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: ".nvmrc"
+                  cache: "pnpm"
+
+            - name: Install Dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Show Pending Migrations
+              # Records in the run log what this release is about to apply.
+              # Exits non-zero precisely when there is something pending, which
+              # is the normal case here, so its status is not the job's.
+              continue-on-error: true
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+              run: pnpm prisma migrate status
+
+            - name: Apply Migrations
+              # deploy, never dev or reset: it only applies migrations that have
+              # not run yet, never rewrites or drops anything, and takes an
+              # advisory lock so overlapping releases queue instead of racing.
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+              run: pnpm db:deploy
+
     docker-push:
         name: Push Docker Image to GHCR
         runs-on: ubuntu-latest
-        needs: release
+        # Waits on migrate as well: an image whose schema has not been applied
+        # is exactly how notifications started answering 500 in production.
+        needs: [release, migrate]
         # Only runs when semantic-release actually created a new version
         if: ${{ needs.release.outputs.new_release_published == 'true' }}
         steps:
