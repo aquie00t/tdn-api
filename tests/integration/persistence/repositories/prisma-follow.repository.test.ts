@@ -77,18 +77,66 @@ describe("PrismaFollowUserRepository (integration)", () => {
             );
             expect(isFollowing).toBe(false);
         });
+
+        it("should report whether the relationship was actually created", async () => {
+            const first = await followRepo.followUser(userCId, userAId);
+            const second = await followRepo.followUser(userCId, userAId);
+
+            expect(first).toBe(true);
+            expect(second).toBe(false);
+
+            await followRepo.unfollowUser(userCId, userAId);
+        });
+
+        it("should survive two concurrent follows of the same target", async () => {
+            // Both calls read and write in the same window. Reading first and
+            // inserting afterwards raised P2002 on the composite primary key
+            // for whichever one lost, which surfaced as a 500.
+            const results = await Promise.all([
+                followRepo.followUser(userCId, userBId),
+                followRepo.followUser(userCId, userBId),
+            ]);
+
+            expect(results.filter(Boolean)).toHaveLength(1);
+            expect(
+                await prisma.follow.count({
+                    where: { followerId: userCId, followingId: userBId },
+                }),
+            ).toBe(1);
+
+            await followRepo.unfollowUser(userCId, userBId);
+        });
     });
 
     describe("unfollowUser()", () => {
         it("should remove the follow relationship", async () => {
             await followRepo.followUser(userBId, userCId);
-            await followRepo.unfollowUser(userBId, userCId);
+            const removed = await followRepo.unfollowUser(userBId, userCId);
+
+            expect(removed).toBe(true);
 
             const isFollowing = await followRepo.checkIsFollowing(
                 userBId,
                 userCId,
             );
             expect(isFollowing).toBe(false);
+        });
+
+        it("should report no match rather than failing on a missing row", async () => {
+            const removed = await followRepo.unfollowUser(userBId, userCId);
+
+            expect(removed).toBe(false);
+        });
+
+        it("should survive two concurrent unfollows of the same target", async () => {
+            await followRepo.followUser(userBId, userCId);
+
+            const results = await Promise.all([
+                followRepo.unfollowUser(userBId, userCId),
+                followRepo.unfollowUser(userBId, userCId),
+            ]);
+
+            expect(results.filter(Boolean)).toHaveLength(1);
         });
     });
 

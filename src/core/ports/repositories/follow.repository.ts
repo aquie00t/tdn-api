@@ -14,18 +14,32 @@ export interface IFollowRepository {
     checkIsFollowing(followerId: string, followingId: string): Promise<boolean>;
 
     /**
-     * Creates a follow relationship between two users.
+     * Creates a follow relationship between two users, if it is not there yet.
+     *
+     * Idempotent, and it has to be: reading first and then writing leaves a
+     * window in which two overlapping requests - a double tap, a retry - both
+     * see no relationship and both insert, and the second one hits the
+     * composite primary key.
+     *
      * @param followerId - The ID of the user initiating the follow (Current User).
      * @param followingId - The ID of the user being followed (Target User).
+     * @returns True when this call created the relationship, false when it
+     * was already there.
      */
-    followUser(followerId: string, followingId: string): Promise<void>;
+    followUser(followerId: string, followingId: string): Promise<boolean>;
 
     /**
-     * Removes a follow relationship between two users.
+     * Removes a follow relationship between two users, if it is still there.
+     *
+     * Idempotent for the same reason as {@link followUser}: two overlapping
+     * unfollows must not turn into a missing-record failure.
+     *
      * @param followerId - The ID of the user who is currently following.
      * @param followingId - The ID of the user being unfollowed.
+     * @returns True when this call removed the relationship, false when there
+     * was nothing to remove.
      */
-    unfollowUser(followerId: string, followingId: string): Promise<void>;
+    unfollowUser(followerId: string, followingId: string): Promise<boolean>;
 
     /**
      * Retrieves a paginated list of users who follow the target user.

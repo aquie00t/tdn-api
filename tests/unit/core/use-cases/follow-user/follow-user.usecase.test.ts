@@ -9,18 +9,14 @@ import { buildProfile } from "../../../helpers/mock-factories";
 
 describe("FollowUserUseCase", () => {
     let useCase: FollowUserUseCase;
-    let followRepo: Pick<
-        IFollowRepository,
-        "checkIsFollowing" | "followUser" | "getFollowersCount"
-    >;
+    let followRepo: Pick<IFollowRepository, "followUser" | "getFollowersCount">;
     let notificationRepo: Pick<INotificationRepository, "create">;
     let realtimeSvc: Pick<RealtimePort, "emitToUser">;
     let profileRepo: Pick<IProfileRepository, "findByUserId">;
 
     beforeEach(() => {
         followRepo = {
-            checkIsFollowing: vi.fn(),
-            followUser: vi.fn(),
+            followUser: vi.fn().mockResolvedValue(true),
             getFollowersCount: vi.fn().mockResolvedValue(42),
         };
         notificationRepo = { create: vi.fn() };
@@ -52,12 +48,11 @@ describe("FollowUserUseCase", () => {
             useCase.execute({ currentUserId: "user-1", targetId: "user-2" }),
         ).rejects.toThrow(NotFoundError);
 
-        expect(followRepo.checkIsFollowing).not.toHaveBeenCalled();
+        expect(followRepo.followUser).not.toHaveBeenCalled();
     });
 
     it("should follow user, create notification and emit realtime when not already following", async () => {
-        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(false);
-        vi.mocked(followRepo.followUser).mockResolvedValue(undefined);
+        vi.mocked(followRepo.followUser).mockResolvedValue(true);
         vi.mocked(notificationRepo.create).mockResolvedValue(undefined);
 
         const result = await useCase.execute({
@@ -75,22 +70,41 @@ describe("FollowUserUseCase", () => {
         expect(result.followersCount).toBe(42);
     });
 
-    it("should skip follow and notification when already following (idempotent)", async () => {
-        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(true);
+    it("should not notify again when the relationship was already there", async () => {
+        // The write is still attempted - the database decides - but it reports
+        // that it changed nothing, so nothing is announced.
+        vi.mocked(followRepo.followUser).mockResolvedValue(false);
 
         const result = await useCase.execute({
             currentUserId: "user-1",
             targetId: "user-2",
         });
 
-        expect(followRepo.followUser).not.toHaveBeenCalled();
+        expect(followRepo.followUser).toHaveBeenCalledOnce();
         expect(notificationRepo.create).not.toHaveBeenCalled();
         expect(realtimeSvc.emitToUser).not.toHaveBeenCalled();
         expect(result.followersCount).toBe(42);
     });
 
+    it("should notify exactly once when two overlapping requests race", async () => {
+        // Whichever request loses the insert gets false back instead of a
+        // unique-constraint failure, so the target is told once.
+        vi.mocked(followRepo.followUser)
+            .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce(false);
+
+        await Promise.all([
+            useCase.execute({ currentUserId: "user-1", targetId: "user-2" }),
+            useCase.execute({ currentUserId: "user-1", targetId: "user-2" }),
+        ]);
+
+        expect(followRepo.followUser).toHaveBeenCalledTimes(2);
+        expect(notificationRepo.create).toHaveBeenCalledOnce();
+        expect(realtimeSvc.emitToUser).toHaveBeenCalledOnce();
+    });
+
     it("should always return followersCount regardless of follow state", async () => {
-        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(true);
+        vi.mocked(followRepo.followUser).mockResolvedValue(false);
         vi.mocked(followRepo.getFollowersCount).mockResolvedValue(100);
 
         const result = await useCase.execute({

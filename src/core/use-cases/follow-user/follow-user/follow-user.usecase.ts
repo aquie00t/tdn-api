@@ -48,14 +48,16 @@ export class FollowUserUseCase {
             await this.profileRepository.findByUserId(targetId);
         if (!targetProfile) throw new NotFoundError("User not found.");
 
-        const isFollowing = await this.followUserRepository.checkIsFollowing(
+        // The write decides, not a preceding read: asking first and inserting
+        // afterwards let two overlapping requests both find nothing and both
+        // insert, and the loser died on the composite primary key. The count
+        // it returns is also the exact answer to "should this notify?".
+        const created = await this.followUserRepository.followUser(
             currentUserId,
             targetId,
         );
 
-        if (!isFollowing) {
-            await this.followUserRepository.followUser(currentUserId, targetId);
-
+        if (created) {
             const notification = Notification.create(
                 targetId,
                 currentUserId,
