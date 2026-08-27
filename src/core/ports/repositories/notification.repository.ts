@@ -1,4 +1,5 @@
 import type { Notification } from "@core/domain/entities/notification.entity";
+import type { NotificationType } from "@core/domain/enums/notification-type.enum";
 
 /**
  * Parameters for paginated notification retrieval.
@@ -7,6 +8,34 @@ export interface FindNotificationsInput {
     userId: string;
     take: number;
     skip: number;
+}
+
+/**
+ * Identifies the notification a single undone action produced.
+ *
+ * Every field participates in the match, and a target left out must be null
+ * in the row: a like on a post and a like on an article are the same type
+ * from the same issuer to the same recipient, and only the target tells them
+ * apart.
+ */
+export interface DeleteNotificationInput {
+    /** The user the notification was delivered to. */
+    recipientId: string;
+
+    /** The user whose action produced it. */
+    issuerId: string;
+
+    /** The kind of notification to remove. */
+    type: NotificationType;
+
+    /** The post it points at, when it points at one. */
+    postId?: string;
+
+    /** The article it points at, when it points at one. */
+    articleId?: string;
+
+    /** The comment it points at, when it points at one. */
+    commentId?: string;
 }
 
 /**
@@ -42,6 +71,18 @@ export interface INotificationRepository {
      * @returns The total number of notifications.
      */
     countByUserId(userId: string): Promise<number>;
+
+    /**
+     * Deletes the notification an undone action had produced.
+     *
+     * Unliking or unfollowing must take its notification back with it,
+     * otherwise the recipient keeps a notification for something that no
+     * longer happened, and toggling the action piles up duplicates.
+     *
+     * @param input - The exact notification to remove.
+     * @returns The number of notifications deleted, zero when none matched.
+     */
+    deleteByTarget(input: DeleteNotificationInput): Promise<number>;
 
     /**
      * Marks a single notification as read.

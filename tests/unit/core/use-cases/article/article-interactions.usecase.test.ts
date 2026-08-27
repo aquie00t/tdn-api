@@ -25,7 +25,10 @@ describe("article like and bookmark use cases", () => {
     let articleRepo: Pick<IArticleRepository, "findById">;
     let likeRepo: IArticleLikeRepository;
     let bookmarkRepo: IArticleBookmarkRepository;
-    let notificationRepo: Pick<INotificationRepository, "create">;
+    let notificationRepo: Pick<
+        INotificationRepository,
+        "create" | "deleteByTarget"
+    >;
     let realtimeSvc: Pick<RealtimePort, "emitToUser">;
     let transactionSvc: Pick<TransactionPort, "runInTransaction">;
 
@@ -50,7 +53,10 @@ describe("article like and bookmark use cases", () => {
             remove: vi.fn().mockResolvedValue(undefined),
             isBookmarked: vi.fn().mockResolvedValue(false),
         };
-        notificationRepo = { create: vi.fn() };
+        notificationRepo = {
+            create: vi.fn(),
+            deleteByTarget: vi.fn().mockResolvedValue(1),
+        };
         realtimeSvc = { emitToUser: vi.fn() };
         transactionSvc = {
             runInTransaction: vi.fn().mockImplementation(async (work) =>
@@ -174,6 +180,27 @@ describe("article like and bookmark use cases", () => {
 
             expect(likeRepo.unlike).not.toHaveBeenCalled();
             expect(likeRepo.decrementLikeCount).not.toHaveBeenCalled();
+        });
+
+        it("should take back the notification the like had produced", async () => {
+            vi.mocked(likeRepo.isLiked).mockResolvedValue(true);
+
+            await useCase.execute({ articleId: ARTICLE, userId: READER });
+
+            expect(notificationRepo.deleteByTarget).toHaveBeenCalledWith({
+                recipientId: AUTHOR,
+                issuerId: READER,
+                type: NotificationType.LIKE,
+                articleId: ARTICLE,
+            });
+        });
+
+        it("should not touch notifications when there was no like to undo", async () => {
+            vi.mocked(likeRepo.isLiked).mockResolvedValue(false);
+
+            await useCase.execute({ articleId: ARTICLE, userId: READER });
+
+            expect(notificationRepo.deleteByTarget).not.toHaveBeenCalled();
         });
     });
 

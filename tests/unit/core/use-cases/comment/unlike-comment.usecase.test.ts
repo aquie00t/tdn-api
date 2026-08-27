@@ -7,6 +7,8 @@ import type {
 } from "@core/ports/services/transaction.port";
 import type { ICommentRepository } from "@core/ports/repositories/comment.repository";
 import { buildComment } from "../../../helpers/mock-factories";
+import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
+import { NotificationType } from "@core/domain/enums/notification-type.enum";
 
 describe("UnlikeCommentUseCase", () => {
     let useCase: UnlikeCommentUseCase;
@@ -15,12 +17,15 @@ describe("UnlikeCommentUseCase", () => {
         ICommentRepository,
         "findById" | "hasUserLiked" | "removeLike" | "decrementLikeCount"
     >;
+    let txNotificationRepo: Pick<INotificationRepository, "deleteByTarget">;
 
     const input = { commentId: "comment-1", userId: "user-1" };
 
     const buildTransactionContext = (): TransactionContext =>
         ({
             commentRepository: txCommentRepo as ICommentRepository,
+            notificationRepository:
+                txNotificationRepo as INotificationRepository,
         }) as TransactionContext;
 
     beforeEach(() => {
@@ -30,6 +35,7 @@ describe("UnlikeCommentUseCase", () => {
             removeLike: vi.fn(),
             decrementLikeCount: vi.fn(),
         };
+        txNotificationRepo = { deleteByTarget: vi.fn().mockResolvedValue(1) };
         transactionSvc = { runInTransaction: vi.fn() };
 
         vi.mocked(transactionSvc.runInTransaction).mockImplementation(
@@ -72,5 +78,36 @@ describe("UnlikeCommentUseCase", () => {
         expect(txCommentRepo.decrementLikeCount).toHaveBeenCalledWith(
             "comment-1",
         );
+    });
+
+    it("should take back the notification the like had produced", async () => {
+        vi.mocked(txCommentRepo.findById).mockResolvedValue(
+            buildComment({ authorId: "comment-author", postId: "post-1" }),
+        );
+        vi.mocked(txCommentRepo.hasUserLiked).mockResolvedValue(true);
+        vi.mocked(txCommentRepo.removeLike).mockResolvedValue(undefined);
+        vi.mocked(txCommentRepo.decrementLikeCount).mockResolvedValue(
+            undefined,
+        );
+
+        await useCase.execute(input);
+
+        expect(txNotificationRepo.deleteByTarget).toHaveBeenCalledWith({
+            recipientId: "comment-author",
+            issuerId: "user-1",
+            type: NotificationType.COMMENT_LIKE,
+            commentId: "comment-1",
+            postId: "post-1",
+            articleId: undefined,
+        });
+    });
+
+    it("should not touch notifications when there was no like to undo", async () => {
+        vi.mocked(txCommentRepo.findById).mockResolvedValue(buildComment());
+        vi.mocked(txCommentRepo.hasUserLiked).mockResolvedValue(false);
+
+        await useCase.execute(input);
+
+        expect(txNotificationRepo.deleteByTarget).not.toHaveBeenCalled();
     });
 });

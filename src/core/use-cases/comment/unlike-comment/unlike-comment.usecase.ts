@@ -1,6 +1,7 @@
 import type { TransactionPort } from "@core/ports/services/transaction.port";
 import { NotFoundError } from "@core/errors";
 import type { UnlikeCommentUseCaseInput } from "./unlike-comment-usecase.input";
+import { NotificationType } from "@core/domain/enums/notification-type.enum";
 
 /**
  * Use case for unliking a comment. This use case handles the logic for removing a like from a comment, including checking if the comment exists, verifying that the user has previously liked the comment, updating the like count, and ensuring that all operations are executed within a transaction to maintain data integrity.
@@ -34,6 +35,15 @@ export class UnlikeCommentUseCase {
                 input.userId,
             );
             await ctx.commentRepository.decrementLikeCount(input.commentId);
+
+            await ctx.notificationRepository.deleteByTarget({
+                recipientId: comment.authorId,
+                issuerId: input.userId,
+                type: NotificationType.COMMENT_LIKE,
+                commentId: input.commentId,
+                postId: comment.postId ?? undefined,
+                articleId: comment.articleId ?? undefined,
+            });
         });
     }
 }

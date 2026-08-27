@@ -167,6 +167,117 @@ describe("PrismaNotificationRepository (integration)", () => {
         });
     });
 
+    describe("deleteByTarget()", () => {
+        it("should remove only the notification for the given target", async () => {
+            const post = await prisma.post.create({
+                data: { content: "Liked post", authorId: recipientId },
+            });
+            const article = await prisma.article.create({
+                data: {
+                    slug: "liked-article",
+                    title: "Liked article",
+                    body: "body",
+                    authorId: recipientId,
+                },
+            });
+
+            await notifRepo.create(
+                Notification.create(
+                    recipientId,
+                    issuerId,
+                    NotificationType.LIKE,
+                    { postId: post.id },
+                ),
+            );
+            await notifRepo.create(
+                Notification.create(
+                    recipientId,
+                    issuerId,
+                    NotificationType.LIKE,
+                    { articleId: article.id },
+                ),
+            );
+
+            const deleted = await notifRepo.deleteByTarget({
+                recipientId,
+                issuerId,
+                type: NotificationType.LIKE,
+                postId: post.id,
+            });
+
+            expect(deleted).toBe(1);
+            expect(
+                await prisma.notification.count({
+                    where: { postId: post.id },
+                }),
+            ).toBe(0);
+            // The article like sits next to it with the same type, recipient
+            // and issuer - only the target keeps them apart.
+            expect(
+                await prisma.notification.count({
+                    where: { articleId: article.id },
+                }),
+            ).toBe(1);
+
+            await prisma.post.delete({ where: { id: post.id } });
+            await prisma.article.delete({ where: { id: article.id } });
+        });
+
+        it("should remove a follow notification, which has no target", async () => {
+            await notifRepo.create(
+                Notification.create(
+                    recipientId,
+                    issuerId,
+                    NotificationType.FOLLOW,
+                ),
+            );
+
+            const deleted = await notifRepo.deleteByTarget({
+                recipientId,
+                issuerId,
+                type: NotificationType.FOLLOW,
+            });
+
+            expect(deleted).toBeGreaterThanOrEqual(1);
+            expect(
+                await prisma.notification.count({
+                    where: {
+                        recipientId,
+                        issuerId,
+                        type: NotificationType.FOLLOW,
+                    },
+                }),
+            ).toBe(0);
+        });
+
+        it("should leave another issuer's notification alone", async () => {
+            await notifRepo.create(
+                Notification.create(
+                    recipientId,
+                    issuerId,
+                    NotificationType.FOLLOW,
+                ),
+            );
+
+            const deleted = await notifRepo.deleteByTarget({
+                recipientId,
+                issuerId: recipientId,
+                type: NotificationType.FOLLOW,
+            });
+
+            expect(deleted).toBe(0);
+            expect(
+                await prisma.notification.count({
+                    where: {
+                        recipientId,
+                        issuerId,
+                        type: NotificationType.FOLLOW,
+                    },
+                }),
+            ).toBe(1);
+        });
+    });
+
     describe("markAsRead()", () => {
         it("should mark a single notification as read for its recipient", async () => {
             await notifRepo.create(

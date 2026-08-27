@@ -7,6 +7,7 @@ import type {
 import type { CachePort } from "@core/ports/services/cache.port";
 import { NotFoundError } from "@core/errors";
 import { buildPost } from "../../../helpers/mock-factories";
+import { NotificationType } from "@core/domain/enums/notification-type.enum";
 
 describe("UnlikePostUseCase", () => {
     let useCase: UnlikePostUseCase;
@@ -14,7 +15,7 @@ describe("UnlikePostUseCase", () => {
     let cacheService: Pick<CachePort, "deleteByPattern">;
     let mockCtx: Pick<
         TransactionContext,
-        "postRepository" | "postLikeRepository"
+        "postRepository" | "postLikeRepository" | "notificationRepository"
     >;
 
     beforeEach(() => {
@@ -27,6 +28,9 @@ describe("UnlikePostUseCase", () => {
                 unlike: vi.fn().mockResolvedValue(undefined),
                 decrementLikeCount: vi.fn().mockResolvedValue(undefined),
             } as unknown as TransactionContext["postLikeRepository"],
+            notificationRepository: {
+                deleteByTarget: vi.fn().mockResolvedValue(1),
+            } as unknown as TransactionContext["notificationRepository"],
         };
         transactionService = {
             runInTransaction: vi
@@ -103,5 +107,36 @@ describe("UnlikePostUseCase", () => {
         await expect(
             useCase.execute({ postId: "post-1", userId: "user-1" }),
         ).rejects.toThrow("Transaction failed");
+    });
+
+    it("should take back the notification the like had produced", async () => {
+        vi.mocked(mockCtx.postRepository.findById).mockResolvedValue(
+            buildPost({ id: "post-1", author: { id: "author-1" } }),
+        );
+        vi.mocked(mockCtx.postLikeRepository.isLiked).mockResolvedValue(true);
+
+        await useCase.execute({ postId: "post-1", userId: "liker-99" });
+
+        expect(
+            mockCtx.notificationRepository.deleteByTarget,
+        ).toHaveBeenCalledWith({
+            recipientId: "author-1",
+            issuerId: "liker-99",
+            type: NotificationType.LIKE,
+            postId: "post-1",
+        });
+    });
+
+    it("should not touch notifications when there was no like to undo", async () => {
+        vi.mocked(mockCtx.postRepository.findById).mockResolvedValue(
+            buildPost({ id: "post-1", author: { id: "author-1" } }),
+        );
+        vi.mocked(mockCtx.postLikeRepository.isLiked).mockResolvedValue(false);
+
+        await useCase.execute({ postId: "post-1", userId: "liker-99" });
+
+        expect(
+            mockCtx.notificationRepository.deleteByTarget,
+        ).not.toHaveBeenCalled();
     });
 });
