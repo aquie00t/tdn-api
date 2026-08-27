@@ -167,6 +167,71 @@ describe("PrismaNotificationRepository (integration)", () => {
         });
     });
 
+    describe("markAsRead()", () => {
+        it("should mark a single notification as read for its recipient", async () => {
+            await notifRepo.create(
+                Notification.create(
+                    recipientId,
+                    issuerId,
+                    NotificationType.FOLLOW,
+                ),
+            );
+
+            const [latest] = await notifRepo.findAllByUserId({
+                userId: recipientId,
+                take: 1,
+                skip: 0,
+            });
+
+            const updated = await notifRepo.markAsRead(latest.id!, recipientId);
+
+            expect(updated).toBe(true);
+
+            const row = await prisma.notification.findUnique({
+                where: { id: latest.id! },
+            });
+            expect(row?.isRead).toBe(true);
+        });
+
+        it("should refuse to mark a notification the user does not own", async () => {
+            await notifRepo.create(
+                Notification.create(
+                    recipientId,
+                    issuerId,
+                    NotificationType.FOLLOW,
+                ),
+            );
+
+            const [latest] = await notifRepo.findAllByUserId({
+                userId: recipientId,
+                take: 1,
+                skip: 0,
+            });
+            await prisma.notification.update({
+                where: { id: latest.id! },
+                data: { isRead: false },
+            });
+
+            const updated = await notifRepo.markAsRead(latest.id!, issuerId);
+
+            expect(updated).toBe(false);
+
+            const row = await prisma.notification.findUnique({
+                where: { id: latest.id! },
+            });
+            expect(row?.isRead).toBe(false);
+        });
+
+        it("should report no match for an unknown notification", async () => {
+            const updated = await notifRepo.markAsRead(
+                "00000000-0000-0000-0000-000000000000",
+                recipientId,
+            );
+
+            expect(updated).toBe(false);
+        });
+    });
+
     describe("markAllAsRead()", () => {
         it("should set isRead=true for all recipient notifications", async () => {
             await notifRepo.markAllAsRead(recipientId);

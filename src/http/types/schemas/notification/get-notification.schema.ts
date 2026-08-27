@@ -56,3 +56,18 @@ export type GetNotificationsResponse = Static<
 
 export const MarkAllReadResponseSchema = MetaOnlyResponseSchema;
 export type MarkAllReadResponse = Static<typeof MarkAllReadResponseSchema>;
+
+export const NotificationIdParamsSchema = Type.Object({
+    id: Type.String({ format: "uuid", description: "Notification ID" }),
+});
+export type NotificationIdParams = Static<typeof NotificationIdParamsSchema>;
+
+export const UnreadCountResponseSchema = FBType.Object({
+    data: FBType.Object({
+        count: FBType.Number(),
+    }),
+    meta: FBType.Object({
+        timestamp: FBType.String(),
+    }),
+});
+export type UnreadCountResponse = Static<typeof UnreadCountResponseSchema>;
