@@ -1,3 +1,10 @@
+## [1.9.2](https://github.com/the-developer-network/tdn-api/compare/v1.9.1...v1.9.2) (2026-08-27)
+
+
+### Bug Fixes
+
+* **http:** answer rate limits and known Prisma failures as problem documents ([#227](https://github.com/the-developer-network/tdn-api/issues/227)) ([21d2713](https://github.com/the-developer-network/tdn-api/commit/21d271368418c36d998b9382263ae3d19a00c574))
+
 ## [1.9.1](https://github.com/the-developer-network/tdn-api/compare/v1.9.0...v1.9.1) (2026-08-27)
 
 
