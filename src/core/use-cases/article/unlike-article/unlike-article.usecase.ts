@@ -1,6 +1,7 @@
 import type { TransactionPort } from "@core/ports/services/transaction.port";
 import { NotFoundError } from "@core/errors";
 import type { UnlikeArticleUseCaseInput } from "./unlike-article-usecase.input";
+import { NotificationType } from "@core/domain/enums/notification-type.enum";
 
 /**
  * Use case for removing a like from an article.
@@ -42,6 +43,13 @@ export class UnlikeArticleUseCase {
                 input.userId,
             );
             await ctx.articleLikeRepository.decrementLikeCount(input.articleId);
+
+            await ctx.notificationRepository.deleteByTarget({
+                recipientId: article.author.id,
+                issuerId: input.userId,
+                type: NotificationType.LIKE,
+                articleId: input.articleId,
+            });
         });
     }
 }

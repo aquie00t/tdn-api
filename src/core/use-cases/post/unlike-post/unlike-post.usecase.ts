@@ -2,6 +2,7 @@ import type { TransactionPort } from "@core/ports/services/transaction.port";
 import { NotFoundError } from "@core/errors";
 import type { UnlikePostUseCaseInput } from "./unlike-post-usecase.input";
 import type { CachePort } from "@core/ports/services/cache.port";
+import { NotificationType } from "@core/domain/enums/notification-type.enum";
 
 /**
  * Use case for unliking a post
@@ -30,7 +31,8 @@ export class UnlikePostUseCase {
      * @remarks
      * This method first validates that the post exists, then checks if the user
      * has previously liked the post. If both conditions are met, it removes the
-     * like relationship and decrements the like count. If the user hasn't liked the post,
+     * like relationship, decrements the like count and takes back the
+     * notification the like had produced. If the user hasn't liked the post,
      * the operation is silently ignored (no error thrown).
      */
     async execute(input: UnlikePostUseCaseInput): Promise<void> {
@@ -49,6 +51,13 @@ export class UnlikePostUseCase {
             if (hasLiked) {
                 await ctx.postLikeRepository.unlike(input.postId, input.userId);
                 await ctx.postLikeRepository.decrementLikeCount(input.postId);
+
+                await ctx.notificationRepository.deleteByTarget({
+                    recipientId: post.author.id,
+                    issuerId: input.userId,
+                    type: NotificationType.LIKE,
+                    postId: input.postId,
+                });
             }
         });
         await this.cacheService.deleteByPattern(

@@ -3,6 +3,8 @@ import { UnfollowUserUseCase } from "@core/use-cases/follow-user/unfollow-user/u
 import { BadRequestError, NotFoundError } from "@core/errors";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
+import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
+import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import { buildProfile } from "../../../helpers/mock-factories";
 
 describe("UnfollowUserUseCase", () => {
@@ -12,6 +14,7 @@ describe("UnfollowUserUseCase", () => {
         "checkIsFollowing" | "unfollowUser" | "getFollowersCount"
     >;
     let profileRepo: Pick<IProfileRepository, "findByUserId">;
+    let notificationRepo: Pick<INotificationRepository, "deleteByTarget">;
 
     beforeEach(() => {
         followRepo = {
@@ -20,10 +23,12 @@ describe("UnfollowUserUseCase", () => {
             getFollowersCount: vi.fn().mockResolvedValue(10),
         };
         profileRepo = { findByUserId: vi.fn() };
+        notificationRepo = { deleteByTarget: vi.fn().mockResolvedValue(1) };
 
         useCase = new UnfollowUserUseCase(
             followRepo as IFollowRepository,
             profileRepo as IProfileRepository,
+            notificationRepo as INotificationRepository,
         );
     });
 
@@ -73,6 +78,33 @@ describe("UnfollowUserUseCase", () => {
         await useCase.execute({ currentUserId: "user-1", targetId: "user-2" });
 
         expect(followRepo.unfollowUser).not.toHaveBeenCalled();
+    });
+
+    it("should take the follow notification back with the follow", async () => {
+        vi.mocked(profileRepo.findByUserId).mockResolvedValue(
+            buildProfile({ userId: "user-2" }),
+        );
+        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(true);
+        vi.mocked(followRepo.unfollowUser).mockResolvedValue(undefined);
+
+        await useCase.execute({ currentUserId: "user-1", targetId: "user-2" });
+
+        expect(notificationRepo.deleteByTarget).toHaveBeenCalledWith({
+            recipientId: "user-2",
+            issuerId: "user-1",
+            type: NotificationType.FOLLOW,
+        });
+    });
+
+    it("should not delete notifications when there was no follow to undo", async () => {
+        vi.mocked(profileRepo.findByUserId).mockResolvedValue(
+            buildProfile({ userId: "user-2" }),
+        );
+        vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(false);
+
+        await useCase.execute({ currentUserId: "user-1", targetId: "user-2" });
+
+        expect(notificationRepo.deleteByTarget).not.toHaveBeenCalled();
     });
 
     it("should always return followersCount regardless of follow state", async () => {

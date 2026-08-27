@@ -1,6 +1,8 @@
 import { BadRequestError, NotFoundError } from "@core/errors";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
+import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
+import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import type { UnFollowUserUseCaseInput, UnFollowUserUseCaseOutput } from "./";
 
 /**
@@ -15,10 +17,12 @@ export class UnfollowUserUseCase {
      *
      * @param followUserRepository - Repository for managing follow relationships
      * @param profileRepository - Repository for managing user profiles
+     * @param notificationRepository - Repository for managing notifications
      */
     constructor(
         private readonly followUserRepository: IFollowRepository,
         private readonly profileRepository: IProfileRepository,
+        private readonly notificationRepository: INotificationRepository,
     ) {}
 
     /**
@@ -50,6 +54,15 @@ export class UnfollowUserUseCase {
                 currentUserId,
                 targetProfile.userId,
             );
+
+            // The follow notification goes with the follow: leaving it behind
+            // tells the target someone follows them who no longer does, and
+            // re-following would stack a second one on top.
+            await this.notificationRepository.deleteByTarget({
+                recipientId: targetProfile.userId,
+                issuerId: currentUserId,
+                type: NotificationType.FOLLOW,
+            });
         }
 
         const followersCount =

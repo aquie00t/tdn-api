@@ -1,8 +1,10 @@
 import type {
     INotificationRepository,
     FindNotificationsInput,
+    DeleteNotificationInput,
 } from "@core/ports/repositories/notification.repository";
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
+import type { NotificationType as PrismaNotificationType } from "@generated/prisma/client";
 import type { Notification } from "@core/domain/entities/notification.entity";
 import { NotificationPrismaMapper } from "@infrastructure/persistence/mappers/notification-prisma.mapper";
 
@@ -85,6 +87,24 @@ export class PrismaNotificationRepository implements INotificationRepository {
                 recipientId: userId,
             },
         });
+    }
+
+    async deleteByTarget(input: DeleteNotificationInput): Promise<number> {
+        // The unset targets are matched as explicit NULLs rather than left
+        // out: Prisma drops an undefined filter, which would let a post like
+        // delete the article like sitting next to it.
+        const result = await this.prisma.notification.deleteMany({
+            where: {
+                recipientId: input.recipientId,
+                issuerId: input.issuerId,
+                type: input.type as unknown as PrismaNotificationType,
+                postId: input.postId ?? null,
+                articleId: input.articleId ?? null,
+                commentId: input.commentId ?? null,
+            },
+        });
+
+        return result.count;
     }
 
     async markAsRead(
