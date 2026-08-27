@@ -7,7 +7,7 @@ import type { RefreshTokenPurgeScheduler } from "@infrastructure/jobs/refresh-to
 import type { ProfileController } from "@services/profile.controller";
 import type { FollowUserController } from "@services/follow-user.controller";
 import type { WebSocketManager } from "@infrastructure/realtime/websocket/websocket-manager";
-import type NotificationController from "@services/notification.controller";
+import type { NotificationController } from "@controllers/notification.controller";
 import type { NotificationPurgeScheduler } from "@infrastructure/jobs/notification/notification-purge.scheduler";
 import type PostController from "@services/post.controller";
 import type { CommentController } from "@controllers/comment.controller";

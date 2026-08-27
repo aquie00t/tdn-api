@@ -30,6 +30,8 @@ import { GetFollowersUseCase } from "@core/use-cases/follow-user/get-followers";
 import { GetFollowingUseCase } from "@core/use-cases/follow-user/get-following";
 import { GetUserNotificationUseCase } from "@core/use-cases/notification/get-user";
 import { MarkAllNotificationsAsReadUseCase } from "@core/use-cases/notification/mark-all";
+import { MarkNotificationAsReadUseCase } from "@core/use-cases/notification/mark-one";
+import { GetUnreadNotificationCountUseCase } from "@core/use-cases/notification/unread-count";
 import { PurgeExpiredNotificationsUseCase } from "@core/use-cases/notification/purge-expired";
 import { CreatePostUseCase } from "@core/use-cases/post/create-post";
 import { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
@@ -290,6 +292,20 @@ export const useCasesModule = {
      */
     getUserNotificationsUseCase: asClass(
         GetUserNotificationUseCase,
+    ).singleton(),
+
+    /**
+     * Use case for reading the unread notification count
+     */
+    getUnreadNotificationCountUseCase: asClass(
+        GetUnreadNotificationCountUseCase,
+    ).singleton(),
+
+    /**
+     * Use case for marking a single notification as read
+     */
+    markNotificationReadUseCase: asClass(
+        MarkNotificationAsReadUseCase,
     ).singleton(),
 
     /**

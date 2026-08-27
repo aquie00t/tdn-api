@@ -44,6 +44,18 @@ export interface INotificationRepository {
     countByUserId(userId: string): Promise<number>;
 
     /**
+     * Marks a single notification as read.
+     *
+     * Scoped to the recipient on purpose: a notification that belongs to
+     * somebody else must be indistinguishable from one that does not exist.
+     *
+     * @param notificationId - The unique identifier of the notification.
+     * @param recipientId - The user the notification must belong to.
+     * @returns True when a notification was updated, false when none matched.
+     */
+    markAsRead(notificationId: string, recipientId: string): Promise<boolean>;
+
+    /**
      * Marks all notifications for a specific user as read.
      * @param userId - The unique identifier of the user.
      */

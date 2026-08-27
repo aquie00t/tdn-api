@@ -87,6 +87,21 @@ export class PrismaNotificationRepository implements INotificationRepository {
         });
     }
 
+    async markAsRead(
+        notificationId: string,
+        recipientId: string,
+    ): Promise<boolean> {
+        // updateMany rather than update: it lets the recipient be part of the
+        // filter, so another user's notification simply matches nothing
+        // instead of being updated or leaking its existence through an error.
+        const result = await this.prisma.notification.updateMany({
+            where: { id: notificationId, recipientId },
+            data: { isRead: true },
+        });
+
+        return result.count > 0;
+    }
+
     async markAllAsRead(userId: string): Promise<void> {
         await this.prisma.notification.updateMany({
             where: {
