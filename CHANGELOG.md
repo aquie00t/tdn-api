@@ -1,3 +1,15 @@
+# [1.10.0](https://github.com/the-developer-network/tdn-api/compare/v1.9.2...v1.10.0) (2026-08-27)
+
+
+### Bug Fixes
+
+* **follow:** let the database settle concurrent follows ([#229](https://github.com/the-developer-network/tdn-api/issues/229)) ([3d90107](https://github.com/the-developer-network/tdn-api/commit/3d90107982d591aa21b7c21f61f20200c99c57ae))
+
+
+### Features
+
+* **follow:** move follow and unfollow to the STANDARD rate limit ([#228](https://github.com/the-developer-network/tdn-api/issues/228)) ([62b1697](https://github.com/the-developer-network/tdn-api/commit/62b1697758515895201a4b7e6e384e1279c33069))
+
 ## [1.9.2](https://github.com/the-developer-network/tdn-api/compare/v1.9.1...v1.9.2) (2026-08-27)
 
 
