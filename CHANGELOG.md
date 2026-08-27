@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/the-developer-network/tdn-api/compare/v1.8.0...v1.9.0) (2026-08-27)
+
+
+### Features
+
+* **notification:** add unread count and per-notification read ([#223](https://github.com/the-developer-network/tdn-api/issues/223)) ([fbd4b22](https://github.com/the-developer-network/tdn-api/commit/fbd4b2263db2ea18626d3733b4ad04ccd06d293e))
+
 # [1.8.0](https://github.com/the-developer-network/tdn-api/compare/v1.7.4...v1.8.0) (2026-08-26)
 
 
