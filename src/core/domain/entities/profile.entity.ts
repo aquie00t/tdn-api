@@ -1,3 +1,4 @@
+import type { PostCategory } from "@core/domain/enums/post-category-enum";
 import type { ProfileProps } from "@core/domain/interfaces/profile-props.interface";
 
 /**
@@ -29,6 +30,7 @@ export class Profile {
             bio: null,
             location: null,
             socials: null,
+            categories: [],
             followersCount: 0,
             followingCount: 0,
         });
@@ -103,6 +105,14 @@ export class Profile {
     }
 
     /**
+     * Get the discovery categories of the profile
+     * @returns The categories, empty for non-bot profiles
+     */
+    get categories(): PostCategory[] {
+        return this.props.categories ?? [];
+    }
+
+    /**
      * Get the creation timestamp of the profile
      * @returns The creation date
      */
@@ -149,7 +159,10 @@ export class Profile {
      */
     public update(
         data: Partial<
-            Pick<ProfileProps, "fullName" | "bio" | "location" | "socials">
+            Pick<
+                ProfileProps,
+                "fullName" | "bio" | "location" | "socials" | "categories"
+            >
         >,
     ): void {
         Object.assign(this.props, {

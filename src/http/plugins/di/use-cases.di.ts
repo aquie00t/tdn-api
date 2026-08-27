@@ -57,6 +57,7 @@ import { RemoveCommentBookmarkUseCase } from "@core/use-cases/bookmark/remove-co
 import { GetTrendsUseCase } from "@core/use-cases/post/get-trends";
 import { SearchTagsUseCase } from "@core/use-cases/tag/search-tag";
 import { GetSuggestedUsersUseCase } from "@core/use-cases/profile/get-suggested-users";
+import { GetBotProfilesUseCase } from "@core/use-cases/profile/get-bot-profiles";
 import { TranslateUseCase } from "@core/use-cases/translate";
 import { CreateArticleUseCase } from "@core/use-cases/article/create-article";
 import { UpdateArticleUseCase } from "@core/use-cases/article/update-article";
@@ -432,6 +433,7 @@ export const useCasesModule = {
     getTrendsUseCase: asClass(GetTrendsUseCase).singleton(),
     searchTagsUseCase: asClass(SearchTagsUseCase).singleton(),
     getSuggestedUsersUseCase: asClass(GetSuggestedUsersUseCase).singleton(),
+    getBotProfilesUseCase: asClass(GetBotProfilesUseCase).singleton(),
     translateUseCase: asClass(TranslateUseCase).singleton(),
 
     /**

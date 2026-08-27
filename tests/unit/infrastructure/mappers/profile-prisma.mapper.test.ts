@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ProfilePrismaMapper } from "@infrastructure/persistence/mappers/profile-prisma.mapper";
 import type { Profile as PrismaProfile } from "@generated/prisma/client";
+import { PostCategory } from "@core/domain/enums/post-category-enum";
 
 const now = new Date("2025-01-01T00:00:00.000Z");
 
@@ -21,6 +22,7 @@ function makeDbProfile(overrides: Partial<DbProfile> = {}): DbProfile {
         avatarUrl: "uploads/avatar.jpg",
         bannerUrl: "uploads/banner.jpg",
         socials: null,
+        categories: [],
         createdAt: now,
         updatedAt: now,
         user: {
@@ -42,6 +44,19 @@ describe("ProfilePrismaMapper", () => {
             expect(profile.avatarUrl).toBe("uploads/avatar.jpg");
             expect(profile.bannerUrl).toBe("uploads/banner.jpg");
             expect(profile.createdAt).toBe(now);
+        });
+
+        it("should map categories", () => {
+            const profile = ProfilePrismaMapper.toDomain(
+                makeDbProfile({
+                    categories: [PostCategory.BACKEND, PostCategory.AI],
+                }),
+            );
+
+            expect(profile.categories).toEqual([
+                PostCategory.BACKEND,
+                PostCategory.AI,
+            ]);
         });
 
         it("should map followersCount and followingCount from _count", () => {
@@ -110,6 +125,7 @@ describe("ProfilePrismaMapper", () => {
             expect(result.bannerUrl).toBe("uploads/banner.jpg");
             expect(result.followersCount).toBe(10);
             expect(result.followingCount).toBe(5);
+            expect(result.categories).toEqual([]);
         });
     });
 
@@ -127,6 +143,23 @@ describe("ProfilePrismaMapper", () => {
             expect(result.bio).toBe("My bio");
             expect(result.location).toBe("Istanbul");
             expect(result.socials).toEqual({ twitter: "https://x.com/user" });
+        });
+
+        it("should map categories when provided", () => {
+            const result = ProfilePrismaMapper.toPrismaUpdate({
+                userId: "user-1",
+                categories: [PostCategory.BACKEND],
+            });
+
+            expect(result.categories).toEqual([PostCategory.BACKEND]);
+        });
+
+        it("should leave categories undefined when omitted so Prisma skips them", () => {
+            const result = ProfilePrismaMapper.toPrismaUpdate({
+                userId: "user-1",
+            });
+
+            expect(result.categories).toBeUndefined();
         });
 
         it("should automatically set updatedAt", () => {

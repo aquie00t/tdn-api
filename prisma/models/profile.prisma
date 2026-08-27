@@ -13,8 +13,12 @@ model Profile {
 
   socials Json?
 
+  /// Discovery categories. Only bot accounts (User.isBot) may set these.
+  categories Category[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([categories])
   @@map("profiles")
 }

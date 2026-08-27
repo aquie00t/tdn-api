@@ -2,6 +2,7 @@ import type { IProfileRepository } from "@core/ports/repositories/profile.reposi
 import type { UpdateProfileInput } from "@core/use-cases/profile/update-profil/update-profile-usecase.input";
 import type { Profile as PrismaProfile } from "@generated/prisma/client";
 import type { Profile } from "@core/domain/entities/profile.entity";
+import type { PostCategory } from "@core/domain/enums/post-category-enum";
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
 import { ProfilePrismaMapper } from "@infrastructure/persistence/mappers/profile-prisma.mapper";
 
@@ -156,6 +157,47 @@ export class PrismaProfileRepository implements IProfileRepository {
                 },
             },
             take: limit,
+        });
+
+        return dbProfiles.map((dbProfile) =>
+            ProfilePrismaMapper.toDomain(dbProfile),
+        );
+    }
+
+    async findBotProfiles(
+        categories: PostCategory[] | undefined,
+        limit: number,
+        offset: number,
+    ): Promise<Profile[]> {
+        const dbProfiles = await this.prisma.profile.findMany({
+            where: {
+                // Hard-coded: this endpoint must never surface human accounts.
+                user: { isBot: true, deletedAt: null },
+                ...(categories?.length
+                    ? { categories: { hasSome: categories } }
+                    : {}),
+            },
+            include: {
+                user: {
+                    include: {
+                        _count: {
+                            select: {
+                                followers: true,
+                                following: true,
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: {
+                user: {
+                    followers: {
+                        _count: "desc",
+                    },
+                },
+            },
+            take: limit,
+            skip: offset,
         });
 
         return dbProfiles.map((dbProfile) =>

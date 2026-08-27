@@ -32,6 +32,7 @@ export const controllersModule = {
             getFollowersUseCase,
             getFollowingUseCase,
             getSuggestedUsersUseCase,
+            getBotProfilesUseCase,
             config,
         ) => {
             return new ProfileController(
@@ -43,6 +44,7 @@ export const controllersModule = {
                 getFollowersUseCase,
                 getFollowingUseCase,
                 getSuggestedUsersUseCase,
+                getBotProfilesUseCase,
                 config.R2_PUBLIC_URL,
             );
         },

@@ -29,6 +29,12 @@ import {
     UpdateProfileBodySchema,
 } from "@typings/schemas/profile/update-profile.schema";
 import {
+    type BotProfilesQuery,
+    BotProfilesQuerySchema,
+    BotProfilesResponseSchema,
+    type BotProfilesResponse,
+} from "@typings/schemas/profile/bot-profiles.schema";
+import {
     type SuggestedUsersQuery,
     SuggestedUsersQuerySchema,
     SuggestedUsersResponseSchema,
@@ -185,6 +191,25 @@ function profileRoutes(fastify: FastifyInstance): void {
             },
         },
         profileController.getSuggestions.bind(profileController),
+    );
+
+    fastify.get<{
+        Querystring: BotProfilesQuery;
+        Reply: { 200: BotProfilesResponse };
+    }>(
+        "/bots",
+        {
+            config: {
+                rateLimit: RateLimitPolicies.PUBLIC,
+            },
+            schema: {
+                querystring: BotProfilesQuerySchema,
+                response: { 200: BotProfilesResponseSchema },
+                tags: ["Profile"],
+            },
+            onRequest: [fastify.optionalAuthenticate],
+        },
+        profileController.getBotProfiles.bind(profileController),
     );
 }
 

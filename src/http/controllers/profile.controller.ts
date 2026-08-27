@@ -1,6 +1,7 @@
 import { BadRequestError } from "@core/errors";
 import type { GetFollowersUseCase } from "@core/use-cases/follow-user/get-followers";
 import type { GetFollowingUseCase } from "@core/use-cases/follow-user/get-following";
+import type { GetBotProfilesUseCase } from "@core/use-cases/profile/get-bot-profiles";
 import type { GetProfileUseCase } from "@core/use-cases/profile/get-profile";
 import type { GetSuggestedUsersUseCase } from "@core/use-cases/profile/get-suggested-users";
 import type { SearchProfilesUseCase } from "@core/use-cases/profile/search-profile";
@@ -8,11 +9,13 @@ import type { UpdateAvatarUseCase } from "@core/use-cases/profile/update-avatar"
 import type { UpdateBannerUseCase } from "@core/use-cases/profile/update-banner";
 import type { UpdateProfileInput } from "@core/use-cases/profile/update-profil";
 import type { UpdateProfileUseCase } from "@core/use-cases/profile/update-profil";
+import { PostCategory } from "@core/domain/enums/post-category-enum";
 import { ProfilePrismaMapper } from "@infrastructure/persistence/mappers/profile-prisma.mapper";
 import {
     type FollowersParams,
     type PaginationQuery,
 } from "@typings/schemas/profile/followers.schema";
+import type { BotProfilesQuery } from "@typings/schemas/profile/bot-profiles.schema";
 import type { SuggestedUsersQuery } from "@typings/schemas/profile/suggested-users.schema";
 import type { GetProfileParams } from "@typings/schemas/profile/get-profile.schema";
 import type { SearchProfilesQuery } from "@typings/schemas/profile/search-profile.schema";
@@ -28,8 +31,32 @@ export class ProfileController {
         private readonly getFollowersUseCase: GetFollowersUseCase,
         private readonly getFollowingUseCase: GetFollowingUseCase,
         private readonly getSuggestedUsersUseCase: GetSuggestedUsersUseCase,
+        private readonly getBotProfilesUseCase: GetBotProfilesUseCase,
         private readonly publicUrl: string,
     ) {}
+
+    /**
+     * Normalizes the raw `categories` query parameter, which Fastify hands over
+     * as a single value, a repeated-key array, or a comma separated string.
+     *
+     * @param raw - The raw category value from the query string.
+     * @returns An array of validated PostCategory enums, or undefined if none are valid.
+     * @private
+     */
+    private parseCategories(
+        raw?: string | string[],
+    ): PostCategory[] | undefined {
+        if (!raw) return undefined;
+        const rawArray = Array.isArray(raw) ? raw : raw.split(",");
+        const validCategories = new Set<string>(Object.values(PostCategory));
+
+        const parsed = rawArray
+            .map((c) => c.trim().toUpperCase())
+            .filter((c) => validCategories.has(c))
+            .map((c) => c as PostCategory);
+
+        return parsed.length > 0 ? parsed : undefined;
+    }
 
     private getFullImageUrl(path: string): string {
         if (path.startsWith("http")) return path;
@@ -258,6 +285,37 @@ export class ProfileController {
             data: responseData,
             meta: {
                 timestamp: new Date().toISOString(),
+            },
+        });
+    }
+
+    async getBotProfiles(
+        request: FastifyRequest<{ Querystring: BotProfilesQuery }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        const { categories: rawCategories, limit, offset } = request.query;
+        const currentUserId = request.user?.id;
+
+        const results = await this.getBotProfilesUseCase.execute({
+            categories: this.parseCategories(rawCategories),
+            currentUserId,
+            limit,
+            offset,
+        });
+
+        const responseData = results.map((item) => ({
+            ...item,
+            avatarUrl: this.getFullImageUrl(item.avatarUrl),
+            bannerUrl: this.getFullImageUrl(item.bannerUrl),
+        }));
+
+        reply.status(200).send({
+            data: responseData,
+            meta: {
+                timestamp: new Date().toISOString(),
+                limit,
+                offset,
+                count: responseData.length,
             },
         });
     }

@@ -1,3 +1,5 @@
+import type { PostCategory } from "@core/domain/enums/post-category-enum";
+
 /**
  * Props interface for Profile entity
  *
@@ -29,6 +31,12 @@ export interface ProfileProps {
 
     /** Optional social media links object (key-value pairs of platform and URL) */
     socials: Record<string, string> | null;
+
+    /**
+     * Discovery categories for the profile.
+     * Only bot accounts populate this — human profiles keep an empty array.
+     */
+    categories: PostCategory[];
 
     /** Creation timestamp of the profile */
     createdAt?: Date;
