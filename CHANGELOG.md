@@ -1,3 +1,10 @@
+## [1.9.1](https://github.com/the-developer-network/tdn-api/compare/v1.9.0...v1.9.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* **notification:** take the notification back when its action is undone ([#226](https://github.com/the-developer-network/tdn-api/issues/226)) ([f8e4138](https://github.com/the-developer-network/tdn-api/commit/f8e4138b63b2f0bec55a7f0407a98a77128be4c5))
+
 # [1.9.0](https://github.com/the-developer-network/tdn-api/compare/v1.8.0...v1.9.0) (2026-08-27)
 
 
