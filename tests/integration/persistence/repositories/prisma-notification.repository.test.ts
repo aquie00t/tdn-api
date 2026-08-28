@@ -494,8 +494,8 @@ describe("PrismaNotificationRepository (integration)", () => {
         it("should persist the NEW_POST fields each recipient needs", async () => {
             const [stored] = await notifRepo.findAllByUserId({
                 userId: followerAId,
-                page: 1,
-                limit: 10,
+                take: 10,
+                skip: 0,
             });
 
             expect(stored.type).toBe(NotificationType.NEW_POST);
