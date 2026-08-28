@@ -38,6 +38,18 @@ export class PrismaNotificationRepository implements INotificationRepository {
         }
     }
 
+    async createMany(notifications: Notification[]): Promise<number> {
+        if (notifications.length === 0) return 0;
+
+        const { count } = await this.prisma.notification.createMany({
+            data: notifications.map((notification) =>
+                NotificationPrismaMapper.toPrisma(notification),
+            ),
+        });
+
+        return count;
+    }
+
     getUnreadCount(userId: string): Promise<number> {
         return this.prisma.notification.count({
             where: {

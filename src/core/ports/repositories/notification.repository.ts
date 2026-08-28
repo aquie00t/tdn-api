@@ -52,6 +52,20 @@ export interface INotificationRepository {
     create(notification: Notification): Promise<void>;
 
     /**
+     * Creates many notifications in a single write.
+     *
+     * Backs fan-out, where one event notifies every follower of an account.
+     * Unlike {@link create} this does not trim the recipient's history: that
+     * trim costs two extra queries per recipient, which would turn a fan-out
+     * into 2N+1 queries and defeat the batch. Age is bounded by the
+     * notification purge job instead.
+     *
+     * @param notifications - The Notification entities to be created.
+     * @returns The number of notifications written.
+     */
+    createMany(notifications: Notification[]): Promise<number>;
+
+    /**
      * Retrieves the count of unread notifications for a specific user.
      * @param userId - The unique identifier of the user.
      * @returns The number of unread notifications.
