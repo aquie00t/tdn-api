@@ -4,7 +4,7 @@ import { ResponseSchema } from "../create-response-schema";
 
 export const CommentAuthorSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
-    username: FBType.Optional(FBType.String()),
+    username: FBType.String(),
     fullName: FBType.Optional(FBType.String()),
     avatarUrl: FBType.String(),
     isMe: FBType.Boolean(),

@@ -187,7 +187,7 @@ export class Comment {
     public get author():
         | {
               id: string;
-              username?: string;
+              username: string;
               avatarUrl?: string;
               fullName?: string;
           }

@@ -55,8 +55,11 @@ export interface CommentProps {
     author?: {
         /** Unique identifier of the author */
         id: string;
-        /** Display username of the author */
-        username?: string;
+        /**
+         * Handle of the author. Always present once the author is loaded:
+         * `User.username` is NOT NULL and the author relation is required.
+         */
+        username: string;
         /** URL of the author's avatar image */
         avatarUrl?: string;
         /** Full name of the author */

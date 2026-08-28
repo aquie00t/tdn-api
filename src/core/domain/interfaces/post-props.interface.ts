@@ -26,7 +26,15 @@ export interface PostProps {
         /** The unique identifier of the user who created this post */
         id: string;
 
-        /** Optional username of the author for display purposes */
+        /**
+         * Handle of the author.
+         *
+         * Absent only on a post built by `Post.create` that has not been
+         * persisted yet, which carries the author id and nothing else. Any
+         * post read back from the database has one: `User.username` is NOT
+         * NULL and the author relation is required, and every query that
+         * loads a post selects it. The response mappers rely on that.
+         */
         username?: string;
 
         /** Optional avatar URL of the author for display purposes */

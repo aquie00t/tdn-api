@@ -3,6 +3,7 @@ import {
     PostPrismaMapper,
     type PostWithRelations,
 } from "@infrastructure/persistence/mappers/post-prisma.mapper";
+import { Post } from "@core/domain/entities/post.entity";
 import { PostType } from "@core/domain/enums/post-type.enum";
 import { PostCategory } from "@core/domain/enums/post-category-enum";
 
@@ -104,19 +105,32 @@ describe("PostPrismaMapper", () => {
             expect(post.isBookmarked).toBe(true);
         });
 
-        it("should map author relations with optional chain safety", () => {
+        it("should carry the author handle through, since the column is NOT NULL", () => {
             const post = PostPrismaMapper.toDomainPost(
                 makeDbPost({
                     author: {
                         id: "user-1",
-                        username: undefined,
+                        username: "testuser",
                         profile: null,
                     } as never,
                 }),
             );
 
             expect(post.author.id).toBe("user-1");
-            expect(post.author.username).toBeUndefined();
+            expect(post.author.username).toBe("testuser");
+        });
+
+        it("should leave avatarUrl undefined when the user has no profile", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({
+                    author: {
+                        id: "user-1",
+                        username: "testuser",
+                        profile: null,
+                    } as never,
+                }),
+            );
+
             expect(post.author.avatarUrl).toBeUndefined();
         });
     });
@@ -262,6 +276,33 @@ describe("PostPrismaMapper", () => {
 
         it("should return empty array for empty input", () => {
             expect(PostPrismaMapper.toFeedResponse([], CDN)).toEqual([]);
+        });
+    });
+
+    describe("author handle guarantee", () => {
+        it("should serialize the author handle", () => {
+            const post = PostPrismaMapper.toDomainPost(makeDbPost());
+
+            expect(PostPrismaMapper.toResponse(post, CDN).author.username).toBe(
+                "testuser",
+            );
+        });
+
+        it("should throw rather than serialize a post with no author handle", () => {
+            // Reachable only if a new query forgets the author include. The
+            // response schema declares username required, so emitting the key
+            // as undefined would break the contract silently.
+            const post = Post.create(
+                "content",
+                PostType.COMMUNITY,
+                "user-1",
+                [],
+                [],
+            );
+
+            expect(() => PostPrismaMapper.toResponse(post, CDN)).toThrow(
+                /loaded with its author/,
+            );
         });
     });
 });
