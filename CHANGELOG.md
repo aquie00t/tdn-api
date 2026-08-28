@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/the-developer-network/tdn-api/compare/v1.11.2...v1.12.0) (2026-08-28)
+
+
+### Features
+
+* **notification:** notify followers when a bot publishes a post ([#234](https://github.com/the-developer-network/tdn-api/issues/234)) ([772d00f](https://github.com/the-developer-network/tdn-api/commit/772d00fa0eb55c750497cf3610db2b53e4ba83f9))
+
 ## [1.11.2](https://github.com/the-developer-network/tdn-api/compare/v1.11.1...v1.11.2) (2026-08-28)
 
 
