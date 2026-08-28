@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/the-developer-network/tdn-api/compare/v1.12.0...v1.12.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **http:** name the enum values in response schemas instead of "string" ([#236](https://github.com/the-developer-network/tdn-api/issues/236)) ([f24665f](https://github.com/the-developer-network/tdn-api/commit/f24665f9d86b33a2086a819f10335b993a53322d))
+
 # [1.12.0](https://github.com/the-developer-network/tdn-api/compare/v1.11.2...v1.12.0) (2026-08-28)
 
 
