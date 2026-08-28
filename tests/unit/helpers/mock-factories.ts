@@ -90,6 +90,7 @@ export function buildProfile(overrides: Partial<ProfileProps> = {}): Profile {
         avatarUrl: "https://example.com/avatar.png",
         bannerUrl: "https://example.com/banner.png",
         socials: null,
+        categories: [],
         followersCount: 0,
         followingCount: 0,
         createdAt: new Date("2024-01-01T00:00:00Z"),
@@ -135,7 +136,6 @@ export function buildPost(overrides: Partial<PostProps> = {}): Post {
         ...overrides,
     });
 }
-
 
 export function buildArticle(overrides: Partial<ArticleProps> = {}): Article {
     return Article.with({

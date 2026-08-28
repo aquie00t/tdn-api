@@ -1,4 +1,5 @@
 import { Profile } from "@core/domain/entities/profile.entity";
+import type { PostCategory } from "@core/domain/enums/post-category-enum";
 import type { UpdateProfileInput } from "@core/use-cases/profile/update-profil/update-profile-usecase.input";
 import type {
     Prisma,
@@ -38,6 +39,7 @@ export class ProfilePrismaMapper {
             avatarUrl: dbProfile.avatarUrl,
             bannerUrl: dbProfile.bannerUrl,
             socials: dbProfile.socials as Record<string, string>,
+            categories: dbProfile.categories as PostCategory[],
             createdAt: dbProfile.createdAt,
             updatedAt: dbProfile.updatedAt,
             followersCount: dbProfile.user?._count?.followers || 0,
@@ -58,6 +60,7 @@ export class ProfilePrismaMapper {
             bio: data.bio,
             location: data.location,
             socials: data.socials as Prisma.InputJsonValue,
+            categories: data.categories,
             updatedAt: new Date(),
         };
     }
@@ -77,6 +80,7 @@ export class ProfilePrismaMapper {
         avatarUrl: string;
         bannerUrl: string;
         socials: Record<string, string>;
+        categories: PostCategory[];
         createdAt: Date;
         updatedAt: Date;
         followersCount: number;
@@ -91,6 +95,7 @@ export class ProfilePrismaMapper {
             avatarUrl: profile.avatarUrl,
             bannerUrl: profile.bannerUrl,
             socials: profile.socials,
+            categories: profile.categories,
             createdAt: profile.createdAt,
             updatedAt: profile.updatedAt,
             followersCount: profile.followersCount,

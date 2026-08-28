@@ -5,7 +5,8 @@ import type { GetPostDetailUseCase } from "@core/use-cases/post/get-post-detail/
 import type { GetPostsUseCase } from "@core/use-cases/post/get-posts";
 import type { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
 import { PostPrismaMapper } from "@infrastructure/persistence/mappers/post-prisma.mapper";
-import { PostCategory } from "@core/domain/enums/post-category-enum";
+import type { PostCategory } from "@core/domain/enums/post-category-enum";
+import { normalizeCategoryQuery } from "../utils/category-query";
 import type { CreatePostBody } from "@typings/schemas/post/create-post.schema";
 import type { DeletePostParams } from "@typings/schemas/post/delete-post.schema";
 import type { GetPostParams } from "@typings/schemas/post/get-post.schema";
@@ -241,24 +242,21 @@ export class PostController {
     }
 
     /**
-     * Helper method to normalize and validate incoming raw categories from query parameters.
-     * * @param raw - The raw category string or string array from the query string.
+     * Helper method to normalize incoming raw categories from query parameters.
+     *
+     * The feed is deliberately lenient: an unrecognized category is dropped and
+     * an all-unknown list falls back to an unfiltered feed rather than a 400.
+     *
+     * @param raw - The raw category string or string array from the query string.
      * @returns An array of validated PostCategory enums, or undefined if none are valid.
      * @private
      */
     private parseCategories(
         raw?: string | string[],
     ): PostCategory[] | undefined {
-        if (!raw) return undefined;
-        const rawArray = Array.isArray(raw) ? raw : raw.split(",");
-        const validCategories = new Set<string>(Object.values(PostCategory));
+        const { categories } = normalizeCategoryQuery(raw);
 
-        const parsed = rawArray
-            .map((c) => c.trim().toUpperCase())
-            .filter((c) => validCategories.has(c))
-            .map((c) => c as PostCategory);
-
-        return parsed.length > 0 ? parsed : undefined;
+        return categories.length > 0 ? categories : undefined;
     }
 
     /**

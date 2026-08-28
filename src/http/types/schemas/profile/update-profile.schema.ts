@@ -1,4 +1,5 @@
 import { type Static, Type } from "@fastify/type-provider-typebox";
+import { PostCategory } from "@core/domain/enums/post-category-enum";
 
 export const UpdateProfileBodySchema = Type.Object(
     {
@@ -20,6 +21,14 @@ export const UpdateProfileBodySchema = Type.Object(
                 Type.Record(Type.String(), Type.String({ format: "uri" })),
                 Type.Null(),
             ]),
+        ),
+        categories: Type.Optional(
+            Type.Array(Type.Enum(PostCategory), {
+                maxItems: 5,
+                uniqueItems: true,
+                description:
+                    "Discovery categories. Bot accounts only — non-bot accounts get a 403.",
+            }),
         ),
     },
     { additionalProperties: false },

@@ -1,5 +1,6 @@
 import type { UpdateProfileInput } from "@core/use-cases/profile/update-profil/update-profile-usecase.input";
 import type { Profile } from "@core/domain/entities/profile.entity";
+import type { PostCategory } from "@core/domain/enums/post-category-enum";
 
 /**
  * Repository interface for managing Profile entities.
@@ -82,5 +83,19 @@ export interface IProfileRepository {
     getSuggestedUsers(
         currentUserId: string | null,
         limit: number,
+    ): Promise<Profile[]>;
+
+    /**
+     * Retrieves bot profiles ordered by follower count, optionally narrowed to
+     * a set of categories. Implementations must never return non-bot accounts.
+     * @param categories - Categories to match with "at least one of"; undefined or empty returns every bot.
+     * @param limit - Maximum number of profiles to return.
+     * @param offset - Number of profiles to skip.
+     * @returns A promise resolving to an array of bot Profile entities.
+     */
+    findBotProfiles(
+        categories: PostCategory[] | undefined,
+        limit: number,
+        offset: number,
     ): Promise<Profile[]>;
 }
