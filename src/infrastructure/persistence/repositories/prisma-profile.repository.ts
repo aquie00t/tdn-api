@@ -173,9 +173,15 @@ export class PrismaProfileRepository implements IProfileRepository {
             where: {
                 // Hard-coded: this endpoint must never surface human accounts.
                 user: { isBot: true, deletedAt: null },
-                ...(categories?.length
-                    ? { categories: { hasSome: categories } }
-                    : {}),
+                // Carrying a category is what makes an account a news bot here.
+                // The persona bots that keep the feed from looking empty are
+                // also isBot, and onboarding must not offer them as news
+                // sources - they are meant to read as ordinary users. They
+                // never get a category, so requiring one excludes them without
+                // a second flag on User to keep in sync.
+                categories: categories?.length
+                    ? { hasSome: categories }
+                    : { isEmpty: false },
             },
             include: {
                 user: {

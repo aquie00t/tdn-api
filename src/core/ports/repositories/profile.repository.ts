@@ -86,9 +86,15 @@ export interface IProfileRepository {
     ): Promise<Profile[]>;
 
     /**
-     * Retrieves bot profiles ordered by follower count, optionally narrowed to
-     * a set of categories. Implementations must never return non-bot accounts.
-     * @param categories - Categories to match with "at least one of"; undefined or empty returns every bot.
+     * Retrieves news bot profiles ordered by follower count, optionally
+     * narrowed to a set of categories.
+     *
+     * Implementations must never return non-bot accounts, and must never
+     * return a bot without categories: the persona bots that populate the feed
+     * are also flagged as bots but are meant to read as ordinary users, and
+     * carrying a category is what separates a news bot from one of them.
+     *
+     * @param categories - Categories to match with "at least one of"; undefined or empty returns every categorized bot.
      * @param limit - Maximum number of profiles to return.
      * @param offset - Number of profiles to skip.
      * @returns A promise resolving to an array of bot Profile entities.

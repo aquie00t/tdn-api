@@ -130,6 +130,7 @@ describe("PrismaProfileRepository (integration)", () => {
         let backendBotId: string;
         let mobileBotId: string;
         let deletedBotId: string;
+        let personaBotId: string;
 
         beforeAll(async () => {
             const userRepo = new PrismaUserRepository(prisma, {
@@ -151,13 +152,21 @@ describe("PrismaProfileRepository (integration)", () => {
                 username: "deletedbot_profilerepo",
                 passwordHash: null,
             });
+            // A persona bot: flagged isBot, but no categories - it exists to
+            // read as an ordinary user, not as a news source.
+            const personaBot = await userRepo.create({
+                email: "personabot@profile-repo-test.com",
+                username: "personabot_profilerepo",
+                passwordHash: null,
+            });
 
             backendBotId = backendBot.id;
             mobileBotId = mobileBot.id;
             deletedBotId = deletedBot.id;
+            personaBotId = personaBot.id;
 
             await prisma.user.updateMany({
-                where: { id: { in: [backendBotId, mobileBotId] } },
+                where: { id: { in: [backendBotId, mobileBotId, personaBotId] } },
                 data: { isBot: true },
             });
             await prisma.user.update({
@@ -191,6 +200,15 @@ describe("PrismaProfileRepository (integration)", () => {
             const results = await profileRepo.findBotProfiles(undefined, 50, 0);
 
             expect(results.map((p) => p.userId)).not.toContain(deletedBotId);
+        });
+
+        it("should exclude bots without categories", async () => {
+            // Persona bots are flagged isBot but never carry a category, and
+            // onboarding must not offer them as news sources.
+            const results = await profileRepo.findBotProfiles(undefined, 50, 0);
+
+            expect(results.map((p) => p.userId)).not.toContain(personaBotId);
+            expect(results.every((p) => p.categories.length > 0)).toBe(true);
         });
 
         it("should match bots carrying at least one requested category", async () => {

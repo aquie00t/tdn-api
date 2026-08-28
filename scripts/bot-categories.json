@@ -1,0 +1,452 @@
+{
+  "typescript": [
+    "BACKEND",
+    "FRONTEND"
+  ],
+  "python": [
+    "BACKEND",
+    "AI"
+  ],
+  "rust": [
+    "BACKEND"
+  ],
+  "golang": [
+    "BACKEND"
+  ],
+  "java": [
+    "BACKEND"
+  ],
+  "kotlin": [
+    "BACKEND",
+    "MOBILE"
+  ],
+  "swift": [
+    "MOBILE"
+  ],
+  "php": [
+    "BACKEND"
+  ],
+  "ruby": [
+    "BACKEND"
+  ],
+  "dotnet": [
+    "BACKEND"
+  ],
+  "elixir": [
+    "BACKEND"
+  ],
+  "zig": [
+    "BACKEND"
+  ],
+  "nodejs": [
+    "BACKEND"
+  ],
+  "deno": [
+    "BACKEND"
+  ],
+  "bun": [
+    "BACKEND"
+  ],
+  "react": [
+    "FRONTEND"
+  ],
+  "nextjs": [
+    "FRONTEND"
+  ],
+  "vue": [
+    "FRONTEND"
+  ],
+  "angular": [
+    "FRONTEND"
+  ],
+  "svelte": [
+    "FRONTEND"
+  ],
+  "tailwindcss": [
+    "FRONTEND"
+  ],
+  "nuxt": [
+    "FRONTEND"
+  ],
+  "astro": [
+    "FRONTEND"
+  ],
+  "solidjs": [
+    "FRONTEND"
+  ],
+  "htmx": [
+    "FRONTEND"
+  ],
+  "alpinejs": [
+    "FRONTEND"
+  ],
+  "bootstrap": [
+    "FRONTEND"
+  ],
+  "threejs": [
+    "FRONTEND",
+    "GAME"
+  ],
+  "laravel": [
+    "BACKEND"
+  ],
+  "remix": [
+    "FRONTEND"
+  ],
+  "express": [
+    "BACKEND"
+  ],
+  "fastify": [
+    "BACKEND"
+  ],
+  "nestjs": [
+    "BACKEND"
+  ],
+  "hono": [
+    "BACKEND"
+  ],
+  "django": [
+    "BACKEND"
+  ],
+  "fastapi": [
+    "BACKEND"
+  ],
+  "springboot": [
+    "BACKEND"
+  ],
+  "rails": [
+    "BACKEND"
+  ],
+  "trpc": [
+    "BACKEND"
+  ],
+  "vite": [
+    "FRONTEND"
+  ],
+  "esbuild": [
+    "FRONTEND",
+    "BACKEND"
+  ],
+  "swc": [
+    "FRONTEND",
+    "BACKEND"
+  ],
+  "biome": [
+    "FRONTEND",
+    "BACKEND"
+  ],
+  "eslint": [
+    "FRONTEND",
+    "BACKEND"
+  ],
+  "prettier": [
+    "FRONTEND",
+    "BACKEND"
+  ],
+  "pnpm": [
+    "FRONTEND",
+    "BACKEND"
+  ],
+  "vitest": [
+    "FRONTEND",
+    "BACKEND"
+  ],
+  "playwright": [
+    "FRONTEND"
+  ],
+  "webpack": [
+    "FRONTEND"
+  ],
+  "docker": [
+    "BACKEND"
+  ],
+  "kubernetes": [
+    "BACKEND"
+  ],
+  "supabase": [
+    "BACKEND"
+  ],
+  "terraform": [
+    "BACKEND"
+  ],
+  "grafana": [
+    "BACKEND"
+  ],
+  "prometheus": [
+    "BACKEND"
+  ],
+  "redis": [
+    "BACKEND"
+  ],
+  "prisma": [
+    "BACKEND"
+  ],
+  "drizzle": [
+    "BACKEND"
+  ],
+  "mongodb": [
+    "BACKEND"
+  ],
+  "flutter": [
+    "MOBILE"
+  ],
+  "reactnative": [
+    "MOBILE"
+  ],
+  "expo": [
+    "MOBILE"
+  ],
+  "ionic": [
+    "MOBILE"
+  ],
+  "maui": [
+    "MOBILE"
+  ],
+  "capacitor": [
+    "MOBILE"
+  ],
+  "electron": [
+    "FRONTEND"
+  ],
+  "tauri": [
+    "FRONTEND"
+  ],
+  "pytorch": [
+    "AI"
+  ],
+  "tensorflow": [
+    "AI"
+  ],
+  "ollama": [
+    "AI"
+  ],
+  "langchain": [
+    "AI"
+  ],
+  "github": [
+    "BACKEND",
+    "FRONTEND"
+  ],
+  "cloudflare": [
+    "BACKEND"
+  ],
+  "vercel": [
+    "FRONTEND",
+    "BACKEND"
+  ],
+  "aws": [
+    "BACKEND"
+  ],
+  "google": [
+    "AI"
+  ],
+  "openai": [
+    "AI"
+  ],
+  "meta": [
+    "AI"
+  ],
+  "netflix": [
+    "BACKEND"
+  ],
+  "godot": [
+    "GAME"
+  ],
+  "phaser": [
+    "GAME"
+  ],
+  "unity": [
+    "GAME"
+  ],
+  "bevy": [
+    "GAME"
+  ],
+  "unrealengine": [
+    "GAME"
+  ],
+  "huggingface": [
+    "AI"
+  ],
+  "gemini": [
+    "AI"
+  ],
+  "cohere": [
+    "AI"
+  ],
+  "groq": [
+    "AI"
+  ],
+  "autogen": [
+    "AI"
+  ],
+  "semantickernel": [
+    "AI"
+  ],
+  "n8n": [
+    "AI",
+    "BACKEND"
+  ],
+  "stability": [
+    "AI"
+  ],
+  "haystack": [
+    "AI"
+  ],
+  "mlflow": [
+    "AI"
+  ],
+  "anthropic": [
+    "AI"
+  ],
+  "claudecode": [
+    "AI"
+  ],
+  "mistral": [
+    "AI"
+  ],
+  "llamaindex": [
+    "AI"
+  ],
+  "crewai": [
+    "AI"
+  ],
+  "vllm": [
+    "AI"
+  ],
+  "dify": [
+    "AI"
+  ],
+  "litellm": [
+    "AI"
+  ],
+  "comfyui": [
+    "AI"
+  ],
+  "deepseek": [
+    "AI"
+  ],
+  "flowise": [
+    "AI"
+  ],
+  "xai": [
+    "AI"
+  ],
+  "cursor": [
+    "AI"
+  ],
+  "jetpackcompose": [
+    "MOBILE"
+  ],
+  "kotlinmultiplatform": [
+    "MOBILE"
+  ],
+  "nativescript": [
+    "MOBILE"
+  ],
+  "androidstudio": [
+    "MOBILE"
+  ],
+  "xcode": [
+    "MOBILE"
+  ],
+  "fastlane": [
+    "MOBILE"
+  ],
+  "firebase": [
+    "MOBILE",
+    "BACKEND"
+  ],
+  "appwrite": [
+    "MOBILE",
+    "BACKEND"
+  ],
+  "realm": [
+    "MOBILE"
+  ],
+  "detox": [
+    "MOBILE"
+  ],
+  "reanimated": [
+    "MOBILE"
+  ],
+  "rnskia": [
+    "MOBILE"
+  ],
+  "tamagui": [
+    "MOBILE"
+  ],
+  "mmkv": [
+    "MOBILE"
+  ],
+  "shopifyrn": [
+    "MOBILE"
+  ],
+  "quasar": [
+    "MOBILE",
+    "FRONTEND"
+  ],
+  "framework7": [
+    "MOBILE",
+    "FRONTEND"
+  ],
+  "nativewind": [
+    "MOBILE"
+  ],
+  "pygame": [
+    "GAME"
+  ],
+  "libgdx": [
+    "GAME"
+  ],
+  "monogame": [
+    "GAME"
+  ],
+  "defold": [
+    "GAME"
+  ],
+  "raylib": [
+    "GAME"
+  ],
+  "love2d": [
+    "GAME"
+  ],
+  "cocos": [
+    "GAME"
+  ],
+  "o3de": [
+    "GAME"
+  ],
+  "flaxengine": [
+    "GAME"
+  ],
+  "stride": [
+    "GAME"
+  ],
+  "babylonjs": [
+    "GAME"
+  ],
+  "pixijs": [
+    "GAME"
+  ],
+  "playcanvas": [
+    "GAME"
+  ],
+  "excalibur": [
+    "GAME"
+  ],
+  "steamworks": [
+    "GAME"
+  ],
+  "fmod": [
+    "GAME"
+  ],
+  "tiled": [
+    "GAME"
+  ],
+  "box2d": [
+    "GAME"
+  ],
+  "bulletphysics": [
+    "GAME"
+  ]
+}
