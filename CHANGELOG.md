@@ -1,3 +1,10 @@
+## [1.11.2](https://github.com/the-developer-network/tdn-api/compare/v1.11.1...v1.11.2) (2026-08-28)
+
+
+### Bug Fixes
+
+* **http:** declare author username required, as the database already guarantees ([#233](https://github.com/the-developer-network/tdn-api/issues/233)) ([541b484](https://github.com/the-developer-network/tdn-api/commit/541b484eb936f3d25b913994f8809dc42fcfb879)), closes [tdn-client#121](https://github.com/tdn-client/issues/121)
+
 ## [1.11.1](https://github.com/the-developer-network/tdn-api/compare/v1.11.0...v1.11.1) (2026-08-28)
 
 
