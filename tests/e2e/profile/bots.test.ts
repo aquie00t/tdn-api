@@ -132,6 +132,61 @@ describe("GET /profiles/bots - Bot discovery by category", () => {
         );
     });
 
+    it("should surface the categories on the bot's own profile", async () => {
+        const response = await request({
+            method: "GET",
+            url: `/profiles/${BOT_USER.username}`,
+        });
+        const body = parseBody<{ data: { categories: string[] } }>(response);
+
+        expect(response.statusCode).toBe(200);
+        expect(body.data.categories).toEqual(
+            expect.arrayContaining(["BACKEND", "AI"]),
+        );
+    });
+
+    it("should treat the comma and repeated-key spellings identically", async () => {
+        const comma = parseBody<BotProfilesBody>(
+            await request({
+                method: "GET",
+                url: "/profiles/bots?categories=ai,game",
+            }),
+        );
+        const repeated = parseBody<BotProfilesBody>(
+            await request({
+                method: "GET",
+                url: "/profiles/bots?categories=ai&categories=game",
+            }),
+        );
+
+        expect(comma.data.map((i) => i.username)).toEqual(
+            repeated.data.map((i) => i.username),
+        );
+        expect(comma.data.some((i) => i.username === BOT_USER.username)).toBe(
+            true,
+        );
+    });
+
+    it("should reject an unknown category with 400", async () => {
+        const response = await request({
+            method: "GET",
+            url: "/profiles/bots?categories=DEVOPS",
+        });
+        const body = parseBody<{ title: string; detail: string }>(response);
+
+        expect(response.statusCode).toBe(400);
+        expect(body.detail).toContain("DEVOPS");
+    });
+
+    it("should reject a partially unknown category list with 400", async () => {
+        const response = await request({
+            method: "GET",
+            url: "/profiles/bots?categories=AI,DEVOPS",
+        });
+
+        expect(response.statusCode).toBe(400);
+    });
+
     it("should reject an out-of-range limit with 400", async () => {
         const response = await request({
             method: "GET",

@@ -11,6 +11,7 @@ import type { UpdateProfileInput } from "@core/use-cases/profile/update-profil";
 import type { UpdateProfileUseCase } from "@core/use-cases/profile/update-profil";
 import { PostCategory } from "@core/domain/enums/post-category-enum";
 import { ProfilePrismaMapper } from "@infrastructure/persistence/mappers/profile-prisma.mapper";
+import { normalizeCategoryQuery } from "../utils/category-query";
 import {
     type FollowersParams,
     type PaginationQuery,
@@ -36,26 +37,32 @@ export class ProfileController {
     ) {}
 
     /**
-     * Normalizes the raw `categories` query parameter, which Fastify hands over
-     * as a single value, a repeated-key array, or a comma separated string.
+     * Normalizes the raw `categories` query parameter for bot discovery.
+     *
+     * Unlike the post feed, an unrecognized category is an error rather than a
+     * dropped token: onboarding picks bots from the fields the user chose, and
+     * silently widening a typo back to the unfiltered list would offer them
+     * bots matching none of those fields.
      *
      * @param raw - The raw category value from the query string.
-     * @returns An array of validated PostCategory enums, or undefined if none are valid.
+     * @returns The requested categories, or undefined when none were requested.
+     * @throws {BadRequestError} When any supplied value is not a known category.
      * @private
      */
     private parseCategories(
         raw?: string | string[],
     ): PostCategory[] | undefined {
-        if (!raw) return undefined;
-        const rawArray = Array.isArray(raw) ? raw : raw.split(",");
-        const validCategories = new Set<string>(Object.values(PostCategory));
+        const { categories, invalid } = normalizeCategoryQuery(raw);
 
-        const parsed = rawArray
-            .map((c) => c.trim().toUpperCase())
-            .filter((c) => validCategories.has(c))
-            .map((c) => c as PostCategory);
+        if (invalid.length > 0) {
+            throw new BadRequestError(
+                `Unknown category: ${invalid.join(", ")}. Valid categories are ${Object.values(
+                    PostCategory,
+                ).join(", ")}.`,
+            );
+        }
 
-        return parsed.length > 0 ? parsed : undefined;
+        return categories.length > 0 ? categories : undefined;
     }
 
     private getFullImageUrl(path: string): string {

@@ -189,13 +189,13 @@ export class PrismaProfileRepository implements IProfileRepository {
                     },
                 },
             },
-            orderBy: {
-                user: {
-                    followers: {
-                        _count: "desc",
-                    },
-                },
-            },
+            // userId breaks ties: at onboarding time most bots share a follower
+            // count, and without a total order take/skip can repeat or drop rows
+            // across pages.
+            orderBy: [
+                { user: { followers: { _count: "desc" } } },
+                { userId: "asc" },
+            ],
             take: limit,
             skip: offset,
         });

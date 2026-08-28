@@ -233,10 +233,28 @@ describe("PrismaProfileRepository (integration)", () => {
             const nextPage = await profileRepo.findBotProfiles(undefined, 1, 1);
 
             expect(page).toHaveLength(1);
-            expect(nextPage.length).toBeLessThanOrEqual(1);
-            if (nextPage.length === 1) {
-                expect(nextPage[0].userId).not.toBe(page[0].userId);
-            }
+            expect(nextPage).toHaveLength(1);
+            expect(nextPage[0].userId).not.toBe(page[0].userId);
+        });
+
+        it("should page deterministically when bots share a follower count", async () => {
+            // Every seeded bot has zero followers, so without a tie-breaker in
+            // the ORDER BY these two runs could disagree.
+            const first = await profileRepo.findBotProfiles(undefined, 50, 0);
+            const second = await profileRepo.findBotProfiles(undefined, 50, 0);
+
+            expect(second.map((p) => p.userId)).toEqual(
+                first.map((p) => p.userId),
+            );
+
+            const paged = [
+                ...(await profileRepo.findBotProfiles(undefined, 1, 0)),
+                ...(await profileRepo.findBotProfiles(undefined, 1, 1)),
+            ];
+
+            expect(paged.map((p) => p.userId)).toEqual(
+                first.slice(0, 2).map((p) => p.userId),
+            );
         });
     });
 });
