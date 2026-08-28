@@ -27,7 +27,7 @@ export interface PostResponse {
     commentCount: number;
     author: {
         id: string;
-        username?: string;
+        username: string;
         avatarUrl: string;
         isMe?: boolean;
         fullName: string | null;
@@ -58,7 +58,7 @@ export class PostPrismaMapper {
 
             author: {
                 id: dbPost.authorId,
-                username: dbPost.author?.username ?? undefined,
+                username: dbPost.author.username,
                 avatarUrl: dbPost.author?.profile?.avatarUrl ?? undefined,
                 fullName: dbPost.author?.profile?.fullName ?? undefined,
             },
@@ -109,6 +109,16 @@ export class PostPrismaMapper {
         cdnUrl: string,
         currentUserId?: string,
     ): PostResponse {
+        // Only a post built by Post.create and not yet persisted lacks a
+        // handle; those never reach a response. Failing here beats serialising
+        // a post with no author handle on it.
+        const { username } = post.author;
+        if (!username) {
+            throw new Error(
+                "PostPrismaMapper.toResponse requires a post loaded with its author.",
+            );
+        }
+
         return {
             id: post.id,
             content: post.content,
@@ -121,7 +131,7 @@ export class PostPrismaMapper {
             isBookmarked: post.isBookmarked || false,
             author: {
                 id: post.author.id,
-                username: post.author.username,
+                username,
                 avatarUrl: post.author.avatarUrl
                     ? post.author.avatarUrl.startsWith("http")
                         ? post.author.avatarUrl

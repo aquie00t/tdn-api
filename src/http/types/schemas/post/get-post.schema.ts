@@ -3,7 +3,7 @@ import { Type } from "@sinclair/typebox";
 
 export const PostAuthorSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
-    username: FBType.Optional(FBType.String()),
+    username: FBType.String(),
     avatarUrl: FBType.String(),
     fullName: FBType.Union([FBType.String(), FBType.Null()]),
     isMe: FBType.Optional(FBType.Boolean()),

@@ -70,6 +70,7 @@ describe("POST /posts/:postId/comments - Create Comment", () => {
                 author: {
                     id: string;
                     isMe: boolean;
+                    username: string;
                 };
             };
             meta: { timestamp: string };
@@ -87,6 +88,9 @@ describe("POST /posts/:postId/comments - Create Comment", () => {
         expect(body.data.isLiked).toBe(false);
         expect(body.data.isBookmarked).toBe(false);
         expect(body.data.author.isMe).toBe(true);
+        // The column is NOT NULL and the relation is required, so the schema
+        // declares this required - it must never be omitted.
+        expect(body.data.author.username).toBe(user.username);
         expect(body.meta).toHaveProperty("timestamp", expect.any(String));
     });
 

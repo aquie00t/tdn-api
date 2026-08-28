@@ -3,7 +3,7 @@ import { ResponseSchema } from "../create-response-schema";
 
 export const ArticleAuthorSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
-    username: FBType.Optional(FBType.String()),
+    username: FBType.String(),
     fullName: FBType.Union([FBType.String(), FBType.Null()]),
     avatarUrl: FBType.String(),
     isMe: FBType.Boolean(),

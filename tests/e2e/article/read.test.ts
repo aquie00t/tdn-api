@@ -8,7 +8,7 @@ interface ArticleData {
     status: string;
     publishedAt: string | null;
     tags: { name: string }[];
-    author: { id: string; isMe: boolean };
+    author: { id: string; isMe: boolean; username: string };
 }
 
 type ArticleEnvelope = { data: ArticleData; meta: { timestamp: string } };
@@ -212,6 +212,9 @@ describe("GET /articles/:slug", () => {
         expect(response.statusCode).toBe(200);
         expect(body.data.id).toBe(published.id);
         expect(body.data.author.isMe).toBe(false);
+        // The column is NOT NULL and the relation is required, so the schema
+        // declares this required - it must never be omitted.
+        expect(body.data.author.username).toBe(author.username);
     });
 
     it("should carry the full markdown body, unlike the list", async () => {

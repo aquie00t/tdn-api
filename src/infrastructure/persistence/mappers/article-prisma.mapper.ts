@@ -38,7 +38,7 @@ export interface ArticleResponse {
     isBookmarked: boolean;
     author: {
         id: string;
-        username?: string;
+        username: string;
         avatarUrl: string;
         fullName: string | null;
         isMe: boolean;
@@ -88,7 +88,7 @@ export class ArticlePrismaMapper {
             readingTimeMinutes: dbArticle.readingTimeMinutes,
             author: {
                 id: dbArticle.authorId,
-                username: dbArticle.author?.username,
+                username: dbArticle.author.username,
                 avatarUrl: dbArticle.author?.profile?.avatarUrl ?? undefined,
                 fullName: dbArticle.author?.profile?.fullName ?? undefined,
             },
@@ -155,6 +155,16 @@ export class ArticlePrismaMapper {
         cdnUrl: string,
         currentUserId?: string,
     ): ArticleSummaryResponse {
+        // Only an article built by Article.create and not yet persisted lacks
+        // a handle; those never reach a response. Failing here beats
+        // serialising an article with no author handle on it.
+        const { username } = article.author;
+        if (!username) {
+            throw new Error(
+                "ArticlePrismaMapper.toSummaryResponse requires an article loaded with its author.",
+            );
+        }
+
         return {
             id: article.id,
             slug: article.slug,
@@ -175,7 +185,7 @@ export class ArticlePrismaMapper {
             isBookmarked: article.isBookmarked,
             author: {
                 id: article.author.id,
-                username: article.author.username,
+                username,
                 avatarUrl: article.author.avatarUrl
                     ? article.author.avatarUrl.startsWith("http")
                         ? article.author.avatarUrl

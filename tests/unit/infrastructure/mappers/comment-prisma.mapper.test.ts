@@ -3,6 +3,7 @@ import {
     CommentPrismaMapper,
     type CommentWithRelations,
 } from "@infrastructure/persistence/mappers/comment-prisma.mapper";
+import { Comment } from "@core/domain/entities/comment.entity";
 
 const CDN = "https://cdn.example.com";
 const now = new Date("2025-01-01T00:00:00.000Z");
@@ -219,6 +220,35 @@ describe("CommentPrismaMapper", () => {
 
         it("should return empty array for empty input", () => {
             expect(CommentPrismaMapper.toListResponse([], CDN)).toEqual([]);
+        });
+    });
+
+    describe("author handle guarantee", () => {
+        it("should serialize the author handle", () => {
+            const comment = CommentPrismaMapper.toDomainComment(
+                makeDbComment(),
+            );
+
+            expect(
+                CommentPrismaMapper.toResponse(comment, CDN).author.username,
+            ).toBe("testuser");
+        });
+
+        it("should throw rather than serialize a comment with no author", () => {
+            // Reachable only if a new query forgets the author include. The
+            // response schema declares username required, so emitting the key
+            // as undefined would break the contract silently.
+            const comment = Comment.createForPost(
+                "content",
+                "post-1",
+                "user-1",
+                null,
+                [],
+            );
+
+            expect(() => CommentPrismaMapper.toResponse(comment, CDN)).toThrow(
+                /loaded with its author/,
+            );
         });
     });
 });

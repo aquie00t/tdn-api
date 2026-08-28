@@ -36,7 +36,7 @@ export interface CommentResponse {
     createdAt: Date;
     author: {
         id: string;
-        username?: string;
+        username: string;
         fullName?: string;
         avatarUrl: string;
         isMe: boolean;
@@ -68,7 +68,7 @@ export class CommentPrismaMapper {
 
             author: {
                 id: dbComment.authorId,
-                username: dbComment.author?.username ?? undefined,
+                username: dbComment.author.username,
                 avatarUrl: dbComment.author?.profile?.avatarUrl ?? undefined,
                 fullName: dbComment.author?.profile?.fullName ?? undefined,
             },
@@ -84,6 +84,16 @@ export class CommentPrismaMapper {
         cdnUrl: string,
         currentUserId?: string,
     ): CommentResponse {
+        // Every repository query that produces a Comment loads the author, so
+        // this only trips if a new one forgets the include. Failing here beats
+        // serialising a comment with no handle on it.
+        const author = comment.author;
+        if (!author) {
+            throw new Error(
+                "CommentPrismaMapper.toResponse requires a comment loaded with its author.",
+            );
+        }
+
         return {
             id: comment.id,
             content: comment.content,
@@ -98,14 +108,14 @@ export class CommentPrismaMapper {
             isBookmarked: comment.isBookmarked,
             author: {
                 id: comment.authorId,
-                username: comment.author?.username,
-                fullName: comment.author?.fullName ?? undefined,
-                avatarUrl: comment.author?.avatarUrl
-                    ? comment.author.avatarUrl.startsWith("http")
-                        ? comment.author.avatarUrl
-                        : comment.author.avatarUrl.includes("default_profile")
-                          ? `${cdnUrl}/${comment.author.avatarUrl}?v=1`
-                          : `${cdnUrl}/${comment.author.avatarUrl}`
+                username: author.username,
+                fullName: author.fullName ?? undefined,
+                avatarUrl: author.avatarUrl
+                    ? author.avatarUrl.startsWith("http")
+                        ? author.avatarUrl
+                        : author.avatarUrl.includes("default_profile")
+                          ? `${cdnUrl}/${author.avatarUrl}?v=1`
+                          : `${cdnUrl}/${author.avatarUrl}`
                     : `${cdnUrl}/default-avatar.png`,
                 isMe: currentUserId
                     ? comment.authorId === currentUserId

@@ -44,7 +44,15 @@ export interface ArticleProps {
         /** The unique identifier of the user who wrote this article */
         id: string;
 
-        /** Optional username of the author for display purposes */
+        /**
+         * Handle of the author.
+         *
+         * Absent only on an article built by `Article.create` that has not
+         * been persisted yet, which carries the author id and nothing else.
+         * Any article read back from the database has one: `User.username` is
+         * NOT NULL and the author relation is required, and every query builds
+         * its include through `buildInclude`, which selects it.
+         */
         username?: string;
 
         /** Optional avatar URL of the author for display purposes */
