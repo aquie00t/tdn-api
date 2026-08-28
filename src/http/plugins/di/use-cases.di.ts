@@ -34,6 +34,7 @@ import { MarkNotificationAsReadUseCase } from "@core/use-cases/notification/mark
 import { GetUnreadNotificationCountUseCase } from "@core/use-cases/notification/unread-count";
 import { PurgeExpiredNotificationsUseCase } from "@core/use-cases/notification/purge-expired";
 import { CreatePostUseCase } from "@core/use-cases/post/create-post";
+import { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
 import { GetPostsUseCase } from "@core/use-cases/post/get-posts";
 import { DeletePostUseCase } from "@core/use-cases/post/delete-post";
@@ -76,12 +77,6 @@ import { RemoveArticleBookmarkUseCase } from "@core/use-cases/article/remove-art
 /**
  * Dependency injection module for use cases
  *
-        (postRepository, cacheService, userRepository) =>
-            new CreatePostUseCase(
-                postRepository,
-                cacheService,
-                userRepository,
-            ),
  * shared dependencies across the application.
  */
 export const useCasesModule = {
@@ -325,9 +320,26 @@ export const useCasesModule = {
      * Use case for creating a new post
      */
     createPostUseCase: asFunction(
-        (postRepository, cacheService, userRepository) =>
-            new CreatePostUseCase(postRepository, cacheService, userRepository),
+        (
+            postRepository,
+            cacheService,
+            userRepository,
+            notifyNewPostUseCase,
+            logger,
+        ) =>
+            new CreatePostUseCase(
+                postRepository,
+                cacheService,
+                userRepository,
+                notifyNewPostUseCase,
+                logger,
+            ),
     ).singleton(),
+
+    /**
+     * Use case for notifying followers that an account published a post
+     */
+    notifyNewPostUseCase: asClass(NotifyNewPostUseCase).singleton(),
 
     /**
      * Use case for uploading post media files

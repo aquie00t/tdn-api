@@ -435,4 +435,86 @@ describe("PrismaNotificationRepository (integration)", () => {
             expect(old).toBeUndefined();
         });
     });
+
+    describe("createMany()", () => {
+        let fanoutPostId: string;
+        let followerAId: string;
+        let followerBId: string;
+
+        beforeAll(async () => {
+            const userRepo = new PrismaUserRepository(prisma, {
+                gracePeriodDays: 30,
+            });
+            const [a, b] = await Promise.all([
+                userRepo.create({
+                    email: "fanout_a@notif-repo-test.com",
+                    username: "fanout_a_notifrepo",
+                    passwordHash: "hashed",
+                }),
+                userRepo.create({
+                    email: "fanout_b@notif-repo-test.com",
+                    username: "fanout_b_notifrepo",
+                    passwordHash: "hashed",
+                }),
+            ]);
+            followerAId = a.id;
+            followerBId = b.id;
+
+            const post = await prisma.post.create({
+                data: { content: "fan-out target", authorId: issuerId },
+            });
+            fanoutPostId = post.id;
+        });
+
+        afterAll(async () => {
+            await prisma.notification.deleteMany({
+                where: { recipientId: { in: [followerAId, followerBId] } },
+            });
+        });
+
+        it("should write one row per recipient in a single call", async () => {
+            const written = await notifRepo.createMany([
+                Notification.create(
+                    followerAId,
+                    issuerId,
+                    NotificationType.NEW_POST,
+                    { postId: fanoutPostId },
+                ),
+                Notification.create(
+                    followerBId,
+                    issuerId,
+                    NotificationType.NEW_POST,
+                    { postId: fanoutPostId },
+                ),
+            ]);
+
+            expect(written).toBe(2);
+        });
+
+        it("should persist the NEW_POST fields each recipient needs", async () => {
+            const [stored] = await notifRepo.findAllByUserId({
+                userId: followerAId,
+                page: 1,
+                limit: 10,
+            });
+
+            expect(stored.type).toBe(NotificationType.NEW_POST);
+            expect(stored.issuerId).toBe(issuerId);
+            expect(stored.postId).toBe(fanoutPostId);
+            expect(stored.referenceId).toBe(fanoutPostId);
+            expect(stored.isRead).toBe(false);
+        });
+
+        it("should count towards the recipient's unread badge", async () => {
+            const count = await notifRepo.getUnreadCount(followerBId);
+
+            expect(count).toBe(1);
+        });
+
+        it("should write nothing for an empty batch", async () => {
+            const written = await notifRepo.createMany([]);
+
+            expect(written).toBe(0);
+        });
+    });
 });

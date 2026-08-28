@@ -3,6 +3,8 @@ import type { CreatePostInput } from "./create-post-usecase.input";
 import type { CachePort } from "@core/ports/services/cache.port";
 import { Post } from "@core/domain/entities/post.entity";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
+import type { LoggerPort } from "@core/ports/services/logger.port";
+import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import { PostType } from "@core/domain/enums";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
 import { NotFoundError } from "@core/errors/common/not-found.error";
@@ -20,11 +22,15 @@ export class CreatePostUseCase {
      * @param postRepository - Repository for managing post data
      * @param cacheService - Service for cache operations
      * @param userRepository - Repository for managing user data
+     * @param notifyNewPostUseCase - Use case that fans the post out to followers
+     * @param logger - Service for logging operations
      */
     constructor(
         private readonly postRepository: IPostRepository,
         private readonly cacheService: CachePort,
         private readonly userRepository: IUserRepository,
+        private readonly notifyNewPostUseCase: NotifyNewPostUseCase,
+        private readonly logger: LoggerPort,
     ) {}
 
     /**
@@ -36,6 +42,10 @@ export class CreatePostUseCase {
      * @remarks
      * This method creates a new post entity, saves it to the database,
      * and clears any cached feed data to ensure consistency.
+     *
+     * Followers are notified after the post is committed, deliberately
+     * outside the caller's critical path: the post is the thing worth keeping,
+     * so a fan-out failure is logged rather than allowed to fail the request.
      */
     async execute(input: CreatePostInput): Promise<Post> {
         if ([PostType.SYSTEM_UPDATE, PostType.TECH_NEWS].includes(input.type)) {
@@ -57,6 +67,19 @@ export class CreatePostUseCase {
 
         const rawPost = await this.postRepository.create(post);
         await this.cacheService.deleteByPattern("posts:feed:*");
+
+        void this.notifyNewPostUseCase
+            .execute({
+                postId: rawPost.id,
+                authorId: input.authorId,
+                postType: input.type,
+            })
+            .catch((err: unknown) => {
+                this.logger.error(
+                    { err, postId: rawPost.id },
+                    "Failed to notify followers of a new post",
+                );
+            });
 
         return rawPost;
     }

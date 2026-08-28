@@ -173,4 +173,72 @@ describe("PrismaFollowUserRepository (integration)", () => {
             expect(followingIds).toHaveLength(0);
         });
     });
+
+    describe("getFollowerIds()", () => {
+        let targetId: string;
+        let liveFollowerId: string;
+        let deletedFollowerId: string;
+
+        beforeAll(async () => {
+            const userRepo = new PrismaUserRepository(prisma, {
+                gracePeriodDays: 30,
+            });
+            const [target, live, deleted] = await Promise.all([
+                userRepo.create({
+                    email: "fanout_target@follow-repo-test.com",
+                    username: "fanout_target_followrepo",
+                    passwordHash: "hashed",
+                }),
+                userRepo.create({
+                    email: "fanout_live@follow-repo-test.com",
+                    username: "fanout_live_followrepo",
+                    passwordHash: "hashed",
+                }),
+                userRepo.create({
+                    email: "fanout_deleted@follow-repo-test.com",
+                    username: "fanout_deleted_followrepo",
+                    passwordHash: "hashed",
+                }),
+            ]);
+            targetId = target.id;
+            liveFollowerId = live.id;
+            deletedFollowerId = deleted.id;
+
+            await followRepo.followUser(liveFollowerId, targetId);
+            await followRepo.followUser(deletedFollowerId, targetId);
+            // The target follows someone too, so a wrong-direction query would
+            // be visible rather than silently returning the same set.
+            await followRepo.followUser(targetId, userAId);
+
+            await prisma.user.update({
+                where: { id: deletedFollowerId },
+                data: { deletedAt: new Date() },
+            });
+        });
+
+        it("should return the users following the given user", async () => {
+            const ids = await followRepo.getFollowerIds(targetId);
+
+            expect(ids).toContain(liveFollowerId);
+        });
+
+        it("should not return who the given user follows", async () => {
+            const ids = await followRepo.getFollowerIds(targetId);
+
+            expect(ids).not.toContain(userAId);
+        });
+
+        it("should exclude soft-deleted followers", async () => {
+            const ids = await followRepo.getFollowerIds(targetId);
+
+            expect(ids).not.toContain(deletedFollowerId);
+            expect(ids).toHaveLength(1);
+        });
+
+        it("should return an empty array for a user nobody follows", async () => {
+            const ids = await followRepo.getFollowerIds(liveFollowerId);
+
+            expect(ids).toHaveLength(0);
+        });
+    });
 });

@@ -107,4 +107,16 @@ export interface IFollowRepository {
      * @returns An array of user IDs that the follower is following.
      */
     getFollowingIds(followerId: string): Promise<string[]>;
+
+    /**
+     * Retrieves the IDs of every user following the given user.
+     *
+     * The mirror of {@link getFollowingIds}. Backs new-post fan-out, which
+     * needs the recipient list and nothing else, so soft-deleted followers are
+     * left out - a deleted account must not collect notifications.
+     *
+     * @param userId - The ID of the user whose followers are being retrieved.
+     * @returns An array of user IDs that follow the given user.
+     */
+    getFollowerIds(userId: string): Promise<string[]>;
 }
