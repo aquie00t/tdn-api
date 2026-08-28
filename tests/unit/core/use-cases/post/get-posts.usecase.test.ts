@@ -4,6 +4,7 @@ import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import { UnauthorizedError } from "@core/errors";
+import { PostType } from "@core/domain/enums/post-type.enum";
 import { buildPost } from "../../../helpers/mock-factories";
 
 describe("GetPostsUseCase", () => {
@@ -125,5 +126,100 @@ describe("GetPostsUseCase", () => {
         expect(result.total).toBe(1);
         expect(result.posts).toHaveLength(1);
         expect(postRepository.findAll).not.toHaveBeenCalled();
+    });
+
+    describe("ordering", () => {
+        const ids = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"];
+
+        function cachedPage(type: PostType): string {
+            return JSON.stringify({
+                posts: ids.map((id) => {
+                    const post = buildPost({ id, type });
+                    return {
+                        id,
+                        content: post.content,
+                        type,
+                        mediaUrls: post.mediaUrls,
+                        author: post.author,
+                        tags: post.tags,
+                        categories: post.categories,
+                        createdAt: post.createdAt.toISOString(),
+                        updatedAt: post.updatedAt.toISOString(),
+                    };
+                }),
+                total: ids.length,
+            });
+        }
+
+        it("should keep a cached non-community feed in its stored order", async () => {
+            // A release feed is only useful chronologically. The cached path
+            // used to shuffle unconditionally, so the same request came back
+            // ordered on a miss and randomised for the next 60 seconds.
+            vi.mocked(cacheService.get).mockResolvedValue(
+                cachedPage(PostType.TECH_NEWS),
+            );
+
+            for (let attempt = 0; attempt < 10; attempt++) {
+                const result = await useCase.execute({
+                    page: 1,
+                    limit: 10,
+                    type: PostType.TECH_NEWS,
+                });
+
+                expect(result.posts.map((p) => p.id)).toEqual(ids);
+            }
+        });
+
+        it("should keep an unfiltered cached feed in its stored order", async () => {
+            vi.mocked(cacheService.get).mockResolvedValue(
+                cachedPage(PostType.TECH_NEWS),
+            );
+
+            const result = await useCase.execute({ page: 1, limit: 10 });
+
+            expect(result.posts.map((p) => p.id)).toEqual(ids);
+        });
+
+        it("should keep a non-community feed in order on a cache miss too", async () => {
+            const posts = ids.map((id) =>
+                buildPost({ id, type: PostType.TECH_NEWS }),
+            );
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts,
+                total: posts.length,
+            });
+
+            const result = await useCase.execute({
+                page: 1,
+                limit: 10,
+                type: PostType.TECH_NEWS,
+            });
+
+            expect(result.posts.map((p) => p.id)).toEqual(ids);
+        });
+
+        it("should still shuffle the community feed on a cache hit", async () => {
+            vi.mocked(cacheService.get).mockResolvedValue(
+                cachedPage(PostType.COMMUNITY),
+            );
+
+            const orders = new Set<string>();
+            for (let attempt = 0; attempt < 25; attempt++) {
+                const result = await useCase.execute({
+                    page: 1,
+                    limit: 10,
+                    type: PostType.COMMUNITY,
+                });
+
+                expect([...result.posts.map((p) => p.id)].sort()).toEqual(
+                    [...ids].sort(),
+                );
+                orders.add(result.posts.map((p) => p.id).join(","));
+            }
+
+            // 25 shuffles of 8 items landing on one order would be a shuffle
+            // that does not shuffle.
+            expect(orders.size).toBeGreaterThan(1);
+        });
     });
 });
