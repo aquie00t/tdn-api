@@ -106,6 +106,22 @@ describe("GET /profiles/bots - Bot discovery by category", () => {
         );
     });
 
+    it("should only list bots that carry at least one category", async () => {
+        // Persona bots are flagged isBot but never categorised; onboarding
+        // must not offer them as news sources.
+        const response = await request({
+            method: "GET",
+            url: "/profiles/bots?limit=50",
+        });
+        const body = parseBody<BotProfilesBody>(response);
+
+        expect(response.statusCode).toBe(200);
+        expect(body.data.length).toBeGreaterThan(0);
+        body.data.forEach((item) => {
+            expect(item.categories.length).toBeGreaterThan(0);
+        });
+    });
+
     it("should exclude bots that do not carry the requested category", async () => {
         const response = await request({
             method: "GET",

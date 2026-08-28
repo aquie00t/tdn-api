@@ -13,3 +13,4 @@ dist
 .idea/
 
 bot-tokens-private.json
+scripts/.bot-categories-state.json
