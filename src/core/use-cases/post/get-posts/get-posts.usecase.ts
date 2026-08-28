@@ -73,7 +73,7 @@ export class GetPostsUseCase {
             });
 
             return {
-                posts: shufflePosts(hydratedPosts),
+                posts: this.orderForResponse(hydratedPosts, input.type),
                 total: parsed.total,
             };
         }
@@ -102,9 +102,27 @@ export class GetPostsUseCase {
         await this.cacheService.set(cacheKey, JSON.stringify(response), 60);
 
         return {
-            posts:
-                input.type === PostType.COMMUNITY ? shufflePosts(posts) : posts,
+            posts: this.orderForResponse(posts, input.type),
             total,
         };
+    }
+
+    /**
+     * Applies the feed's ordering policy to a page of posts.
+     *
+     * Only the community feed is shuffled, to keep it from looking static
+     * between visits. Every other feed is chronological, because a release or
+     * a job posting is only useful in the order it happened.
+     *
+     * Shared by both the cached and uncached paths on purpose: when the cache
+     * hit shuffled unconditionally, the same request returned chronological
+     * results on a miss and randomised ones for the next 60 seconds.
+     *
+     * @param posts - The page of posts to order
+     * @param type - The post type the caller filtered on, if any
+     * @returns The posts in the order they should be returned
+     */
+    private orderForResponse(posts: Post[], type?: PostType): Post[] {
+        return type === PostType.COMMUNITY ? shufflePosts(posts) : posts;
     }
 }
