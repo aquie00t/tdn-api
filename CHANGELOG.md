@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/the-developer-network/tdn-api/compare/v1.11.0...v1.11.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **profile:** list only categorised bots, and add the category assignment script ([#232](https://github.com/the-developer-network/tdn-api/issues/232)) ([2bf382c](https://github.com/the-developer-network/tdn-api/commit/2bf382c3f2507973b389b139f7cca53c9ee08ce3))
+
 # [1.11.0](https://github.com/the-developer-network/tdn-api/compare/v1.10.0...v1.11.0) (2026-08-28)
 
 
