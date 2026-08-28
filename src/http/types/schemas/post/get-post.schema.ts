@@ -1,5 +1,6 @@
 import { Type as FBType, type Static } from "@fastify/type-provider-typebox";
 import { Type } from "@sinclair/typebox";
+import { PostType } from "@core/domain/enums/post-type.enum";
 
 export const PostAuthorSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
@@ -12,7 +13,7 @@ export const PostAuthorSchema = FBType.Object({
 export const PostItemSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
     content: FBType.String(),
-    type: FBType.String(),
+    type: FBType.Enum(PostType),
     mediaUrls: FBType.Array(FBType.String()),
     createdAt: FBType.String(),
     likeCount: FBType.Number(),

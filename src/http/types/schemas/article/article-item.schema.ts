@@ -1,5 +1,6 @@
 import { Type as FBType, type Static } from "@fastify/type-provider-typebox";
 import { ResponseSchema } from "../create-response-schema";
+import { ArticleStatus } from "@core/domain/enums/article-status.enum";
 
 export const ArticleAuthorSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
@@ -23,7 +24,7 @@ export const ArticleItemSchema = FBType.Object({
     excerpt: FBType.Union([FBType.String(), FBType.Null()]),
     coverImageUrl: FBType.Union([FBType.String(), FBType.Null()]),
     coverImageAlt: FBType.Union([FBType.String(), FBType.Null()]),
-    status: FBType.String(),
+    status: FBType.Enum(ArticleStatus),
     publishedAt: FBType.Union([FBType.String(), FBType.Null()]),
     readingTimeMinutes: FBType.Number(),
     createdAt: FBType.String(),
