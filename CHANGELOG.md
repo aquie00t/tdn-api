@@ -1,3 +1,10 @@
+## [1.12.2](https://github.com/the-developer-network/tdn-api/compare/v1.12.1...v1.12.2) (2026-08-28)
+
+
+### Bug Fixes
+
+* **post:** stop randomising cached news feeds ([#237](https://github.com/the-developer-network/tdn-api/issues/237)) ([7f1b945](https://github.com/the-developer-network/tdn-api/commit/7f1b945704fa264044064e8d5d5a9004aef05ff2))
+
 ## [1.12.1](https://github.com/the-developer-network/tdn-api/compare/v1.12.0...v1.12.1) (2026-08-28)
 
 
