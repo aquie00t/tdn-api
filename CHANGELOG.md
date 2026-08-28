@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/the-developer-network/tdn-api/compare/v1.10.0...v1.11.0) (2026-08-28)
+
+
+### Features
+
+* **profile:** add bot-only categories and category-filtered bot discovery ([#231](https://github.com/the-developer-network/tdn-api/issues/231)) ([0f7ebf9](https://github.com/the-developer-network/tdn-api/commit/0f7ebf92e1d736a97483e5da2f8b36b7a24d8f58))
+
 # [1.10.0](https://github.com/the-developer-network/tdn-api/compare/v1.9.2...v1.10.0) (2026-08-27)
 
 
