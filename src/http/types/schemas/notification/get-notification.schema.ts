@@ -1,13 +1,14 @@
 import { Type } from "@sinclair/typebox";
 import { Type as FBType, type Static } from "@fastify/type-provider-typebox";
 import { MetaOnlyResponseSchema } from "../create-response-schema";
+import { NotificationType } from "@core/domain/enums/notification-type.enum";
 
 const NotificationItemSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
     recipientId: FBType.String({ format: "uuid" }),
     issuerId: FBType.String({ format: "uuid" }),
     username: FBType.Optional(FBType.String()),
-    type: FBType.String(),
+    type: FBType.Enum(NotificationType),
     avatarUrl: FBType.Optional(FBType.String()),
     // The most specific target id, kept for clients written against the old
     // shape. New clients should read the explicit ids below.
