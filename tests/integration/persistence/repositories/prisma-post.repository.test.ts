@@ -266,6 +266,58 @@ describe("PrismaPostRepository (integration)", () => {
             expect(created.quoteCount).toBe(0);
         });
 
+        it("should list only the quotes of the requested post, newest first", async () => {
+            const original = await postRepo.create(
+                Post.create("Listed original", PostType.COMMUNITY, testUserId),
+            );
+            const other = await postRepo.create(
+                Post.create("Unrelated post", PostType.COMMUNITY, testUserId),
+            );
+
+            const first = await postRepo.create(
+                Post.create(
+                    "First quote",
+                    PostType.COMMUNITY,
+                    testUserId,
+                    [],
+                    [],
+                    original.id,
+                ),
+            );
+            const second = await postRepo.create(
+                Post.create(
+                    "Second quote",
+                    PostType.COMMUNITY,
+                    testUserId,
+                    [],
+                    [],
+                    original.id,
+                ),
+            );
+            await postRepo.create(
+                Post.create(
+                    "Quote of something else",
+                    PostType.COMMUNITY,
+                    testUserId,
+                    [],
+                    [],
+                    other.id,
+                ),
+            );
+
+            const result = await postRepo.findAll({
+                page: 1,
+                limit: 10,
+                quotedPostId: original.id,
+            });
+
+            expect(result.total).toBe(2);
+            expect(result.posts.map((p) => p.id)).toEqual([
+                second.id,
+                first.id,
+            ]);
+        });
+
         it("should cascade the delete of an original onto its quotes", async () => {
             const original = await postRepo.create(
                 Post.create("Doomed original", PostType.COMMUNITY, testUserId),

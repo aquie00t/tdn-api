@@ -23,6 +23,14 @@ import {
     type GetPostResponse,
 } from "@typings/schemas/post/get-post.schema";
 import {
+    getPostQuotesParamsSchema,
+    getPostQuotesQuerySchema,
+    GetPostQuotesResponseSchema,
+    type GetPostQuotesParams,
+    type GetPostQuotesQuery,
+    type GetPostQuotesResponse,
+} from "@typings/schemas/post/get-post-quotes.schema";
+import {
     getPostsQuerySchema,
     type GetPostsQuery,
     GetFeedResponseSchema,
@@ -137,5 +145,29 @@ export function postRoutes(fastify: FastifyInstance): void {
             onRequest: [fastify.optionalAuthenticate],
         },
         postController.getPost.bind(postController),
+    );
+
+    /**
+     * List the posts quoting a post
+     * Applies standard rate limiting; optional auth fills in the caller's
+     * like and bookmark state on each quote
+     */
+    fastify.get<{
+        Params: GetPostQuotesParams;
+        Querystring: GetPostQuotesQuery;
+        Reply: { 200: GetPostQuotesResponse };
+    }>(
+        "/posts/:id/quotes",
+        {
+            schema: {
+                params: getPostQuotesParamsSchema,
+                querystring: getPostQuotesQuerySchema,
+                response: { 200: GetPostQuotesResponseSchema },
+                tags: ["Post"],
+            },
+            config: { rateLimit: RateLimitPolicies.STANDARD },
+            onRequest: [fastify.optionalAuthenticate],
+        },
+        postController.getQuotes.bind(postController),
     );
 }

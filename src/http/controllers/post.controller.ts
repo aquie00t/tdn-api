@@ -3,6 +3,7 @@ import type { CreatePostUseCase } from "@core/use-cases/post/create-post";
 import type { DeletePostUseCase } from "@core/use-cases/post/delete-post";
 import type { GetPostDetailUseCase } from "@core/use-cases/post/get-post-detail/get-post-detail.usecase";
 import type { GetPostsUseCase } from "@core/use-cases/post/get-posts";
+import type { GetPostQuotesUseCase } from "@core/use-cases/post/get-post-quotes";
 import type { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
 import { PostPrismaMapper } from "@infrastructure/persistence/mappers/post-prisma.mapper";
 import type { PostCategory } from "@core/domain/enums/post-category-enum";
@@ -10,6 +11,10 @@ import { normalizeCategoryQuery } from "../utils/category-query";
 import type { CreatePostBody } from "@typings/schemas/post/create-post.schema";
 import type { DeletePostParams } from "@typings/schemas/post/delete-post.schema";
 import type { GetPostParams } from "@typings/schemas/post/get-post.schema";
+import type {
+    GetPostQuotesParams,
+    GetPostQuotesQuery,
+} from "@typings/schemas/post/get-post-quotes.schema";
 import type { GetPostsQuery } from "@typings/schemas/post/get-posts.schema";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
@@ -29,6 +34,7 @@ export class PostController {
      * @param getPostsUseCase - Use case for retrieving a paginated feed of posts.
      * @param deletePostUseCase - Use case for soft/hard deleting a post.
      * @param getPostDetailUseCase - Use case for fetching details of a specific post.
+     * @param getPostQuotesUseCase - Use case for listing the posts quoting a post.
      */
     constructor(
         private readonly createPostUseCase: CreatePostUseCase,
@@ -36,6 +42,7 @@ export class PostController {
         private readonly getPostsUseCase: GetPostsUseCase,
         private readonly deletePostUseCase: DeletePostUseCase,
         private readonly getPostDetailUseCase: GetPostDetailUseCase,
+        private readonly getPostQuotesUseCase: GetPostQuotesUseCase,
     ) {}
 
     /**
@@ -240,6 +247,49 @@ export class PostController {
 
         return reply.status(200).send({
             data: formattedData,
+        });
+    }
+
+    /**
+     * Lists the posts quoting a given post, newest first.
+     *
+     * @param request - The Fastify request carrying the post ID and paging.
+     * @param reply - The Fastify reply object.
+     * @returns A 200 OK response with the page of quotes and pagination metadata.
+     */
+    async getQuotes(
+        request: FastifyRequest<{
+            Params: GetPostQuotesParams;
+            Querystring: GetPostQuotesQuery;
+        }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        const { id } = request.params;
+        const { page = 1, limit = 10 } = request.query;
+        const currentUserId = request.user?.id;
+        const cdnUrl = this.normalizeCdnUrl(
+            request.server.config.R2_PUBLIC_URL,
+        );
+
+        const result = await this.getPostQuotesUseCase.execute({
+            postId: id,
+            page,
+            limit,
+            currentUserId,
+        });
+
+        return reply.status(200).send({
+            data: PostPrismaMapper.toFeedResponse(
+                result.posts,
+                cdnUrl,
+                currentUserId,
+            ),
+            meta: {
+                total: result.total,
+                currentPage: page,
+                limit,
+                totalPages: Math.ceil(result.total / limit),
+            },
         });
     }
 

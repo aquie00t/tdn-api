@@ -48,6 +48,7 @@ import { GetBookmarksUseCase } from "@core/use-cases/bookmark/get-bookmarks/get-
 import { DeleteCommentUseCase } from "@core/use-cases/comment/delete-comment/delete-comment.usecase";
 import { GetUserPostsUseCase } from "@core/use-cases/post/get-user-posts/get-user.posts.usecase";
 import { GetPostDetailUseCase } from "@core/use-cases/post/get-post-detail/get-post-detail.usecase";
+import { GetPostQuotesUseCase } from "@core/use-cases/post/get-post-quotes";
 import { GetCommentsUseCase } from "@core/use-cases/comment/get-comments/get-comments.usecase";
 import { GetCommentUseCase } from "@core/use-cases/comment/get-comment/get-comment.usecase";
 import { GetCommentRepliesUseCase } from "@core/use-cases/comment/get-comment-replies/get-comment-replies.usecase";
@@ -428,6 +429,11 @@ export const useCasesModule = {
      *
      */
     getPostDetailUseCase: asClass(GetPostDetailUseCase).singleton(),
+
+    /**
+     * Use case for listing the posts quoting a post
+     */
+    getPostQuotesUseCase: asClass(GetPostQuotesUseCase).singleton(),
     /**
      *
      */

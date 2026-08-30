@@ -110,6 +110,7 @@ export class PrismaPostRepository implements IPostRepository {
             currentUserId,
             tag,
             followingIds,
+            quotedPostId,
         } = params;
         const skip = (page - 1) * limit;
 
@@ -124,6 +125,7 @@ export class PrismaPostRepository implements IPostRepository {
                 ? { bookmarks: { some: { userId: savedByUserId } } }
                 : {}),
             ...(tag ? { tags: { some: { name: tag.toLowerCase() } } } : {}),
+            ...(quotedPostId ? { quotedPostId } : {}),
             ...(params.categories && params.categories.length > 0
                 ? { category: { hasSome: params.categories } }
                 : {}),

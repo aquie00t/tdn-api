@@ -216,6 +216,23 @@ describe("POST /posts - Create Post", () => {
             expect(body.data.quoteCount).toBe(1);
         });
 
+        it("should accept a quote with no text of its own", async () => {
+            // A quote with nothing added is a pure repost, the most common
+            // shape of the feature.
+            const response = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: { content: "", quotedPostId: originalPostId },
+            });
+            const body = parseBody<{
+                data: { content: string; quotedPost: { id: string } | null };
+            }>(response);
+
+            expect(response.statusCode).toBe(201);
+            expect(body.data.content).toBe("");
+            expect(body.data.quotedPost?.id).toBe(originalPostId);
+        });
+
         it("should return 404 when the quoted post does not exist", async () => {
             const response = await authRequest(accessToken, {
                 method: "POST",

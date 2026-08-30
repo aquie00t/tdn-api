@@ -15,7 +15,9 @@ export interface CreatePostInput {
 
     /**
      * The textual content of the post.
-     * Can be empty for media-only posts.
+     *
+     * May be empty only when `quotedPostId` is set: a quote with nothing added
+     * is a pure repost. An empty post that quotes nothing is rejected.
      */
     content: string;
 

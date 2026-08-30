@@ -9,6 +9,7 @@ import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/not
 import { PostType } from "@core/domain/enums";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
 import { NotFoundError } from "@core/errors/common/not-found.error";
+import { BadRequestError } from "@core/errors/common/bad-request.error";
 
 /**
  * Use case for creating a new post.
@@ -43,11 +44,17 @@ export class CreatePostUseCase {
      * and the optional id of the post being quoted
      * @returns Promise<void> - Resolves when post creation is complete
      *
+     * @throws BadRequestError - When an empty post quotes nothing
      * @throws NotFoundError - When quotedPostId names a post that does not exist
      *
      * @remarks
      * This method creates a new post entity, saves it to the database,
      * and clears any cached feed data to ensure consistency.
+     *
+     * Content may be empty only when the post quotes another one: a quote with
+     * nothing added is a pure repost, while an empty post that quotes nothing
+     * is nothing at all. The rule spans two fields, which is why it lives here
+     * rather than in the request schema.
      *
      * The post and the quoted post's counter are written in one transaction:
      * a post that exists without having been counted would leave the quote
@@ -67,6 +74,10 @@ export class CreatePostUseCase {
      * rather than allowed to fail the request or roll the write back.
      */
     async execute(input: CreatePostInput): Promise<Post> {
+        if (input.content.length === 0 && !input.quotedPostId) {
+            throw new BadRequestError("Post content cannot be empty.");
+        }
+
         if ([PostType.SYSTEM_UPDATE, PostType.TECH_NEWS].includes(input.type)) {
             const author = await this.userRepository.findById(input.authorId);
             if (!author) throw new NotFoundError("User not found.");

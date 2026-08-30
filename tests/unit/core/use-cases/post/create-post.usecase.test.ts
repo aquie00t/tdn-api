@@ -12,6 +12,7 @@ import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-n
 import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
 import { NotFoundError } from "@core/errors/common/not-found.error";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
+import { BadRequestError } from "@core/errors/common/bad-request.error";
 import { PostType } from "@core/domain/enums/post-type.enum";
 import { buildUser, buildPost } from "../../../helpers/mock-factories";
 
@@ -322,6 +323,33 @@ describe("CreatePostUseCase", () => {
             await vi.waitFor(() => {
                 expect(logger.error).toHaveBeenCalledOnce();
             });
+        });
+
+        it("should accept an empty body when quoting, as a pure repost", async () => {
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ id: "post-0" }),
+            );
+
+            await useCase.execute({
+                content: "",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                quotedPostId: "post-0",
+            });
+
+            expect(postRepository.create).toHaveBeenCalledOnce();
+        });
+
+        it("should reject an empty post that quotes nothing", async () => {
+            await expect(
+                useCase.execute({
+                    content: "",
+                    type: PostType.COMMUNITY,
+                    authorId: "user-1",
+                }),
+            ).rejects.toThrow(BadRequestError);
+
+            expect(transactionService.runInTransaction).not.toHaveBeenCalled();
         });
 
         it("should allow quoting a quote", async () => {

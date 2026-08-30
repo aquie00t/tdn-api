@@ -15,6 +15,9 @@ export interface GetPostsParams {
     tag?: string;
     followingIds?: string[];
     categories?: PostCategory[];
+
+    /** Restricts the page to the posts quoting this one. */
+    quotedPostId?: string;
 }
 
 /**
