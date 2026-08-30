@@ -1,3 +1,10 @@
+## [1.12.3](https://github.com/the-developer-network/tdn-api/compare/v1.12.2...v1.12.3) (2026-08-30)
+
+
+### Bug Fixes
+
+* **article:** match the tag filter case-insensitively ([#238](https://github.com/the-developer-network/tdn-api/issues/238)) ([8acad07](https://github.com/the-developer-network/tdn-api/commit/8acad073eaae4f9827cd5bc30e027782def95ab6))
+
 ## [1.12.2](https://github.com/the-developer-network/tdn-api/compare/v1.12.1...v1.12.2) (2026-08-28)
 
 
