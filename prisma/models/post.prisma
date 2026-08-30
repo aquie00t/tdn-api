@@ -23,6 +23,13 @@ model Post {
   authorId String @map("author_id")
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
+  // A quote post embeds another post, the way a quote tweet does. The relation
+  // is self-referential and cascades: deleting a post deletes every post that
+  // quotes it, so a quote card can never point at content that is gone.
+  quotedPostId String? @map("quoted_post_id")
+  quotedPost   Post?   @relation("PostQuotes", fields: [quotedPostId], references: [id], onDelete: Cascade)
+  quotes       Post[]  @relation("PostQuotes")
+
   tags          Tag[]
   likes         PostLike[]
   bookmarks     PostBookmark[]
@@ -38,6 +45,7 @@ model Post {
   @@index([createdAt])
   @@index([type])
   @@index([category])
+  @@index([quotedPostId])
   @@map("posts")
 }
 

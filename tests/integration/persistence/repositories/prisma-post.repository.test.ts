@@ -170,4 +170,99 @@ describe("PrismaPostRepository (integration)", () => {
             expect(found).toBeNull();
         });
     });
+
+    describe("quote posts", () => {
+        it("should persist the quoted post id and read the card back", async () => {
+            const original = await postRepo.create(
+                Post.create("The original", PostType.COMMUNITY, testUserId),
+            );
+
+            const quote = await postRepo.create(
+                Post.create(
+                    "Quoting the original",
+                    PostType.COMMUNITY,
+                    testUserId,
+                    [],
+                    [],
+                    original.id,
+                ),
+            );
+
+            expect(quote.quotedPostId).toBe(original.id);
+            expect(quote.quotedPost?.id).toBe(original.id);
+            expect(quote.quotedPost?.content).toBe("The original");
+            expect(quote.quotedPost?.author.username).toBe(
+                "postauthor_postrepo",
+            );
+
+            const readBack = await postRepo.findById(quote.id);
+            expect(readBack?.quotedPost?.content).toBe("The original");
+        });
+
+        it("should include only one level of quote", async () => {
+            // A quote card shows the post being quoted, never the chain behind
+            // it - otherwise a long chain would drag its whole history into
+            // every feed row.
+            const original = await postRepo.create(
+                Post.create("Level 0", PostType.COMMUNITY, testUserId),
+            );
+            const firstQuote = await postRepo.create(
+                Post.create(
+                    "Level 1",
+                    PostType.COMMUNITY,
+                    testUserId,
+                    [],
+                    [],
+                    original.id,
+                ),
+            );
+            const secondQuote = await postRepo.create(
+                Post.create(
+                    "Level 2",
+                    PostType.COMMUNITY,
+                    testUserId,
+                    [],
+                    [],
+                    firstQuote.id,
+                ),
+            );
+
+            const readBack = await postRepo.findById(secondQuote.id);
+
+            expect(readBack?.quotedPost?.content).toBe("Level 1");
+            expect(readBack?.quotedPost).not.toHaveProperty("quotedPost");
+        });
+
+        it("should leave quotedPost unset on a post that quotes nothing", async () => {
+            const created = await postRepo.create(
+                Post.create("No quote here", PostType.COMMUNITY, testUserId),
+            );
+
+            const readBack = await postRepo.findById(created.id);
+
+            expect(readBack?.quotedPostId).toBeUndefined();
+            expect(readBack?.quotedPost).toBeUndefined();
+            expect(readBack?.isQuote()).toBe(false);
+        });
+
+        it("should cascade the delete of an original onto its quotes", async () => {
+            const original = await postRepo.create(
+                Post.create("Doomed original", PostType.COMMUNITY, testUserId),
+            );
+            const quote = await postRepo.create(
+                Post.create(
+                    "Quoting a doomed post",
+                    PostType.COMMUNITY,
+                    testUserId,
+                    [],
+                    [],
+                    original.id,
+                ),
+            );
+
+            await postRepo.delete(original.id);
+
+            expect(await postRepo.findById(quote.id)).toBeNull();
+        });
+    });
 });

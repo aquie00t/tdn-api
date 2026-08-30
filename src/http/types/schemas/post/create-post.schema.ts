@@ -29,6 +29,12 @@ export const createPostBodySchema = Type.Object({
             uniqueItems: true,
         }),
     ),
+    quotedPostId: Type.Optional(
+        Type.String({
+            format: "uuid",
+            description: "The post this one quotes, rendered as a quote card",
+        }),
+    ),
 });
 
 export type CreatePostBody = Static<typeof createPostBodySchema>;

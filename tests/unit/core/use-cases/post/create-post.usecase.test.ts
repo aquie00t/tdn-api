@@ -12,7 +12,7 @@ import { buildUser, buildPost } from "../../../helpers/mock-factories";
 
 describe("CreatePostUseCase", () => {
     let useCase: CreatePostUseCase;
-    let postRepository: Pick<IPostRepository, "create">;
+    let postRepository: Pick<IPostRepository, "create" | "findById">;
     let userRepository: Pick<IUserRepository, "findById">;
     let cacheService: Pick<CachePort, "deleteByPattern">;
     let notifyNewPostUseCase: Pick<NotifyNewPostUseCase, "execute">;
@@ -21,6 +21,7 @@ describe("CreatePostUseCase", () => {
     beforeEach(() => {
         postRepository = {
             create: vi.fn().mockResolvedValue(buildPost()),
+            findById: vi.fn().mockResolvedValue(buildPost()),
         };
         userRepository = {
             findById: vi.fn(),
@@ -152,6 +153,72 @@ describe("CreatePostUseCase", () => {
             await vi.waitFor(() => {
                 expect(logger.error).toHaveBeenCalledOnce();
             });
+        });
+    });
+
+    describe("quote posts", () => {
+        it("should carry quotedPostId onto the created post", async () => {
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ id: "post-0" }),
+            );
+
+            await useCase.execute({
+                content: "I agree with this",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                quotedPostId: "post-0",
+            });
+
+            const created = vi.mocked(postRepository.create).mock.calls[0][0];
+            expect(created.quotedPostId).toBe("post-0");
+            expect(created.isQuote()).toBe(true);
+        });
+
+        it("should throw NotFoundError when the quoted post is gone", async () => {
+            vi.mocked(postRepository.findById).mockResolvedValue(null);
+
+            await expect(
+                useCase.execute({
+                    content: "I agree with this",
+                    type: PostType.COMMUNITY,
+                    authorId: "user-1",
+                    quotedPostId: "missing-post",
+                }),
+            ).rejects.toThrow(NotFoundError);
+
+            expect(postRepository.create).not.toHaveBeenCalled();
+        });
+
+        it("should not look up anything when nothing is quoted", async () => {
+            await useCase.execute({
+                content: "Just a post",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(postRepository.findById).not.toHaveBeenCalled();
+            expect(
+                vi.mocked(postRepository.create).mock.calls[0][0].isQuote(),
+            ).toBe(false);
+        });
+
+        it("should allow quoting a quote", async () => {
+            // Only the read side stops at one level; the write side does not
+            // care how deep the chain already goes.
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ id: "post-1", quotedPostId: "post-0" }),
+            );
+
+            await useCase.execute({
+                content: "and another thing",
+                type: PostType.COMMUNITY,
+                authorId: "user-2",
+                quotedPostId: "post-1",
+            });
+
+            expect(
+                vi.mocked(postRepository.create).mock.calls[0][0].quotedPostId,
+            ).toBe("post-1");
         });
     });
 });

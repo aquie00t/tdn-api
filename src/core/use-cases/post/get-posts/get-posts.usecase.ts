@@ -6,6 +6,7 @@ import type { GetPostsOutput } from "./get-posts-usecase.output";
 import { Post } from "@core/domain/entities/post.entity";
 import { UnauthorizedError } from "@core/errors";
 import { PostType } from "@core/domain/enums";
+import type { QuotedPostSnapshot } from "@core/domain/interfaces/quoted-post.interface";
 
 interface CachedPostData {
     id: string;
@@ -18,6 +19,27 @@ interface CachedPostData {
 interface CachedFeedData {
     posts: CachedPostData[];
     total: number;
+}
+
+/**
+ * Rebuilds the quoted post card that came back from the cache.
+ *
+ * `JSON.parse` leaves every date a string, and the caller revives only the
+ * top-level `createdAt` / `updatedAt`. Without this the same request would
+ * answer with a `Date` on a cache miss and a string for the next 60 seconds,
+ * so the serialised shape of the response would flip on its own.
+ *
+ * @param raw - The `quotedPost` value as it was parsed out of the cache
+ * @returns The card with a real `Date`, or undefined when nothing is quoted
+ */
+function hydrateQuotedPost(raw: unknown): QuotedPostSnapshot | undefined {
+    if (!raw) return undefined;
+
+    const quoted = raw as Omit<QuotedPostSnapshot, "createdAt"> & {
+        createdAt: string;
+    };
+
+    return { ...quoted, createdAt: new Date(quoted.createdAt) };
 }
 
 function shufflePosts(posts: Post[]): Post[] {
@@ -69,6 +91,7 @@ export class GetPostsUseCase {
                     id: p.id || (data.id as string),
                     createdAt: new Date(data.createdAt as string),
                     updatedAt: new Date(data.updatedAt as string),
+                    quotedPost: hydrateQuotedPost(data.quotedPost),
                 });
             });
 

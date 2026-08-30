@@ -125,6 +125,128 @@ describe("POST /posts - Create Post", () => {
         expect(body.title).toBe("UnauthorizedError");
     });
 
+    describe("Quote posts", () => {
+        let originalPostId = "";
+
+        beforeAll(async () => {
+            const response = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: { content: "The post everyone quotes" },
+            });
+            originalPostId = parseBody<{ data: { id: string } }>(response).data
+                .id;
+        });
+
+        it("should return 201 with the quoted post embedded as a card", async () => {
+            const response = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: {
+                    content: "Quoting the original",
+                    quotedPostId: originalPostId,
+                },
+            });
+            const body = parseBody<{
+                data: {
+                    content: string;
+                    quotedPost: {
+                        id: string;
+                        content: string;
+                        mediaUrls: string[];
+                        createdAt: string;
+                        author: { username: string; avatarUrl: string };
+                    } | null;
+                };
+            }>(response);
+
+            expect(response.statusCode).toBe(201);
+            expect(body.data.content).toBe("Quoting the original");
+            expect(body.data.quotedPost).not.toBeNull();
+            expect(body.data.quotedPost?.id).toBe(originalPostId);
+            expect(body.data.quotedPost?.content).toBe(
+                "The post everyone quotes",
+            );
+            expect(body.data.quotedPost?.author.username).toBe(user.username);
+            // A quote card carries no counters and no second level.
+            expect(body.data.quotedPost).not.toHaveProperty("likeCount");
+            expect(body.data.quotedPost).not.toHaveProperty("quotedPost");
+        });
+
+        it("should return quotedPost as null for a post that quotes nothing", async () => {
+            const response = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: { content: "A post that quotes nothing" },
+            });
+            const body = parseBody<{ data: { quotedPost: unknown } }>(response);
+
+            expect(response.statusCode).toBe(201);
+            expect(body.data.quotedPost).toBeNull();
+        });
+
+        it("should return 404 when the quoted post does not exist", async () => {
+            const response = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: {
+                    content: "Quoting a ghost",
+                    quotedPostId: "00000000-0000-0000-0000-000000000000",
+                },
+            });
+            const body = parseBody<{ title: string }>(response);
+
+            expect(response.statusCode).toBe(404);
+            expect(body.title).toBe("NotFoundError");
+        });
+
+        it("should return 400 when quotedPostId is not a uuid", async () => {
+            const response = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: {
+                    content: "Quoting nonsense",
+                    quotedPostId: "not-a-uuid",
+                },
+            });
+
+            expect(response.statusCode).toBe(400);
+        });
+
+        it("should delete the quote when the quoted post is deleted", async () => {
+            const originalRes = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: { content: "Doomed original" },
+            });
+            const doomedId = parseBody<{ data: { id: string } }>(originalRes)
+                .data.id;
+
+            const quoteRes = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: {
+                    content: "Quoting a doomed post",
+                    quotedPostId: doomedId,
+                },
+            });
+            const quoteId = parseBody<{ data: { id: string } }>(quoteRes).data
+                .id;
+
+            const deleteRes = await authRequest(accessToken, {
+                method: "DELETE",
+                url: `/posts/${doomedId}`,
+            });
+            expect(deleteRes.statusCode).toBe(204);
+
+            const readBack = await request({
+                method: "GET",
+                url: `/posts/${quoteId}`,
+            });
+            expect(readBack.statusCode).toBe(404);
+        });
+    });
+
     describe("Bot user post type restrictions", () => {
         let botAccessToken = "";
 

@@ -305,4 +305,101 @@ describe("PostPrismaMapper", () => {
             );
         });
     });
+
+    describe("quote posts", () => {
+        const quotedRelation = {
+            id: "post-0",
+            content: "The quoted post",
+            mediaUrls: ["uploads/quoted.png"],
+            createdAt: now,
+            authorId: "user-9",
+            author: {
+                id: "user-9",
+                username: "quoted-author",
+                profile: {
+                    avatarUrl: "uploads/quoted-avatar.jpg",
+                    fullName: "Quoted Author",
+                },
+            },
+        };
+
+        it("should map the quoted relation onto the entity", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({
+                    quotedPostId: "post-0",
+                    quotedPost: quotedRelation,
+                } as never),
+            );
+
+            expect(post.isQuote()).toBe(true);
+            expect(post.quotedPostId).toBe("post-0");
+            expect(post.quotedPost?.content).toBe("The quoted post");
+            expect(post.quotedPost?.author.username).toBe("quoted-author");
+        });
+
+        it("should leave the entity without a quote when nothing is quoted", () => {
+            const post = PostPrismaMapper.toDomainPost(makeDbPost());
+
+            expect(post.isQuote()).toBe(false);
+            expect(post.quotedPost).toBeUndefined();
+        });
+
+        it("should carry quotedPostId through to the Prisma payload", () => {
+            const quote = PostPrismaMapper.toDomainPost(
+                makeDbPost({
+                    quotedPostId: "post-0",
+                    quotedPost: quotedRelation,
+                } as never),
+            );
+            const plain = PostPrismaMapper.toDomainPost(makeDbPost());
+
+            expect(PostPrismaMapper.toPrismaPost(quote).quotedPostId).toBe(
+                "post-0",
+            );
+            expect(PostPrismaMapper.toPrismaPost(plain).quotedPostId).toBeNull();
+        });
+
+        it("should render the quote card with a CDN-resolved avatar", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({
+                    quotedPostId: "post-0",
+                    quotedPost: quotedRelation,
+                } as never),
+            );
+            const result = PostPrismaMapper.toResponse(post, CDN);
+
+            expect(result.quotedPost).toEqual({
+                id: "post-0",
+                content: "The quoted post",
+                mediaUrls: ["uploads/quoted.png"],
+                createdAt: now,
+                author: {
+                    id: "user-9",
+                    username: "quoted-author",
+                    avatarUrl: `${CDN}/uploads/quoted-avatar.jpg`,
+                    fullName: "Quoted Author",
+                },
+            });
+        });
+
+        it("should send quotedPost as null for a post that quotes nothing", () => {
+            const post = PostPrismaMapper.toDomainPost(makeDbPost());
+
+            expect(PostPrismaMapper.toResponse(post, CDN).quotedPost).toBeNull();
+        });
+
+        it("should not nest a second level of quotes in the card", () => {
+            // The include stops at one level, so a quote of a quote carries the
+            // post it quotes and nothing behind it.
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({
+                    quotedPostId: "post-0",
+                    quotedPost: quotedRelation,
+                } as never),
+            );
+            const result = PostPrismaMapper.toResponse(post, CDN);
+
+            expect(result.quotedPost).not.toHaveProperty("quotedPost");
+        });
+    });
 });

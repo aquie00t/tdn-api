@@ -36,12 +36,19 @@ export class CreatePostUseCase {
     /**
      * Executes the post creation process.
      *
-     * @param input - Input containing post content, type, author ID, and media URLs
+     * @param input - Input containing post content, type, author ID, media URLs
+     * and the optional id of the post being quoted
      * @returns Promise<void> - Resolves when post creation is complete
+     *
+     * @throws NotFoundError - When quotedPostId names a post that does not exist
      *
      * @remarks
      * This method creates a new post entity, saves it to the database,
      * and clears any cached feed data to ensure consistency.
+     *
+     * A quoted post is resolved before the write so a quote can never be
+     * stored against an id that is already gone. The foreign key would reject
+     * it too, but a 404 says what happened and a constraint violation does not.
      *
      * Followers are notified after the post is committed, deliberately
      * outside the caller's critical path: the post is the thing worth keeping,
@@ -57,12 +64,21 @@ export class CreatePostUseCase {
                 );
             }
         }
+
+        if (input.quotedPostId) {
+            const quoted = await this.postRepository.findById(
+                input.quotedPostId,
+            );
+            if (!quoted) throw new NotFoundError("Quoted post not found.");
+        }
+
         const post = Post.create(
             input.content,
             input.type,
             input.authorId,
             input.mediaUrls || [],
             input.categories || [],
+            input.quotedPostId,
         );
 
         const rawPost = await this.postRepository.create(post);

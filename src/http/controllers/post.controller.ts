@@ -50,7 +50,8 @@ export class PostController {
         reply: FastifyReply,
     ): Promise<void> {
         const authorId = request.user.id;
-        const { content, type, mediaUrls, categories } = request.body;
+        const { content, type, mediaUrls, categories, quotedPostId } =
+            request.body;
 
         const post = await this.createPostUseCase.execute({
             authorId,
@@ -58,6 +59,7 @@ export class PostController {
             type,
             mediaUrls,
             categories,
+            quotedPostId,
         });
 
         const cdnUrl = this.normalizeCdnUrl(

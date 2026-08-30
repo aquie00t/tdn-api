@@ -128,6 +128,43 @@ describe("GetPostsUseCase", () => {
         expect(postRepository.findAll).not.toHaveBeenCalled();
     });
 
+    it("should revive the quoted post's date on a cache hit", async () => {
+        // Caching a Post serialises its private props bag, and every date in
+        // it comes back a string. Without the nested revival the same request
+        // would answer with a Date on a miss and a string for the 60 seconds
+        // after it.
+        const post = buildPost({
+            quotedPostId: "post-0",
+            quotedPost: {
+                id: "post-0",
+                content: "The quoted post",
+                mediaUrls: [],
+                createdAt: new Date("2024-01-01T00:00:00Z"),
+                author: { id: "user-9", username: "quoted-author" },
+            },
+        });
+        vi.mocked(cacheService.get).mockResolvedValue(
+            JSON.stringify({ posts: [post], total: 1 }),
+        );
+
+        const result = await useCase.execute({ page: 1, limit: 10 });
+
+        expect(result.posts[0].quotedPost?.createdAt).toBeInstanceOf(Date);
+        expect(result.posts[0].quotedPost?.content).toBe("The quoted post");
+        expect(result.posts[0].quotedPostId).toBe("post-0");
+    });
+
+    it("should leave a cached plain post without a quote", async () => {
+        vi.mocked(cacheService.get).mockResolvedValue(
+            JSON.stringify({ posts: [buildPost()], total: 1 }),
+        );
+
+        const result = await useCase.execute({ page: 1, limit: 10 });
+
+        expect(result.posts[0].quotedPost).toBeUndefined();
+        expect(result.posts[0].isQuote()).toBe(false);
+    });
+
     describe("ordering", () => {
         const ids = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"];
 

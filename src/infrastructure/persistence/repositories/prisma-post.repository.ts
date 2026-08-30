@@ -12,6 +12,31 @@ import type { PrismaTransactionalClient } from "@infrastructure/persistence/data
 import type { Prisma } from "@generated/prisma/client";
 
 /**
+ * The author fields every post read selects.
+ *
+ * `as const` is load-bearing: the include clauses below are inferred by Prisma
+ * at each call site, and a widened `boolean` here would cost that inference.
+ */
+const POST_AUTHOR_SELECT = {
+    select: {
+        id: true,
+        username: true,
+        profile: { select: { avatarUrl: true, fullName: true } },
+    },
+} as const;
+
+/**
+ * The quoted post embedded in a quote post.
+ *
+ * One level deep and without its own quote: a quote card shows the post being
+ * quoted, never the chain behind it. Counters and the viewer's like/bookmark
+ * state are left out too, so embedding one costs no extra joins.
+ */
+const QUOTED_POST_INCLUDE = {
+    include: { author: POST_AUTHOR_SELECT },
+} as const;
+
+/**
  * Prisma implementation of the Post repository
  *
  * Provides database operations for Post entities using Prisma ORM.
@@ -56,18 +81,11 @@ export class PrismaPostRepository implements IPostRepository {
                 },
             },
             include: {
-                author: {
-                    select: {
-                        id: true,
-                        username: true,
-                        profile: {
-                            select: { avatarUrl: true, fullName: true },
-                        },
-                    },
-                },
+                author: POST_AUTHOR_SELECT,
                 tags: true,
                 likes: false,
                 bookmarks: false,
+                quotedPost: QUOTED_POST_INCLUDE,
             },
         });
 
@@ -121,15 +139,7 @@ export class PrismaPostRepository implements IPostRepository {
                 take: limit,
                 orderBy,
                 include: {
-                    author: {
-                        select: {
-                            id: true,
-                            username: true,
-                            profile: {
-                                select: { avatarUrl: true, fullName: true },
-                            },
-                        },
-                    },
+                    author: POST_AUTHOR_SELECT,
                     tags: true,
                     likes: currentUserId
                         ? { where: { userId: currentUserId } }
@@ -137,6 +147,7 @@ export class PrismaPostRepository implements IPostRepository {
                     bookmarks: currentUserId
                         ? { where: { userId: currentUserId } }
                         : false,
+                    quotedPost: QUOTED_POST_INCLUDE,
                 },
             }),
         ]);
@@ -158,15 +169,7 @@ export class PrismaPostRepository implements IPostRepository {
         const raw = await this.prisma.post.findUnique({
             where: { id },
             include: {
-                author: {
-                    select: {
-                        id: true,
-                        username: true,
-                        profile: {
-                            select: { avatarUrl: true, fullName: true },
-                        },
-                    },
-                },
+                author: POST_AUTHOR_SELECT,
                 tags: true,
                 likes: currentUserId
                     ? { where: { userId: currentUserId } }
@@ -174,6 +177,7 @@ export class PrismaPostRepository implements IPostRepository {
                 bookmarks: currentUserId
                     ? { where: { userId: currentUserId } }
                     : false,
+                quotedPost: QUOTED_POST_INCLUDE,
             },
         });
 
@@ -253,15 +257,7 @@ export class PrismaPostRepository implements IPostRepository {
                 skip,
                 take: limit,
                 include: {
-                    author: {
-                        select: {
-                            id: true,
-                            username: true,
-                            profile: {
-                                select: { avatarUrl: true, fullName: true },
-                            },
-                        },
-                    },
+                    author: POST_AUTHOR_SELECT,
                     tags: true,
                     likes: currentUserId
                         ? { where: { userId: currentUserId } }
@@ -269,6 +265,7 @@ export class PrismaPostRepository implements IPostRepository {
                     bookmarks: currentUserId
                         ? { where: { userId: currentUserId } }
                         : false,
+                    quotedPost: QUOTED_POST_INCLUDE,
                 },
             }),
         ]);

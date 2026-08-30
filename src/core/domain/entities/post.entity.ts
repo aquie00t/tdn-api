@@ -1,6 +1,7 @@
 import type { PostType } from "@core/domain/enums/post-type.enum";
 import type { PostProps } from "@core/domain/interfaces/post-props.interface";
 import type { PostCategory } from "../enums/post-category-enum";
+import type { QuotedPostSnapshot } from "../interfaces/quoted-post.interface";
 
 /**
  * Rich domain model for Post entity
@@ -23,6 +24,7 @@ export class Post {
      * @param authorId - The unique identifier of the post's author.
      * @param mediaUrls - Optional. An array of media URLs associated with the post. Defaults to an empty array.
      * @param categories - Optional. An array of categories assigned to the post. Defaults to an empty array.
+     * @param quotedPostId - Optional. The id of the post this one quotes.
      * @returns A new Post instance with the specified properties.
      */
     public static create(
@@ -31,6 +33,7 @@ export class Post {
         authorId: string,
         mediaUrls: string[] = [],
         categories: PostCategory[] = [],
+        quotedPostId?: string,
     ): Post {
         return new Post({
             content,
@@ -39,6 +42,7 @@ export class Post {
             author: { id: authorId },
             tags: [],
             categories,
+            quotedPostId,
         });
     }
 
@@ -156,11 +160,36 @@ export class Post {
     }
 
     /**
+     * Get the id of the post this one quotes
+     * @returns The quoted post ID, or undefined when this is not a quote post
+     */
+    get quotedPostId(): string | undefined {
+        return this.props.quotedPostId;
+    }
+
+    /**
+     * Get the embedded snapshot of the quoted post
+     * @returns The quoted post, or undefined when this post quotes nothing or
+     * was loaded without its quote relation
+     */
+    get quotedPost(): QuotedPostSnapshot | undefined {
+        return this.props.quotedPost;
+    }
+
+    /**
      * Check if the post has any media attached
      * @returns True if the post has one or more media items
      */
     public hasMedia(): boolean {
         return this.props.mediaUrls.length > 0;
+    }
+
+    /**
+     * Check if this post quotes another post
+     * @returns True if the post was created as a quote of another post
+     */
+    public isQuote(): boolean {
+        return this.props.quotedPostId !== undefined;
     }
 
     /**

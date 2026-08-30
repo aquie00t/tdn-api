@@ -181,4 +181,51 @@ describe("GET /posts - Get Post Feed", () => {
         expect(response.statusCode).toBe(200);
         expect(body.data.length).toBeGreaterThanOrEqual(1);
     });
+
+    it("should carry the quote card through the feed, cached or not", async () => {
+        const originalRes = await authRequest(accessToken, {
+            method: "POST",
+            url: "/posts",
+            payload: { content: "E2E feed quote target" },
+        });
+        const originalId = parseBody<{ data: { id: string } }>(originalRes).data
+            .id;
+
+        const quoteRes = await authRequest(accessToken, {
+            method: "POST",
+            url: "/posts",
+            payload: {
+                content: "E2E feed quote",
+                quotedPostId: originalId,
+            },
+        });
+        const quoteId = parseBody<{ data: { id: string } }>(quoteRes).data.id;
+
+        type FeedBody = {
+            data: {
+                id: string;
+                quotedPost: { id: string; createdAt: string } | null;
+            }[];
+        };
+
+        const findQuote = (body: FeedBody): FeedBody["data"][number] => {
+            const found = body.data.find((post) => post.id === quoteId);
+            expect(found).toBeDefined();
+            return found!;
+        };
+
+        const first = await request({ method: "GET", url: "/posts?limit=50" });
+        expect(first.statusCode).toBe(200);
+        const fromDb = findQuote(parseBody<FeedBody>(first));
+
+        expect(fromDb.quotedPost?.id).toBe(originalId);
+
+        // The second read is served from the 60-second feed cache. The dates in
+        // it are revived by hand, so the shape must not drift between the two.
+        const second = await request({ method: "GET", url: "/posts?limit=50" });
+        expect(second.statusCode).toBe(200);
+        const fromCache = findQuote(parseBody<FeedBody>(second));
+
+        expect(fromCache.quotedPost).toEqual(fromDb.quotedPost);
+    });
 });
