@@ -6,6 +6,7 @@ import type { IFollowRepository } from "@core/ports/repositories/follow.reposito
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
 import { UnauthorizedError } from "@core/errors";
+import { normalizeTagFilter } from "../article-input";
 import type { GetArticlesUseCaseInput } from "./get-articles-usecase.input";
 import type { GetArticlesUseCaseOutput } from "./get-articles-usecase.output";
 
@@ -95,6 +96,7 @@ export class GetArticlesUseCase {
         const page = input.page ?? 1;
         const limit = input.limit ?? DEFAULT_LIMIT;
         const followedOnly = input.followedOnly ?? false;
+        const tag = normalizeTagFilter(input.tag);
 
         if (followedOnly && !input.currentUserId) {
             throw new UnauthorizedError(
@@ -102,7 +104,13 @@ export class GetArticlesUseCase {
             );
         }
 
-        const cacheKey = this.buildCacheKey(input, page, limit, followedOnly);
+        const cacheKey = this.buildCacheKey(
+            input,
+            page,
+            limit,
+            followedOnly,
+            tag,
+        );
         const cached = await this.cacheService.get(cacheKey);
 
         if (cached) {
@@ -136,7 +144,7 @@ export class GetArticlesUseCase {
         const result = await this.articleRepository.findAll({
             page,
             limit,
-            tag: input.tag,
+            tag,
             authorId,
             categories: input.categories,
             followingIds,
@@ -167,6 +175,7 @@ export class GetArticlesUseCase {
      * @param page - Resolved page number
      * @param limit - Resolved page size
      * @param followedOnly - Resolved followed-authors flag
+     * @param normalizedTag - The tag filter as the repository will see it
      * @returns The cache key
      */
     private buildCacheKey(
@@ -174,8 +183,11 @@ export class GetArticlesUseCase {
         page: number,
         limit: number,
         followedOnly: boolean,
+        normalizedTag?: string,
     ): string {
-        const tag = input.tag ?? "ALL";
+        // The normalized tag, not the raw one: "NodeJS" and "nodejs" select the
+        // same articles, so they must not occupy two cache entries.
+        const tag = normalizedTag ?? "ALL";
         const author = input.authorUsername ?? "ALL";
         const categories =
             input.categories && input.categories.length > 0

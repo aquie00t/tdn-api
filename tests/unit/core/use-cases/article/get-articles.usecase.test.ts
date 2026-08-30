@@ -120,6 +120,33 @@ describe("GetArticlesUseCase", () => {
         expect(key.startsWith("articles:list:")).toBe(true);
     });
 
+    it("should lowercase the tag filter before it reaches the repository", async () => {
+        await useCase.execute({ tag: "  NodeJS  " });
+
+        expect(articleRepository.findAll).toHaveBeenCalledWith(
+            expect.objectContaining({ tag: "nodejs" }),
+        );
+    });
+
+    it("should drop a blank tag filter instead of matching the empty tag", async () => {
+        await useCase.execute({ tag: "   " });
+
+        expect(articleRepository.findAll).toHaveBeenCalledWith(
+            expect.objectContaining({ tag: undefined }),
+        );
+    });
+
+    it("should reuse one key for tags differing only in case", async () => {
+        await useCase.execute({ tag: "NodeJS" });
+        const first = vi.mocked(cacheService.get).mock.calls[0][0];
+
+        vi.mocked(cacheService.get).mockClear();
+        await useCase.execute({ tag: "nodejs" });
+        const second = vi.mocked(cacheService.get).mock.calls[0][0];
+
+        expect(first).toBe(second);
+    });
+
     it("should order categories so the same filter reuses one key", async () => {
         await useCase.execute({
             categories: [PostCategory.FRONTEND, PostCategory.BACKEND],

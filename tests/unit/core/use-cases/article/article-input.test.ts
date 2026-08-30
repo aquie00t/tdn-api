@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
     normalizeBody,
     normalizeTags,
+    normalizeTagFilter,
     normalizeTitle,
     validateCoverImageKey,
 } from "@core/use-cases/article/article-input";
@@ -87,9 +88,9 @@ describe("article input rules", () => {
         });
 
         it("should reject more than five distinct tags", () => {
-            expect(() =>
-                normalizeTags(["a", "b", "c", "d", "e", "f"]),
-            ).toThrow(BadRequestError);
+            expect(() => normalizeTags(["a", "b", "c", "d", "e", "f"])).toThrow(
+                BadRequestError,
+            );
         });
 
         it("should skip blank entries rather than reject them", () => {
@@ -162,6 +163,22 @@ describe("article input rules", () => {
             expect(() => validateCoverImageKey(key, USER)).toThrow(
                 BadRequestError,
             );
+        });
+    });
+
+    describe("normalizeTagFilter()", () => {
+        it("should lowercase and trim the filter", () => {
+            expect(normalizeTagFilter("  NodeJS  ")).toBe("nodejs");
+        });
+
+        it("should treat a missing or blank filter as no filter", () => {
+            expect(normalizeTagFilter()).toBeUndefined();
+            expect(normalizeTagFilter("")).toBeUndefined();
+            expect(normalizeTagFilter("   ")).toBeUndefined();
+        });
+
+        it("should not throw on a malformed filter", () => {
+            expect(normalizeTagFilter("Not A Tag!")).toBe("not a tag!");
         });
     });
 });
