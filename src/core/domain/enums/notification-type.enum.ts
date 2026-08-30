@@ -30,4 +30,9 @@ export enum NotificationType {
      * A reply to one of the user's comments
      */
     COMMENT_REPLY = "COMMENT_REPLY",
+
+    /**
+     * Notification when a user quotes another user's post
+     */
+    QUOTE = "QUOTE",
 }

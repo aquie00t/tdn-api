@@ -10,6 +10,22 @@ export const PostAuthorSchema = FBType.Object({
     isMe: FBType.Optional(FBType.Boolean()),
 });
 
+/**
+ * The quoted post embedded in a quote post.
+ *
+ * One level only: a quote card carries no `quotedPost` of its own, and no
+ * counters or viewer-specific flags.
+ */
+export const QuotedPostSchema = FBType.Object({
+    id: FBType.String({ format: "uuid" }),
+    content: FBType.String(),
+    mediaUrls: FBType.Array(FBType.String()),
+    createdAt: FBType.String(),
+    author: PostAuthorSchema,
+});
+
+export type QuotedPost = Static<typeof QuotedPostSchema>;
+
 export const PostItemSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
     content: FBType.String(),
@@ -18,11 +34,13 @@ export const PostItemSchema = FBType.Object({
     createdAt: FBType.String(),
     likeCount: FBType.Number(),
     commentCount: FBType.Number(),
+    quoteCount: FBType.Number(),
     isLiked: FBType.Boolean(),
     isBookmarked: FBType.Boolean(),
     author: PostAuthorSchema,
     tags: FBType.Array(FBType.Object({ name: FBType.String() })),
     categories: FBType.Array(FBType.Object({ name: FBType.String() })),
+    quotedPost: FBType.Union([QuotedPostSchema, FBType.Null()]),
 });
 
 export type PostItem = Static<typeof PostItemSchema>;

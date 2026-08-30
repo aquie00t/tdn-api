@@ -12,6 +12,31 @@ import type { PrismaTransactionalClient } from "@infrastructure/persistence/data
 import type { Prisma } from "@generated/prisma/client";
 
 /**
+ * The author fields every post read selects.
+ *
+ * `as const` is load-bearing: the include clauses below are inferred by Prisma
+ * at each call site, and a widened `boolean` here would cost that inference.
+ */
+const POST_AUTHOR_SELECT = {
+    select: {
+        id: true,
+        username: true,
+        profile: { select: { avatarUrl: true, fullName: true } },
+    },
+} as const;
+
+/**
+ * The quoted post embedded in a quote post.
+ *
+ * One level deep and without its own quote: a quote card shows the post being
+ * quoted, never the chain behind it. Counters and the viewer's like/bookmark
+ * state are left out too, so embedding one costs no extra joins.
+ */
+const QUOTED_POST_INCLUDE = {
+    include: { author: POST_AUTHOR_SELECT },
+} as const;
+
+/**
  * Prisma implementation of the Post repository
  *
  * Provides database operations for Post entities using Prisma ORM.
@@ -56,18 +81,11 @@ export class PrismaPostRepository implements IPostRepository {
                 },
             },
             include: {
-                author: {
-                    select: {
-                        id: true,
-                        username: true,
-                        profile: {
-                            select: { avatarUrl: true, fullName: true },
-                        },
-                    },
-                },
+                author: POST_AUTHOR_SELECT,
                 tags: true,
                 likes: false,
                 bookmarks: false,
+                quotedPost: QUOTED_POST_INCLUDE,
             },
         });
 
@@ -92,6 +110,7 @@ export class PrismaPostRepository implements IPostRepository {
             currentUserId,
             tag,
             followingIds,
+            quotedPostId,
         } = params;
         const skip = (page - 1) * limit;
 
@@ -106,6 +125,7 @@ export class PrismaPostRepository implements IPostRepository {
                 ? { bookmarks: { some: { userId: savedByUserId } } }
                 : {}),
             ...(tag ? { tags: { some: { name: tag.toLowerCase() } } } : {}),
+            ...(quotedPostId ? { quotedPostId } : {}),
             ...(params.categories && params.categories.length > 0
                 ? { category: { hasSome: params.categories } }
                 : {}),
@@ -121,15 +141,7 @@ export class PrismaPostRepository implements IPostRepository {
                 take: limit,
                 orderBy,
                 include: {
-                    author: {
-                        select: {
-                            id: true,
-                            username: true,
-                            profile: {
-                                select: { avatarUrl: true, fullName: true },
-                            },
-                        },
-                    },
+                    author: POST_AUTHOR_SELECT,
                     tags: true,
                     likes: currentUserId
                         ? { where: { userId: currentUserId } }
@@ -137,6 +149,7 @@ export class PrismaPostRepository implements IPostRepository {
                     bookmarks: currentUserId
                         ? { where: { userId: currentUserId } }
                         : false,
+                    quotedPost: QUOTED_POST_INCLUDE,
                 },
             }),
         ]);
@@ -158,15 +171,7 @@ export class PrismaPostRepository implements IPostRepository {
         const raw = await this.prisma.post.findUnique({
             where: { id },
             include: {
-                author: {
-                    select: {
-                        id: true,
-                        username: true,
-                        profile: {
-                            select: { avatarUrl: true, fullName: true },
-                        },
-                    },
-                },
+                author: POST_AUTHOR_SELECT,
                 tags: true,
                 likes: currentUserId
                     ? { where: { userId: currentUserId } }
@@ -174,6 +179,7 @@ export class PrismaPostRepository implements IPostRepository {
                 bookmarks: currentUserId
                     ? { where: { userId: currentUserId } }
                     : false,
+                quotedPost: QUOTED_POST_INCLUDE,
             },
         });
 
@@ -218,6 +224,30 @@ export class PrismaPostRepository implements IPostRepository {
     }
 
     /**
+     * Increments the quote count for a post by its unique identifier.
+     * @param postId - The unique identifier of the post that was quoted.
+     * @returns A promise that resolves when the update is complete.
+     */
+    async incrementQuoteCount(postId: string): Promise<void> {
+        await this.prisma.post.update({
+            where: { id: postId },
+            data: { quoteCount: { increment: 1 } },
+        });
+    }
+
+    /**
+     * Decrements the quote count for a post by its unique identifier.
+     * @param postId - The unique identifier of the post whose quote was deleted.
+     * @returns A promise that resolves when the update is complete.
+     */
+    async decrementQuoteCount(postId: string): Promise<void> {
+        await this.prisma.post.update({
+            where: { id: postId },
+            data: { quoteCount: { decrement: 1 } },
+        });
+    }
+
+    /**
      * Finds posts by the author's username with pagination and optional type filtering.
      * @param username - The username of the author whose posts are being retrieved.
      * @param page - The page number for pagination.
@@ -253,15 +283,7 @@ export class PrismaPostRepository implements IPostRepository {
                 skip,
                 take: limit,
                 include: {
-                    author: {
-                        select: {
-                            id: true,
-                            username: true,
-                            profile: {
-                                select: { avatarUrl: true, fullName: true },
-                            },
-                        },
-                    },
+                    author: POST_AUTHOR_SELECT,
                     tags: true,
                     likes: currentUserId
                         ? { where: { userId: currentUserId } }
@@ -269,6 +291,7 @@ export class PrismaPostRepository implements IPostRepository {
                     bookmarks: currentUserId
                         ? { where: { userId: currentUserId } }
                         : false,
+                    quotedPost: QUOTED_POST_INCLUDE,
                 },
             }),
         ]);

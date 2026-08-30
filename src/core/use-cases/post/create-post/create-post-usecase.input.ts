@@ -15,7 +15,9 @@ export interface CreatePostInput {
 
     /**
      * The textual content of the post.
-     * Can be empty for media-only posts.
+     *
+     * May be empty only when `quotedPostId` is set: a quote with nothing added
+     * is a pure repost. An empty post that quotes nothing is rejected.
      */
     content: string;
 
@@ -33,4 +35,12 @@ export interface CreatePostInput {
      * Array of categories associated with the post for classification and discovery.
      */
     categories?: PostCategory[];
+
+    /**
+     * Optional id of the post this one quotes.
+     *
+     * When set, the created post embeds that post as a quote card. Quoting a
+     * quote is allowed; only the read side stops at one level.
+     */
+    quotedPostId?: string;
 }

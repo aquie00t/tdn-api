@@ -5,6 +5,7 @@ enum NotificationType {
   LIKE
   COMMENT_LIKE
   COMMENT_REPLY
+  QUOTE
 }
 
 model Notification {

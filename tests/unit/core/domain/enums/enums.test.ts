@@ -78,8 +78,12 @@ describe("Domain Enums", () => {
             expect(NotificationType.COMMENT_REPLY).toBe("COMMENT_REPLY");
         });
 
-        it("should have exactly 6 values", () => {
-            expect(Object.keys(NotificationType)).toHaveLength(6);
+        it("should have QUOTE value", () => {
+            expect(NotificationType.QUOTE).toBe("QUOTE");
+        });
+
+        it("should have exactly 7 values", () => {
+            expect(Object.keys(NotificationType)).toHaveLength(7);
         });
     });
 

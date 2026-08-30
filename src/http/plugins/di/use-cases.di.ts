@@ -35,6 +35,7 @@ import { GetUnreadNotificationCountUseCase } from "@core/use-cases/notification/
 import { PurgeExpiredNotificationsUseCase } from "@core/use-cases/notification/purge-expired";
 import { CreatePostUseCase } from "@core/use-cases/post/create-post";
 import { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
+import { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
 import { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
 import { GetPostsUseCase } from "@core/use-cases/post/get-posts";
 import { DeletePostUseCase } from "@core/use-cases/post/delete-post";
@@ -47,6 +48,7 @@ import { GetBookmarksUseCase } from "@core/use-cases/bookmark/get-bookmarks/get-
 import { DeleteCommentUseCase } from "@core/use-cases/comment/delete-comment/delete-comment.usecase";
 import { GetUserPostsUseCase } from "@core/use-cases/post/get-user-posts/get-user.posts.usecase";
 import { GetPostDetailUseCase } from "@core/use-cases/post/get-post-detail/get-post-detail.usecase";
+import { GetPostQuotesUseCase } from "@core/use-cases/post/get-post-quotes";
 import { GetCommentsUseCase } from "@core/use-cases/comment/get-comments/get-comments.usecase";
 import { GetCommentUseCase } from "@core/use-cases/comment/get-comment/get-comment.usecase";
 import { GetCommentRepliesUseCase } from "@core/use-cases/comment/get-comment-replies/get-comment-replies.usecase";
@@ -321,17 +323,19 @@ export const useCasesModule = {
      */
     createPostUseCase: asFunction(
         (
-            postRepository,
+            transactionService,
             cacheService,
             userRepository,
             notifyNewPostUseCase,
+            notifyQuotedAuthorUseCase,
             logger,
         ) =>
             new CreatePostUseCase(
-                postRepository,
+                transactionService,
                 cacheService,
                 userRepository,
                 notifyNewPostUseCase,
+                notifyQuotedAuthorUseCase,
                 logger,
             ),
     ).singleton(),
@@ -340,6 +344,11 @@ export const useCasesModule = {
      * Use case for notifying followers that an account published a post
      */
     notifyNewPostUseCase: asClass(NotifyNewPostUseCase).singleton(),
+
+    /**
+     * Use case for telling an author that one of their posts was quoted
+     */
+    notifyQuotedAuthorUseCase: asClass(NotifyQuotedAuthorUseCase).singleton(),
 
     /**
      * Use case for uploading post media files
@@ -362,12 +371,19 @@ export const useCasesModule = {
      * Use case for deleting a post
      */
     deletePostUseCase: asFunction(
-        (postRepository, storageService, logger, cacheService) =>
+        (
+            postRepository,
+            storageService,
+            logger,
+            cacheService,
+            transactionService,
+        ) =>
             new DeletePostUseCase(
                 postRepository,
                 storageService,
                 logger,
                 cacheService,
+                transactionService,
             ),
     ).singleton(),
 
@@ -413,6 +429,11 @@ export const useCasesModule = {
      *
      */
     getPostDetailUseCase: asClass(GetPostDetailUseCase).singleton(),
+
+    /**
+     * Use case for listing the posts quoting a post
+     */
+    getPostQuotesUseCase: asClass(GetPostQuotesUseCase).singleton(),
     /**
      *
      */

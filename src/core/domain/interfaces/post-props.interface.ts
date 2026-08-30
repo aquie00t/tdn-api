@@ -1,5 +1,6 @@
 import type { PostType } from "@core/domain/enums";
 import type { PostCategory } from "../enums/post-category-enum";
+import type { QuotedPostSnapshot } from "./quoted-post.interface";
 
 /**
  * Props interface for Post entity
@@ -61,6 +62,9 @@ export interface PostProps {
     /** Optional comment count for the post */
     commentCount?: number;
 
+    /** Optional count of posts quoting this one */
+    quoteCount?: number;
+
     /** Indicates if the current authenticated user has bookmarked this post */
     isBookmarked?: boolean;
 
@@ -69,4 +73,20 @@ export interface PostProps {
 
     /** Array of categories associated with the post */
     categories: PostCategory[];
+
+    /**
+     * The post this one quotes, when it is a quote post.
+     *
+     * Only ever the id on a post built by `Post.create`; a post read back from
+     * the database carries `quotedPost` alongside it.
+     */
+    quotedPostId?: string;
+
+    /**
+     * The embedded snapshot of the quoted post.
+     *
+     * Present only when the post was loaded with its quote relation. A quote
+     * of a quote carries one level and no more - see {@link QuotedPostSnapshot}.
+     */
+    quotedPost?: QuotedPostSnapshot;
 }

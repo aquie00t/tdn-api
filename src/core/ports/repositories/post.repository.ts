@@ -15,6 +15,9 @@ export interface GetPostsParams {
     tag?: string;
     followingIds?: string[];
     categories?: PostCategory[];
+
+    /** Restricts the page to the posts quoting this one. */
+    quotedPostId?: string;
 }
 
 /**
@@ -61,6 +64,18 @@ export interface IPostRepository {
      * @param postId - The ID of the post to decrement comment count for
      */
     decrementCommentsCount(postId: string): Promise<void>;
+
+    /**
+     * Increments the quote count for a post.
+     * @param postId - The ID of the post that was quoted.
+     */
+    incrementQuoteCount(postId: string): Promise<void>;
+
+    /**
+     * Decrements the quote count for a post.
+     * @param postId - The ID of the post whose quote was deleted.
+     */
+    decrementQuoteCount(postId: string): Promise<void>;
     /**
      * Finds posts by the author's username with pagination and optional type filtering.
      * @param username - The username of the author whose posts are being retrieved.
