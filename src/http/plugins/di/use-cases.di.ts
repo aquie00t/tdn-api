@@ -321,14 +321,14 @@ export const useCasesModule = {
      */
     createPostUseCase: asFunction(
         (
-            postRepository,
+            transactionService,
             cacheService,
             userRepository,
             notifyNewPostUseCase,
             logger,
         ) =>
             new CreatePostUseCase(
-                postRepository,
+                transactionService,
                 cacheService,
                 userRepository,
                 notifyNewPostUseCase,
@@ -362,12 +362,19 @@ export const useCasesModule = {
      * Use case for deleting a post
      */
     deletePostUseCase: asFunction(
-        (postRepository, storageService, logger, cacheService) =>
+        (
+            postRepository,
+            storageService,
+            logger,
+            cacheService,
+            transactionService,
+        ) =>
             new DeletePostUseCase(
                 postRepository,
                 storageService,
                 logger,
                 cacheService,
+                transactionService,
             ),
     ).singleton(),
 

@@ -1,4 +1,4 @@
-import { type IPostRepository } from "@core/ports/repositories/post.repository";
+import type { TransactionPort } from "@core/ports/services/transaction.port";
 import type { CreatePostInput } from "./create-post-usecase.input";
 import type { CachePort } from "@core/ports/services/cache.port";
 import { Post } from "@core/domain/entities/post.entity";
@@ -19,14 +19,14 @@ export class CreatePostUseCase {
     /**
      * Creates a new instance of CreatePostUseCase.
      *
-     * @param postRepository - Repository for managing post data
+     * @param transactionService - Service for running the write atomically
      * @param cacheService - Service for cache operations
      * @param userRepository - Repository for managing user data
      * @param notifyNewPostUseCase - Use case that fans the post out to followers
      * @param logger - Service for logging operations
      */
     constructor(
-        private readonly postRepository: IPostRepository,
+        private readonly transactionService: TransactionPort,
         private readonly cacheService: CachePort,
         private readonly userRepository: IUserRepository,
         private readonly notifyNewPostUseCase: NotifyNewPostUseCase,
@@ -46,9 +46,17 @@ export class CreatePostUseCase {
      * This method creates a new post entity, saves it to the database,
      * and clears any cached feed data to ensure consistency.
      *
-     * A quoted post is resolved before the write so a quote can never be
-     * stored against an id that is already gone. The foreign key would reject
-     * it too, but a 404 says what happened and a constraint violation does not.
+     * The post and the quoted post's counter are written in one transaction:
+     * a post that exists without having been counted would leave the quote
+     * badge permanently short, and there is no cheap way to notice afterwards.
+     * The quoted post is resolved inside that transaction too, so a quote can
+     * never be stored against an id that is already gone - the foreign key
+     * would reject it as well, but a 404 says what happened and a constraint
+     * violation does not.
+     *
+     * The bot check stays outside the transaction because it only reads, and
+     * so do the cache purge and the fan-out, which must not hold the write
+     * open or roll it back.
      *
      * Followers are notified after the post is committed, deliberately
      * outside the caller's critical path: the post is the thing worth keeping,
@@ -65,23 +73,38 @@ export class CreatePostUseCase {
             }
         }
 
-        if (input.quotedPostId) {
-            const quoted = await this.postRepository.findById(
-                input.quotedPostId,
-            );
-            if (!quoted) throw new NotFoundError("Quoted post not found.");
-        }
+        const rawPost = await this.transactionService.runInTransaction(
+            async (ctx) => {
+                if (input.quotedPostId) {
+                    const quoted = await ctx.postRepository.findById(
+                        input.quotedPostId,
+                    );
+                    if (!quoted) {
+                        throw new NotFoundError("Quoted post not found.");
+                    }
+                }
 
-        const post = Post.create(
-            input.content,
-            input.type,
-            input.authorId,
-            input.mediaUrls || [],
-            input.categories || [],
-            input.quotedPostId,
+                const post = Post.create(
+                    input.content,
+                    input.type,
+                    input.authorId,
+                    input.mediaUrls || [],
+                    input.categories || [],
+                    input.quotedPostId,
+                );
+
+                const created = await ctx.postRepository.create(post);
+
+                if (input.quotedPostId) {
+                    await ctx.postRepository.incrementQuoteCount(
+                        input.quotedPostId,
+                    );
+                }
+
+                return created;
+            },
         );
 
-        const rawPost = await this.postRepository.create(post);
         await this.cacheService.deleteByPattern("posts:feed:*");
 
         void this.notifyNewPostUseCase

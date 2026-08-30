@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DeletePostUseCase } from "@core/use-cases/post/delete-post";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
+import type {
+    TransactionPort,
+    TransactionContext,
+} from "@core/ports/services/transaction.port";
 import type { StoragePort } from "@core/ports/services/storage.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { CachePort } from "@core/ports/services/cache.port";
@@ -10,7 +14,11 @@ import { buildPost } from "../../../helpers/mock-factories";
 
 describe("DeletePostUseCase", () => {
     let useCase: DeletePostUseCase;
-    let postRepository: Pick<IPostRepository, "findById" | "delete">;
+    let postRepository: Pick<
+        IPostRepository,
+        "findById" | "delete" | "decrementQuoteCount"
+    >;
+    let transactionService: Pick<TransactionPort, "runInTransaction">;
     let storageService: Pick<StoragePort, "delete">;
     let logger: LoggerPort;
     let cacheService: Pick<CachePort, "deleteByPattern">;
@@ -19,6 +27,14 @@ describe("DeletePostUseCase", () => {
         postRepository = {
             findById: vi.fn(),
             delete: vi.fn().mockResolvedValue(undefined),
+            decrementQuoteCount: vi.fn().mockResolvedValue(undefined),
+        };
+        transactionService = {
+            runInTransaction: vi
+                .fn()
+                .mockImplementation(async (work) =>
+                    work({ postRepository } as unknown as TransactionContext),
+                ),
         };
         storageService = {
             delete: vi.fn().mockResolvedValue(undefined),
@@ -34,6 +50,7 @@ describe("DeletePostUseCase", () => {
             storageService as StoragePort,
             logger,
             cacheService as CachePort,
+            transactionService as TransactionPort,
         );
     });
 
@@ -114,5 +131,54 @@ describe("DeletePostUseCase", () => {
 
         expect(logger.error).toHaveBeenCalledOnce();
         expect(postRepository.delete).toHaveBeenCalledWith("post-1");
+    });
+
+    describe("quote counter", () => {
+        it("should give the quoted post its count back when a quote is deleted", async () => {
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ author: { id: "user-1" }, quotedPostId: "post-0" }),
+            );
+
+            await useCase.execute({
+                postId: "post-1",
+                userId: "user-1",
+                cdnBaseUrl: "https://cdn.example.com",
+            });
+
+            expect(postRepository.decrementQuoteCount).toHaveBeenCalledWith(
+                "post-0",
+            );
+        });
+
+        it("should delete the post and decrement in one transaction", async () => {
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ author: { id: "user-1" }, quotedPostId: "post-0" }),
+            );
+
+            await useCase.execute({
+                postId: "post-1",
+                userId: "user-1",
+                cdnBaseUrl: "https://cdn.example.com",
+            });
+
+            expect(transactionService.runInTransaction).toHaveBeenCalledOnce();
+            expect(postRepository.delete).toHaveBeenCalledWith("post-1");
+        });
+
+        it("should not touch any counter when the post quotes nothing", async () => {
+            // A quoted post needs no decrement of its own: its quotes are
+            // cascaded away with it and no surviving row was counting them.
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ author: { id: "user-1" } }),
+            );
+
+            await useCase.execute({
+                postId: "post-1",
+                userId: "user-1",
+                cdnBaseUrl: "https://cdn.example.com",
+            });
+
+            expect(postRepository.decrementQuoteCount).not.toHaveBeenCalled();
+        });
     });
 });

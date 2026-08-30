@@ -4,6 +4,7 @@ import type { LoggerPort } from "@core/ports/services/logger.port";
 import { UnauthorizedActionError, NotFoundError } from "@core/errors";
 import type { DeletePostUseCaseInput } from "./delete-post-usecase.input";
 import type { CachePort } from "@core/ports/services/cache.port";
+import type { TransactionPort } from "@core/ports/services/transaction.port";
 
 /**
  * Use case for deleting a post.
@@ -19,12 +20,14 @@ export class DeletePostUseCase {
      * @param storageService - Service for file storage operations
      * @param logger - Service for logging operations
      * @param cacheService - Service for cache operations
+     * @param transactionService - Service for running the delete atomically
      */
     constructor(
         private readonly postRepository: IPostRepository,
         private readonly storageService: StoragePort,
         private readonly logger: LoggerPort,
         private readonly cacheService: CachePort,
+        private readonly transactionService: TransactionPort,
     ) {}
 
     /**
@@ -40,6 +43,11 @@ export class DeletePostUseCase {
      * This method validates ownership, deletes associated media files,
      * clears cache entries, and removes the post from the database.
      * Media deletion errors are logged but don't prevent post deletion.
+     *
+     * Deleting a quote also gives the quoted post its count back, in the same
+     * transaction as the delete so the two cannot come apart. Deleting a
+     * quoted post needs no such care: its own quotes are cascaded away with
+     * it, and no surviving row was counting them.
      */
     async execute(input: DeletePostUseCaseInput): Promise<void> {
         const post = await this.postRepository.findById(input.postId);
@@ -72,6 +80,13 @@ export class DeletePostUseCase {
         }
 
         await this.cacheService.deleteByPattern("posts:feed:*");
-        await this.postRepository.delete(input.postId);
+
+        await this.transactionService.runInTransaction(async (ctx) => {
+            if (post.quotedPostId) {
+                await ctx.postRepository.decrementQuoteCount(post.quotedPostId);
+            }
+
+            await ctx.postRepository.delete(input.postId);
+        });
     }
 }

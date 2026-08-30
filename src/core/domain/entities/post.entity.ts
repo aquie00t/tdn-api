@@ -136,6 +136,14 @@ export class Post {
     }
 
     /**
+     * Get the number of posts quoting this one
+     * @returns The quote count, 0 when the post has never been quoted
+     */
+    get quoteCount(): number {
+        return this.props.quoteCount ?? 0;
+    }
+
+    /**
      * Indicates whether the current user has bookmarked the post
      * @returns True if the post is bookmarked by the current user, false otherwise
      */

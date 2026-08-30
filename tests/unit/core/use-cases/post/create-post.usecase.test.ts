@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CreatePostUseCase } from "@core/use-cases/post/create-post";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
+import type {
+    TransactionPort,
+    TransactionContext,
+} from "@core/ports/services/transaction.port";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
@@ -12,7 +16,12 @@ import { buildUser, buildPost } from "../../../helpers/mock-factories";
 
 describe("CreatePostUseCase", () => {
     let useCase: CreatePostUseCase;
-    let postRepository: Pick<IPostRepository, "create" | "findById">;
+    // The transactional repository, reached through the mocked transaction.
+    let postRepository: Pick<
+        IPostRepository,
+        "create" | "findById" | "incrementQuoteCount"
+    >;
+    let transactionService: Pick<TransactionPort, "runInTransaction">;
     let userRepository: Pick<IUserRepository, "findById">;
     let cacheService: Pick<CachePort, "deleteByPattern">;
     let notifyNewPostUseCase: Pick<NotifyNewPostUseCase, "execute">;
@@ -22,6 +31,14 @@ describe("CreatePostUseCase", () => {
         postRepository = {
             create: vi.fn().mockResolvedValue(buildPost()),
             findById: vi.fn().mockResolvedValue(buildPost()),
+            incrementQuoteCount: vi.fn().mockResolvedValue(undefined),
+        };
+        transactionService = {
+            runInTransaction: vi
+                .fn()
+                .mockImplementation(async (work) =>
+                    work({ postRepository } as unknown as TransactionContext),
+                ),
         };
         userRepository = {
             findById: vi.fn(),
@@ -34,7 +51,7 @@ describe("CreatePostUseCase", () => {
         };
         logger = { error: vi.fn() };
         useCase = new CreatePostUseCase(
-            postRepository as IPostRepository,
+            transactionService as TransactionPort,
             cacheService as CachePort,
             userRepository as IUserRepository,
             notifyNewPostUseCase as NotifyNewPostUseCase,
@@ -200,6 +217,50 @@ describe("CreatePostUseCase", () => {
             expect(
                 vi.mocked(postRepository.create).mock.calls[0][0].isQuote(),
             ).toBe(false);
+        });
+
+        it("should count the quote on the post it quotes", async () => {
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ id: "post-0" }),
+            );
+
+            await useCase.execute({
+                content: "I agree with this",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                quotedPostId: "post-0",
+            });
+
+            expect(postRepository.incrementQuoteCount).toHaveBeenCalledWith(
+                "post-0",
+            );
+        });
+
+        it("should write the post and the counter in one transaction", async () => {
+            // A post that exists without having been counted leaves the quote
+            // badge permanently short, with nothing to notice it afterwards.
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ id: "post-0" }),
+            );
+
+            await useCase.execute({
+                content: "I agree with this",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                quotedPostId: "post-0",
+            });
+
+            expect(transactionService.runInTransaction).toHaveBeenCalledOnce();
+        });
+
+        it("should not touch the counter when nothing is quoted", async () => {
+            await useCase.execute({
+                content: "Just a post",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(postRepository.incrementQuoteCount).not.toHaveBeenCalled();
         });
 
         it("should allow quoting a quote", async () => {

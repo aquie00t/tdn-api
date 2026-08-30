@@ -34,6 +34,7 @@ export const PostItemSchema = FBType.Object({
     createdAt: FBType.String(),
     likeCount: FBType.Number(),
     commentCount: FBType.Number(),
+    quoteCount: FBType.Number(),
     isLiked: FBType.Boolean(),
     isBookmarked: FBType.Boolean(),
     author: PostAuthorSchema,

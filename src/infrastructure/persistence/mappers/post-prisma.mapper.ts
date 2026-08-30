@@ -59,6 +59,7 @@ export interface PostResponse {
     createdAt: Date;
     likeCount: number;
     commentCount: number;
+    quoteCount: number;
     author: {
         id: string;
         username: string;
@@ -103,6 +104,7 @@ export class PostPrismaMapper {
             updatedAt: dbPost.updatedAt,
             likeCount: dbPost.likeCount,
             commentCount: dbPost.commentCount,
+            quoteCount: dbPost.quoteCount,
             isLiked: dbPost.likes && dbPost.likes.length > 0,
             isBookmarked: dbPost.bookmarks && dbPost.bookmarks.length > 0,
             categories: (dbPost.category as PostCategory[]) || [],
@@ -183,6 +185,7 @@ export class PostPrismaMapper {
             createdAt: post.createdAt,
             likeCount: post.likeCount || 0,
             commentCount: post.commentCount || 0,
+            quoteCount: post.quoteCount || 0,
             isLiked: post.isLiked || false,
             isBookmarked: post.isBookmarked || false,
             author: {

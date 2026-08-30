@@ -112,4 +112,48 @@ describe("DELETE /posts/:id - Delete Post", () => {
 
         expect(response.statusCode).toBe(204);
     });
+
+    it("should give the quoted post its count back when the quote is deleted", async () => {
+        const originalRes = await authRequest(tokenA, {
+            method: "POST",
+            url: "/posts",
+            payload: { content: "Quote counter target" },
+        });
+        const originalId = parseBody<{ data: { id: string } }>(originalRes).data
+            .id;
+
+        const quoteRes = await authRequest(tokenA, {
+            method: "POST",
+            url: "/posts",
+            payload: {
+                content: "Quote to be deleted",
+                quotedPostId: originalId,
+            },
+        });
+        const quoteId = parseBody<{ data: { id: string } }>(quoteRes).data.id;
+
+        const counted = await request({
+            method: "GET",
+            url: `/posts/${originalId}`,
+        });
+        expect(
+            parseBody<{ data: { quoteCount: number } }>(counted).data
+                .quoteCount,
+        ).toBe(1);
+
+        const deleteRes = await authRequest(tokenA, {
+            method: "DELETE",
+            url: `/posts/${quoteId}`,
+        });
+        expect(deleteRes.statusCode).toBe(204);
+
+        const recounted = await request({
+            method: "GET",
+            url: `/posts/${originalId}`,
+        });
+        expect(
+            parseBody<{ data: { quoteCount: number } }>(recounted).data
+                .quoteCount,
+        ).toBe(0);
+    });
 });

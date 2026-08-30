@@ -22,6 +22,7 @@ function makeDbPost(
         category: [],
         likeCount: 0,
         commentCount: 0,
+        quoteCount: 0,
         createdAt: now,
         updatedAt: now,
         author: {
@@ -386,6 +387,36 @@ describe("PostPrismaMapper", () => {
             const post = PostPrismaMapper.toDomainPost(makeDbPost());
 
             expect(PostPrismaMapper.toResponse(post, CDN).quotedPost).toBeNull();
+        });
+
+        it("should map quoteCount onto the entity and the response", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({ quoteCount: 3 } as never),
+            );
+
+            expect(post.quoteCount).toBe(3);
+            expect(PostPrismaMapper.toResponse(post, CDN).quoteCount).toBe(3);
+        });
+
+        it("should default quoteCount to 0 when the column is absent", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({ quoteCount: undefined } as never),
+            );
+
+            expect(post.quoteCount).toBe(0);
+        });
+
+        it("should keep counters off the quote card", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({
+                    quotedPostId: "post-0",
+                    quotedPost: quotedRelation,
+                } as never),
+            );
+            const result = PostPrismaMapper.toResponse(post, CDN);
+
+            expect(result.quotedPost).not.toHaveProperty("quoteCount");
+            expect(result.quotedPost).not.toHaveProperty("likeCount");
         });
 
         it("should not nest a second level of quotes in the card", () => {

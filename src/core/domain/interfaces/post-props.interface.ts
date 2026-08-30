@@ -62,6 +62,9 @@ export interface PostProps {
     /** Optional comment count for the post */
     commentCount?: number;
 
+    /** Optional count of posts quoting this one */
+    quoteCount?: number;
+
     /** Indicates if the current authenticated user has bookmarked this post */
     isBookmarked?: boolean;
 

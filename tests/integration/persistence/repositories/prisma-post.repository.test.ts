@@ -245,6 +245,27 @@ describe("PrismaPostRepository (integration)", () => {
             expect(readBack?.isQuote()).toBe(false);
         });
 
+        it("should move the quote counter up and down", async () => {
+            const original = await postRepo.create(
+                Post.create("Counted post", PostType.COMMUNITY, testUserId),
+            );
+
+            await postRepo.incrementQuoteCount(original.id);
+            await postRepo.incrementQuoteCount(original.id);
+            expect((await postRepo.findById(original.id))?.quoteCount).toBe(2);
+
+            await postRepo.decrementQuoteCount(original.id);
+            expect((await postRepo.findById(original.id))?.quoteCount).toBe(1);
+        });
+
+        it("should start a new post at a quote count of zero", async () => {
+            const created = await postRepo.create(
+                Post.create("Fresh post", PostType.COMMUNITY, testUserId),
+            );
+
+            expect(created.quoteCount).toBe(0);
+        });
+
         it("should cascade the delete of an original onto its quotes", async () => {
             const original = await postRepo.create(
                 Post.create("Doomed original", PostType.COMMUNITY, testUserId),

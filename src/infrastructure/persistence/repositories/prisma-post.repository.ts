@@ -222,6 +222,30 @@ export class PrismaPostRepository implements IPostRepository {
     }
 
     /**
+     * Increments the quote count for a post by its unique identifier.
+     * @param postId - The unique identifier of the post that was quoted.
+     * @returns A promise that resolves when the update is complete.
+     */
+    async incrementQuoteCount(postId: string): Promise<void> {
+        await this.prisma.post.update({
+            where: { id: postId },
+            data: { quoteCount: { increment: 1 } },
+        });
+    }
+
+    /**
+     * Decrements the quote count for a post by its unique identifier.
+     * @param postId - The unique identifier of the post whose quote was deleted.
+     * @returns A promise that resolves when the update is complete.
+     */
+    async decrementQuoteCount(postId: string): Promise<void> {
+        await this.prisma.post.update({
+            where: { id: postId },
+            data: { quoteCount: { decrement: 1 } },
+        });
+    }
+
+    /**
      * Finds posts by the author's username with pagination and optional type filtering.
      * @param username - The username of the author whose posts are being retrieved.
      * @param page - The page number for pagination.

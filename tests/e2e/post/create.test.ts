@@ -185,6 +185,37 @@ describe("POST /posts - Create Post", () => {
             expect(body.data.quotedPost).toBeNull();
         });
 
+        it("should count the quote on the post it quotes", async () => {
+            const targetRes = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: { content: "Counted quote target" },
+            });
+            const targetId = parseBody<{
+                data: { id: string; quoteCount: number };
+            }>(targetRes);
+
+            expect(targetId.data.quoteCount).toBe(0);
+
+            await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: {
+                    content: "Counting quote",
+                    quotedPostId: targetId.data.id,
+                },
+            });
+
+            const readBack = await request({
+                method: "GET",
+                url: `/posts/${targetId.data.id}`,
+            });
+            const body = parseBody<{ data: { quoteCount: number } }>(readBack);
+
+            expect(readBack.statusCode).toBe(200);
+            expect(body.data.quoteCount).toBe(1);
+        });
+
         it("should return 404 when the quoted post does not exist", async () => {
             const response = await authRequest(accessToken, {
                 method: "POST",
