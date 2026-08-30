@@ -134,3 +134,22 @@ export function validateCoverImageKey(
 
     return key;
 }
+
+/**
+ * Normalizes a tag used as a *read* filter.
+ *
+ * Tags are stored lowercased by {@link normalizeTags}, so a filter that is not
+ * lowercased matches nothing. Unlike the write path this never throws: a
+ * malformed filter is a filter that matches no article, not a bad request, and
+ * a blank one is no filter at all.
+ *
+ * @param tag - The raw tag from the query string
+ * @returns The lowercased tag, or undefined when nothing was supplied
+ */
+export function normalizeTagFilter(tag?: string): string | undefined {
+    if (!tag) return undefined;
+
+    const normalized = tag.trim().toLowerCase();
+
+    return normalized.length > 0 ? normalized : undefined;
+}
