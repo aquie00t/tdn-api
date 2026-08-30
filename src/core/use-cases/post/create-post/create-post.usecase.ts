@@ -5,6 +5,7 @@ import { Post } from "@core/domain/entities/post.entity";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
+import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
 import { PostType } from "@core/domain/enums";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
 import { NotFoundError } from "@core/errors/common/not-found.error";
@@ -23,6 +24,7 @@ export class CreatePostUseCase {
      * @param cacheService - Service for cache operations
      * @param userRepository - Repository for managing user data
      * @param notifyNewPostUseCase - Use case that fans the post out to followers
+     * @param notifyQuotedAuthorUseCase - Use case that tells an author their post was quoted
      * @param logger - Service for logging operations
      */
     constructor(
@@ -30,6 +32,7 @@ export class CreatePostUseCase {
         private readonly cacheService: CachePort,
         private readonly userRepository: IUserRepository,
         private readonly notifyNewPostUseCase: NotifyNewPostUseCase,
+        private readonly notifyQuotedAuthorUseCase: NotifyQuotedAuthorUseCase,
         private readonly logger: LoggerPort,
     ) {}
 
@@ -58,9 +61,10 @@ export class CreatePostUseCase {
      * so do the cache purge and the fan-out, which must not hold the write
      * open or roll it back.
      *
-     * Followers are notified after the post is committed, deliberately
-     * outside the caller's critical path: the post is the thing worth keeping,
-     * so a fan-out failure is logged rather than allowed to fail the request.
+     * Followers and, for a quote, the quoted author are notified after the
+     * post is committed, deliberately outside the caller's critical path: the
+     * post is the thing worth keeping, so a notification failure is logged
+     * rather than allowed to fail the request or roll the write back.
      */
     async execute(input: CreatePostInput): Promise<Post> {
         if ([PostType.SYSTEM_UPDATE, PostType.TECH_NEWS].includes(input.type)) {
@@ -119,6 +123,21 @@ export class CreatePostUseCase {
                     "Failed to notify followers of a new post",
                 );
             });
+
+        if (input.quotedPostId) {
+            void this.notifyQuotedAuthorUseCase
+                .execute({
+                    quotePostId: rawPost.id,
+                    quotedPostId: input.quotedPostId,
+                    issuerId: input.authorId,
+                })
+                .catch((err: unknown) => {
+                    this.logger.error(
+                        { err, postId: rawPost.id },
+                        "Failed to notify the quoted author",
+                    );
+                });
+        }
 
         return rawPost;
     }

@@ -35,6 +35,7 @@ import { GetUnreadNotificationCountUseCase } from "@core/use-cases/notification/
 import { PurgeExpiredNotificationsUseCase } from "@core/use-cases/notification/purge-expired";
 import { CreatePostUseCase } from "@core/use-cases/post/create-post";
 import { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
+import { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
 import { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
 import { GetPostsUseCase } from "@core/use-cases/post/get-posts";
 import { DeletePostUseCase } from "@core/use-cases/post/delete-post";
@@ -325,6 +326,7 @@ export const useCasesModule = {
             cacheService,
             userRepository,
             notifyNewPostUseCase,
+            notifyQuotedAuthorUseCase,
             logger,
         ) =>
             new CreatePostUseCase(
@@ -332,6 +334,7 @@ export const useCasesModule = {
                 cacheService,
                 userRepository,
                 notifyNewPostUseCase,
+                notifyQuotedAuthorUseCase,
                 logger,
             ),
     ).singleton(),
@@ -340,6 +343,11 @@ export const useCasesModule = {
      * Use case for notifying followers that an account published a post
      */
     notifyNewPostUseCase: asClass(NotifyNewPostUseCase).singleton(),
+
+    /**
+     * Use case for telling an author that one of their posts was quoted
+     */
+    notifyQuotedAuthorUseCase: asClass(NotifyQuotedAuthorUseCase).singleton(),
 
     /**
      * Use case for uploading post media files

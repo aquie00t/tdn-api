@@ -9,6 +9,7 @@ import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
+import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
 import { NotFoundError } from "@core/errors/common/not-found.error";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
 import { PostType } from "@core/domain/enums/post-type.enum";
@@ -25,6 +26,7 @@ describe("CreatePostUseCase", () => {
     let userRepository: Pick<IUserRepository, "findById">;
     let cacheService: Pick<CachePort, "deleteByPattern">;
     let notifyNewPostUseCase: Pick<NotifyNewPostUseCase, "execute">;
+    let notifyQuotedAuthorUseCase: Pick<NotifyQuotedAuthorUseCase, "execute">;
     let logger: Pick<LoggerPort, "error">;
 
     beforeEach(() => {
@@ -49,12 +51,16 @@ describe("CreatePostUseCase", () => {
         notifyNewPostUseCase = {
             execute: vi.fn().mockResolvedValue(0),
         };
+        notifyQuotedAuthorUseCase = {
+            execute: vi.fn().mockResolvedValue(0),
+        };
         logger = { error: vi.fn() };
         useCase = new CreatePostUseCase(
             transactionService as TransactionPort,
             cacheService as CachePort,
             userRepository as IUserRepository,
             notifyNewPostUseCase as NotifyNewPostUseCase,
+            notifyQuotedAuthorUseCase as NotifyQuotedAuthorUseCase,
             logger as LoggerPort,
         );
     });
@@ -261,6 +267,61 @@ describe("CreatePostUseCase", () => {
             });
 
             expect(postRepository.incrementQuoteCount).not.toHaveBeenCalled();
+        });
+
+        it("should tell the quoted author about it", async () => {
+            const created = buildPost({ id: "quote-1" });
+            vi.mocked(postRepository.create).mockResolvedValue(created);
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ id: "post-0" }),
+            );
+
+            await useCase.execute({
+                content: "I agree with this",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                quotedPostId: "post-0",
+            });
+
+            await vi.waitFor(() => {
+                expect(notifyQuotedAuthorUseCase.execute).toHaveBeenCalledWith({
+                    quotePostId: "quote-1",
+                    quotedPostId: "post-0",
+                    issuerId: "user-1",
+                });
+            });
+        });
+
+        it("should not notify anyone when nothing is quoted", async () => {
+            await useCase.execute({
+                content: "Just a post",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(notifyQuotedAuthorUseCase.execute).not.toHaveBeenCalled();
+        });
+
+        it("should still return the post when the quote notification fails", async () => {
+            // The post is the thing worth keeping; a notification failure must
+            // not surface as a failed request.
+            const created = buildPost({ id: "quote-1" });
+            vi.mocked(postRepository.create).mockResolvedValue(created);
+            vi.mocked(notifyQuotedAuthorUseCase.execute).mockRejectedValue(
+                new Error("notifier exploded"),
+            );
+
+            const result = await useCase.execute({
+                content: "I agree with this",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                quotedPostId: "post-0",
+            });
+
+            expect(result).toBe(created);
+            await vi.waitFor(() => {
+                expect(logger.error).toHaveBeenCalledOnce();
+            });
         });
 
         it("should allow quoting a quote", async () => {
