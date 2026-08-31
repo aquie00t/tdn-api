@@ -113,6 +113,17 @@ describe("QUOTE notifications", () => {
             quotedPostId: originalPostId,
         });
 
+        // The notification is written fire-and-forget, after the create
+        // response has already been sent, so a single read can land before it.
+        await expect
+            .poll(async () => {
+                const items = await notificationsOf(authorToken);
+                return items.some(
+                    (item) => item.type === "QUOTE" && item.postId === quoteId,
+                );
+            })
+            .toBe(true);
+
         const notifications = await notificationsOf(authorToken);
         const quoteNotification = notifications.find(
             (item) => item.type === "QUOTE" && item.postId === quoteId,
@@ -149,8 +160,14 @@ describe("QUOTE notifications", () => {
             quotedPostId: originalPostId,
         });
 
-        const notified = await notificationsOf(authorToken);
-        expect(notified.some((item) => item.postId === quoteId)).toBe(true);
+        // Fire-and-forget again: wait for the notification to exist before
+        // deleting the quote, or this asserts on a race rather than on cascade.
+        await expect
+            .poll(async () => {
+                const items = await notificationsOf(authorToken);
+                return items.some((item) => item.postId === quoteId);
+            })
+            .toBe(true);
 
         const deleteRes = await authRequest(quoterToken, {
             method: "DELETE",
