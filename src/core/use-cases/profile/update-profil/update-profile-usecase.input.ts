@@ -43,4 +43,10 @@ export interface UpdateProfileInput {
      * Optional - an empty array clears every category.
      */
     categories?: PostCategory[];
+
+    /**
+     * The languages the user wants their feed ranked for, most preferred first.
+     * Optional - an empty array hands the choice back to Accept-Language.
+     */
+    languages?: string[];
 }

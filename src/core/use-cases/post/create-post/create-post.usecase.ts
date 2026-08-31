@@ -6,6 +6,7 @@ import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
+import type { LanguageDetectionPort } from "@core/ports/services/language-detection.port";
 import { PostType } from "@core/domain/enums";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
 import { NotFoundError } from "@core/errors/common/not-found.error";
@@ -26,6 +27,7 @@ export class CreatePostUseCase {
      * @param userRepository - Repository for managing user data
      * @param notifyNewPostUseCase - Use case that fans the post out to followers
      * @param notifyQuotedAuthorUseCase - Use case that tells an author their post was quoted
+     * @param languageDetectionService - Service that labels the content with the language it was written in
      * @param logger - Service for logging operations
      */
     constructor(
@@ -34,6 +36,7 @@ export class CreatePostUseCase {
         private readonly userRepository: IUserRepository,
         private readonly notifyNewPostUseCase: NotifyNewPostUseCase,
         private readonly notifyQuotedAuthorUseCase: NotifyQuotedAuthorUseCase,
+        private readonly languageDetectionService: LanguageDetectionPort,
         private readonly logger: LoggerPort,
     ) {}
 
@@ -68,6 +71,11 @@ export class CreatePostUseCase {
      * so do the cache purge and the fan-out, which must not hold the write
      * open or roll it back.
      *
+     * The language is detected before the transaction opens, from the content
+     * alone: the detector is in-process and pure, so there is nothing to gain
+     * from holding the write open across it, and a post whose language cannot
+     * be told is stored with a null rather than a guess.
+     *
      * Followers and, for a quote, the quoted author are notified after the
      * post is committed, deliberately outside the caller's critical path: the
      * post is the thing worth keeping, so a notification failure is logged
@@ -88,6 +96,8 @@ export class CreatePostUseCase {
             }
         }
 
+        const lang = await this.languageDetectionService.detect(input.content);
+
         const rawPost = await this.transactionService.runInTransaction(
             async (ctx) => {
                 if (input.quotedPostId) {
@@ -106,6 +116,7 @@ export class CreatePostUseCase {
                     input.mediaUrls || [],
                     input.categories || [],
                     input.quotedPostId,
+                    lang,
                 );
 
                 const created = await ctx.postRepository.create(post);

@@ -38,6 +38,15 @@ export interface ProfileProps {
      */
     categories: PostCategory[];
 
+    /**
+     * BCP-47 language codes the user wants their feed in, most preferred first.
+     *
+     * Empty means the user never chose, which is not the same as wanting no
+     * language: the feed falls back to the request's Accept-Language and then
+     * to the platform default.
+     */
+    languages: string[];
+
     /** Creation timestamp of the profile */
     createdAt?: Date;
 

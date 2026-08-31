@@ -220,8 +220,9 @@ describe("GET /posts - Get Post Feed", () => {
 
         expect(fromDb.quotedPost?.id).toBe(originalId);
 
-        // The second read is served from the 60-second feed cache. The dates in
-        // it are revived by hand, so the shape must not drift between the two.
+        // The second read reuses the cached ranked order instead of rebuilding
+        // it. Only the ids are cached and the page is hydrated fresh either
+        // way, so the quote card must come back identical.
         const second = await request({ method: "GET", url: "/posts?limit=50" });
         expect(second.statusCode).toBe(200);
         const fromCache = findQuote(parseBody<FeedBody>(second));

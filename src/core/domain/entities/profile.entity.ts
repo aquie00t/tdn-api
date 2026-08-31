@@ -31,6 +31,7 @@ export class Profile {
             location: null,
             socials: null,
             categories: [],
+            languages: [],
             followersCount: 0,
             followingCount: 0,
         });
@@ -110,6 +111,14 @@ export class Profile {
      */
     get categories(): PostCategory[] {
         return this.props.categories ?? [];
+    }
+
+    /**
+     * Get the feed languages the user chose
+     * @returns The language codes, empty when the user never chose
+     */
+    get languages(): string[] {
+        return this.props.languages ?? [];
     }
 
     /**

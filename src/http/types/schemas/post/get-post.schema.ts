@@ -37,6 +37,9 @@ export const PostItemSchema = FBType.Object({
     quoteCount: FBType.Number(),
     isLiked: FBType.Boolean(),
     isBookmarked: FBType.Boolean(),
+    // Null whenever the detector could not call it, which the client needs in
+    // order to decide whether offering a translation makes any sense.
+    lang: FBType.Union([FBType.String(), FBType.Null()]),
     author: PostAuthorSchema,
     tags: FBType.Array(FBType.Object({ name: FBType.String() })),
     categories: FBType.Array(FBType.Object({ name: FBType.String() })),

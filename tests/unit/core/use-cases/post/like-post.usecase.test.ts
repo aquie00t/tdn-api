@@ -5,7 +5,6 @@ import type {
     TransactionContext,
 } from "@core/ports/services/transaction.port";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
-import type { CachePort } from "@core/ports/services/cache.port";
 import { NotFoundError } from "@core/errors";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import { buildPost } from "../../../helpers/mock-factories";
@@ -14,7 +13,6 @@ describe("LikePostUseCase", () => {
     let useCase: LikePostUseCase;
     let transactionService: Pick<TransactionPort, "runInTransaction">;
     let realtimeService: Pick<RealtimePort, "emitToUser">;
-    let cacheService: Pick<CachePort, "deleteByPattern">;
     let mockCtx: Pick<
         TransactionContext,
         "postRepository" | "postLikeRepository" | "notificationRepository"
@@ -44,13 +42,9 @@ describe("LikePostUseCase", () => {
         realtimeService = {
             emitToUser: vi.fn(),
         };
-        cacheService = {
-            deleteByPattern: vi.fn().mockResolvedValue(undefined),
-        };
         useCase = new LikePostUseCase(
             transactionService as TransactionPort,
             realtimeService as RealtimePort,
-            cacheService as CachePort,
         );
     });
 
@@ -135,17 +129,5 @@ describe("LikePostUseCase", () => {
 
         expect(mockCtx.notificationRepository.create).not.toHaveBeenCalled();
         expect(realtimeService.emitToUser).not.toHaveBeenCalled();
-    });
-
-    it("should invalidate user feed cache after liking", async () => {
-        vi.mocked(mockCtx.postRepository.findById).mockResolvedValue(
-            buildPost({ author: { id: "author-1" } }),
-        );
-
-        await useCase.execute({ postId: "post-1", userId: "user-42" });
-
-        expect(cacheService.deleteByPattern).toHaveBeenCalledWith(
-            "posts:feed:*user:user-42*",
-        );
     });
 });

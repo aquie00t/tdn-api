@@ -38,6 +38,7 @@ import { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-po
 import { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
 import { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
 import { GetPostsUseCase } from "@core/use-cases/post/get-posts";
+import type { FeedRankingWeights } from "@core/use-cases/post/get-posts/feed-ranking";
 import { DeletePostUseCase } from "@core/use-cases/post/delete-post";
 import { LikePostUseCase } from "@core/use-cases/post/like-post";
 import { UnlikePostUseCase } from "@core/use-cases/post/unlike-post";
@@ -328,6 +329,7 @@ export const useCasesModule = {
             userRepository,
             notifyNewPostUseCase,
             notifyQuotedAuthorUseCase,
+            languageDetectionService,
             logger,
         ) =>
             new CreatePostUseCase(
@@ -336,6 +338,7 @@ export const useCasesModule = {
                 userRepository,
                 notifyNewPostUseCase,
                 notifyQuotedAuthorUseCase,
+                languageDetectionService,
                 logger,
             ),
     ).singleton(),
@@ -356,14 +359,54 @@ export const useCasesModule = {
     uploadPostMediaUseCase: asClass(UploadPostMediaUseCase).singleton(),
 
     /**
+     * Tuning weights for the feed ranker.
+     *
+     * Registered as a value rather than resolved inside the use case so the
+     * ranker stays a pure function of its inputs, and so the mix can be read
+     * straight off the environment in one place.
+     */
+    feedRankingWeights: asFunction((config): FeedRankingWeights => {
+        return {
+            language: config.FEED_WEIGHT_LANGUAGE,
+            social: config.FEED_WEIGHT_SOCIAL,
+            engagement: config.FEED_WEIGHT_ENGAGEMENT,
+            halfLifeHours: config.FEED_HALF_LIFE_HOURS,
+            maxPostsPerAuthor: config.FEED_MAX_POSTS_PER_AUTHOR,
+            foreignLanguageQuota: config.FEED_FOREIGN_LANGUAGE_QUOTA,
+        };
+    }).singleton(),
+
+    /** Hard cap on the pool of posts the feed ranker scores per build */
+    feedCandidatePoolSize: asFunction(
+        (config): number => config.FEED_CANDIDATE_POOL_SIZE,
+    ).singleton(),
+
+    /** How far back the feed ranker draws its candidates from */
+    feedCandidateWindowDays: asFunction(
+        (config): number => config.FEED_CANDIDATE_WINDOW_DAYS,
+    ).singleton(),
+
+    /**
      * Use case for retrieving posts
      */
     getPostsUseCase: asFunction(
-        (postRepository, cacheService, followUserRepository) =>
+        (
+            postRepository,
+            cacheService,
+            followUserRepository,
+            profileRepository,
+            feedRankingWeights,
+            feedCandidatePoolSize,
+            feedCandidateWindowDays,
+        ) =>
             new GetPostsUseCase(
                 postRepository,
                 cacheService,
                 followUserRepository,
+                profileRepository,
+                feedRankingWeights,
+                feedCandidatePoolSize,
+                feedCandidateWindowDays,
             ),
     ).singleton(),
 
@@ -409,10 +452,6 @@ export const useCasesModule = {
      *
      */
     removeBookmarkUseCase: asClass(RemoveBookmarkUseCase).singleton(),
-    /**
-     *
-     */
-    getSavedPostsUseCase: asClass(GetPostsUseCase).singleton(),
     /**
      *
      */

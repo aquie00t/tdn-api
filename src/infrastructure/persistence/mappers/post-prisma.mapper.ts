@@ -69,6 +69,8 @@ export interface PostResponse {
     };
     isLiked: boolean;
     isBookmarked: boolean;
+    /** Detected content language, null when the detector could not tell. */
+    lang: string | null;
     tags?: { name: string }[];
     categories?: { name: string }[];
     quotedPost: QuotedPostResponse | null;
@@ -108,6 +110,7 @@ export class PostPrismaMapper {
             isLiked: dbPost.likes && dbPost.likes.length > 0,
             isBookmarked: dbPost.bookmarks && dbPost.bookmarks.length > 0,
             categories: (dbPost.category as PostCategory[]) || [],
+            lang: dbPost.lang,
             quotedPostId: dbPost.quotedPostId ?? undefined,
             quotedPost: dbPost.quotedPost
                 ? {
@@ -142,6 +145,7 @@ export class PostPrismaMapper {
         mediaUrls: string[];
         authorId: string;
         category: PostCategory[];
+        lang: string | null;
         quotedPostId: string | null;
     } {
         return {
@@ -150,6 +154,7 @@ export class PostPrismaMapper {
             mediaUrls: post.mediaUrls,
             authorId: post.author.id,
             category: post.categories || [],
+            lang: post.lang,
             quotedPostId: post.quotedPostId ?? null,
         };
     }
@@ -188,6 +193,7 @@ export class PostPrismaMapper {
             quoteCount: post.quoteCount || 0,
             isLiked: post.isLiked || false,
             isBookmarked: post.isBookmarked || false,
+            lang: post.lang,
             author: {
                 id: post.author.id,
                 username,

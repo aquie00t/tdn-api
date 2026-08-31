@@ -16,6 +16,11 @@ model Profile {
   /// Discovery categories. Only bot accounts (User.isBot) may set these.
   categories Category[] @default([])
 
+  /// BCP-47 language codes the user wants their feed in, most preferred first.
+  /// Empty means the user never chose: the feed then falls back to the
+  /// request's Accept-Language, and to the platform default after that.
+  languages String[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

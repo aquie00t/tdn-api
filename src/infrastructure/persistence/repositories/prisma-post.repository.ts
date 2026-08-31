@@ -1,7 +1,10 @@
 import type {
     IPostRepository,
     GetPostsParams,
+    FeedCandidateParams,
+    CountPostsParams,
 } from "@core/ports/repositories/post.repository";
+import type { FeedCandidate } from "@core/domain/interfaces/feed-candidate.interface";
 import type { Post } from "@core/domain/entities/post.entity";
 import {
     PostPrismaMapper,
@@ -101,35 +104,13 @@ export class PrismaPostRepository implements IPostRepository {
     async findAll(
         params: GetPostsParams,
     ): Promise<{ posts: Post[]; total: number }> {
-        const {
-            page,
-            limit,
-            type,
-            authorId,
-            savedByUserId,
-            currentUserId,
-            tag,
-            followingIds,
-            quotedPostId,
-        } = params;
-        const skip = (page - 1) * limit;
+        const { page, limit, currentUserId } = params;
+        // The ranked feed supplies its own offset: its chronological tail
+        // starts wherever the ranked window ended, which no page number
+        // expresses.
+        const skip = params.skip ?? (page - 1) * limit;
 
-        const whereCondition = {
-            ...(type ? { type } : {}),
-            ...(followingIds
-                ? { authorId: { in: followingIds } }
-                : authorId
-                  ? { authorId }
-                  : {}),
-            ...(savedByUserId
-                ? { bookmarks: { some: { userId: savedByUserId } } }
-                : {}),
-            ...(tag ? { tags: { some: { name: tag.toLowerCase() } } } : {}),
-            ...(quotedPostId ? { quotedPostId } : {}),
-            ...(params.categories && params.categories.length > 0
-                ? { category: { hasSome: params.categories } }
-                : {}),
-        };
+        const whereCondition = this.buildWhere(params);
 
         const orderBy = { createdAt: "desc" as const };
 
@@ -159,6 +140,139 @@ export class PrismaPostRepository implements IPostRepository {
         );
 
         return { posts, total };
+    }
+
+    /**
+     * Counts the posts matching a set of feed filters.
+     *
+     * @param params - The filters, without pagination.
+     * @returns The number of matching posts.
+     */
+    async countAll(params: CountPostsParams): Promise<number> {
+        return this.prisma.post.count({ where: this.buildWhere(params) });
+    }
+
+    /**
+     * Builds the `where` clause shared by the post reads.
+     *
+     * Shared on purpose: a count that filtered differently from the page it
+     * describes would hand the client a page total it can never reach.
+     *
+     * @param params - The filters to apply.
+     * @returns The Prisma where clause.
+     */
+    private buildWhere(
+        params: CountPostsParams & Partial<GetPostsParams>,
+    ): Prisma.PostWhereInput {
+        const {
+            type,
+            authorId,
+            savedByUserId,
+            tag,
+            followingIds,
+            quotedPostId,
+            excludeIds,
+            categories,
+        } = params;
+
+        return {
+            ...(type ? { type } : {}),
+            ...(followingIds
+                ? { authorId: { in: followingIds } }
+                : authorId
+                  ? { authorId }
+                  : {}),
+            ...(savedByUserId
+                ? { bookmarks: { some: { userId: savedByUserId } } }
+                : {}),
+            ...(tag ? { tags: { some: { name: tag.toLowerCase() } } } : {}),
+            ...(quotedPostId ? { quotedPostId } : {}),
+            ...(excludeIds && excludeIds.length > 0
+                ? { id: { notIn: excludeIds } }
+                : {}),
+            ...(categories && categories.length > 0
+                ? { category: { hasSome: categories } }
+                : {}),
+        };
+    }
+
+    /**
+     * Loads the pool of recent posts the feed ranker scores.
+     *
+     * Selects the ranking inputs and nothing else - no author, no tags, no
+     * quote card. The pool is a few hundred rows where the served page is ten,
+     * so every column the ranker does not read is paid for a few hundred times
+     * over and thrown away.
+     *
+     * @param params - Filters, time window and pool size.
+     * @returns The candidates, newest first.
+     */
+    async findFeedCandidates(
+        params: FeedCandidateParams,
+    ): Promise<FeedCandidate[]> {
+        const { type, tag, categories, followingIds, since, limit } = params;
+
+        const rows = await this.prisma.post.findMany({
+            where: {
+                createdAt: { gte: since },
+                ...(type ? { type } : {}),
+                ...(followingIds ? { authorId: { in: followingIds } } : {}),
+                ...(tag ? { tags: { some: { name: tag.toLowerCase() } } } : {}),
+                ...(categories && categories.length > 0
+                    ? { category: { hasSome: categories } }
+                    : {}),
+            },
+            // Newest first, so a window that overflows the cap keeps the
+            // freshest posts. Ranking then reorders what survives.
+            orderBy: { createdAt: "desc" },
+            take: limit,
+            select: {
+                id: true,
+                authorId: true,
+                lang: true,
+                createdAt: true,
+                likeCount: true,
+                commentCount: true,
+                quoteCount: true,
+            },
+        });
+
+        return rows;
+    }
+
+    /**
+     * Loads fully hydrated posts by their identifiers.
+     *
+     * Returns them in whatever order Postgres produces; the feed re-imposes
+     * its ranking afterwards. Ids that no longer exist are simply missing from
+     * the result - a post deleted between ranking and hydration must not fail
+     * the request.
+     *
+     * @param ids - The post identifiers to load.
+     * @param currentUserId - Optional viewer, used to resolve isLiked/isBookmarked.
+     * @returns The posts that still exist.
+     */
+    async findByIds(ids: string[], currentUserId?: string): Promise<Post[]> {
+        if (ids.length === 0) return [];
+
+        const rawPosts = await this.prisma.post.findMany({
+            where: { id: { in: ids } },
+            include: {
+                author: POST_AUTHOR_SELECT,
+                tags: true,
+                likes: currentUserId
+                    ? { where: { userId: currentUserId } }
+                    : false,
+                bookmarks: currentUserId
+                    ? { where: { userId: currentUserId } }
+                    : false,
+                quotedPost: QUOTED_POST_INCLUDE,
+            },
+        });
+
+        return rawPosts.map((post) =>
+            PostPrismaMapper.toDomainPost(post as PostWithRelations),
+        );
     }
 
     /**

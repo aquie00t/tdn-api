@@ -68,6 +68,26 @@ export const EnvSchema = Type.Object({
     FRONTEND_URL: Type.String({ default: "http://localhost:5173" }),
     API_URL: Type.String({ default: "http://localhost:8080" }),
 
+    // --- Feed ranking ---
+    // The right values here are an empirical question, so they are configured
+    // rather than compiled in: the mix can be retuned without a deploy.
+    //
+    // With the defaults a post in the viewer's language starts at 4x the score
+    // of one they cannot read, which roughly 36 hours of freshness - two
+    // half-lives - is needed to overcome.
+    FEED_WEIGHT_LANGUAGE: Type.Number({ default: 3 }),
+    FEED_WEIGHT_SOCIAL: Type.Number({ default: 2 }),
+    FEED_WEIGHT_ENGAGEMENT: Type.Number({ default: 0.6 }),
+    FEED_HALF_LIFE_HOURS: Type.Number({ default: 18, minimum: 1 }),
+    FEED_MAX_POSTS_PER_AUTHOR: Type.Number({ default: 3, minimum: 1 }),
+    FEED_FOREIGN_LANGUAGE_QUOTA: Type.Number({
+        default: 0.25,
+        minimum: 0,
+        maximum: 1,
+    }),
+    FEED_CANDIDATE_POOL_SIZE: Type.Number({ default: 300, minimum: 1 }),
+    FEED_CANDIDATE_WINDOW_DAYS: Type.Number({ default: 7, minimum: 1 }),
+
     // Set to true to bypass rate limiting (e.g. in test environments)
     DISABLE_RATE_LIMIT: Type.Boolean({ default: false }),
 });

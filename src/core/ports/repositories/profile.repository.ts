@@ -43,6 +43,19 @@ export interface IProfileRepository {
     findByUserId(userId: string): Promise<Profile | null>;
 
     /**
+     * Retrieves only the feed languages a user chose.
+     *
+     * Deliberately narrower than {@link findByUserId}, which joins the user
+     * and its follower counts: this runs on every personalised feed build and
+     * needs one column.
+     *
+     * @param userId - The unique identifier of the user.
+     * @returns The chosen language codes; empty when the user never chose or
+     * has no profile.
+     */
+    findLanguagesByUserId(userId: string): Promise<string[]>;
+
+    /**
      * Updates the banner image URL for a specific user's profile.
      * @param userId - The unique identifier of the user.
      * @param bannerUrl - The new storage URL of the banner image.

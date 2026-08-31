@@ -75,6 +75,16 @@ export interface PostProps {
     categories: PostCategory[];
 
     /**
+     * BCP-47 language code the content was detected to be in.
+     *
+     * Null when the detector could not tell and undefined when the post was
+     * loaded through a projection that does not carry it. Both mean "unknown"
+     * to the feed ranker, which scores such a post as language-neutral rather
+     * than dropping it.
+     */
+    lang?: string | null;
+
+    /**
      * The post this one quotes, when it is a quote post.
      *
      * Only ever the id on a post built by `Post.create`; a post read back from

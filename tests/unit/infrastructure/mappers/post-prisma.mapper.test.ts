@@ -433,4 +433,30 @@ describe("PostPrismaMapper", () => {
             expect(result.quotedPost).not.toHaveProperty("quotedPost");
         });
     });
+    describe("lang", () => {
+        it("should carry the detected language through every direction", () => {
+            const domain = PostPrismaMapper.toDomainPost(
+                makeDbPost({ lang: "tr" } as Partial<PostWithRelations>),
+            );
+
+            expect(domain.lang).toBe("tr");
+            expect(PostPrismaMapper.toPrismaPost(domain).lang).toBe("tr");
+            expect(PostPrismaMapper.toResponse(domain, CDN).lang).toBe("tr");
+        });
+
+        it("should keep an undetected language null rather than dropping the field", () => {
+            // The client reads this to decide whether offering a translation
+            // makes sense, so an absent field and a null one are not the same.
+            const domain = PostPrismaMapper.toDomainPost(
+                makeDbPost({ lang: null } as Partial<PostWithRelations>),
+            );
+
+            expect(domain.lang).toBeNull();
+            expect(PostPrismaMapper.toPrismaPost(domain).lang).toBeNull();
+
+            const response = PostPrismaMapper.toResponse(domain, CDN);
+            expect(response).toHaveProperty("lang");
+            expect(response.lang).toBeNull();
+        });
+    });
 });

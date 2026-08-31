@@ -4,7 +4,6 @@ import type {
     TransactionPort,
     TransactionContext,
 } from "@core/ports/services/transaction.port";
-import type { CachePort } from "@core/ports/services/cache.port";
 import { NotFoundError } from "@core/errors";
 import { buildPost } from "../../../helpers/mock-factories";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
@@ -12,7 +11,6 @@ import { NotificationType } from "@core/domain/enums/notification-type.enum";
 describe("UnlikePostUseCase", () => {
     let useCase: UnlikePostUseCase;
     let transactionService: Pick<TransactionPort, "runInTransaction">;
-    let cacheService: Pick<CachePort, "deleteByPattern">;
     let mockCtx: Pick<
         TransactionContext,
         "postRepository" | "postLikeRepository" | "notificationRepository"
@@ -39,13 +37,7 @@ describe("UnlikePostUseCase", () => {
                     work(mockCtx as TransactionContext),
                 ),
         };
-        cacheService = {
-            deleteByPattern: vi.fn().mockResolvedValue(undefined),
-        };
-        useCase = new UnlikePostUseCase(
-            transactionService as TransactionPort,
-            cacheService as CachePort,
-        );
+        useCase = new UnlikePostUseCase(transactionService as TransactionPort);
     });
 
     it("should throw NotFoundError when post not found", async () => {
@@ -85,18 +77,6 @@ describe("UnlikePostUseCase", () => {
         expect(
             mockCtx.postLikeRepository.decrementLikeCount,
         ).not.toHaveBeenCalled();
-    });
-
-    it("should invalidate user feed cache after unliking", async () => {
-        vi.mocked(mockCtx.postRepository.findById).mockResolvedValue(
-            buildPost(),
-        );
-
-        await useCase.execute({ postId: "post-1", userId: "user-55" });
-
-        expect(cacheService.deleteByPattern).toHaveBeenCalledWith(
-            "posts:feed:*user:user-55*",
-        );
     });
 
     it("should propagate transaction errors", async () => {

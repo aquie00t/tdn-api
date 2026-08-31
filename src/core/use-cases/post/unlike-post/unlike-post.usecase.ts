@@ -1,7 +1,6 @@
 import type { TransactionPort } from "@core/ports/services/transaction.port";
 import { NotFoundError } from "@core/errors";
 import type { UnlikePostUseCaseInput } from "./unlike-post-usecase.input";
-import type { CachePort } from "@core/ports/services/cache.port";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
 
 /**
@@ -16,10 +15,7 @@ export class UnlikePostUseCase {
      * Creates a new UnlikePostUseCase instance
      * @param transactionService - Service for handling database transactions
      */
-    constructor(
-        private readonly transactionService: TransactionPort,
-        private readonly cacheService: CachePort,
-    ) {}
+    constructor(private readonly transactionService: TransactionPort) {}
 
     /**
      * Executes the unlike post use case
@@ -60,8 +56,9 @@ export class UnlikePostUseCase {
                 });
             }
         });
-        await this.cacheService.deleteByPattern(
-            `posts:feed:*user:${input.userId}*`,
-        );
+        // The feed cache holds only the ranked order of post ids; isLiked and
+        // isBookmarked are read fresh on every page. Purging the viewer's
+        // ranked order here would rebuild it mid-scroll and shift every page
+        // under them, to refresh a flag that was never stale.
     }
 }

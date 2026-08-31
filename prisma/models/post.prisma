@@ -20,6 +20,12 @@ model Post {
   category  Category[] @map("category")
   mediaUrls String[]   @map("media_urls")
 
+  /// BCP-47 language code the content was written in, detected on write.
+  /// Null when the detector could not tell - a link-only or emoji-only post
+  /// has nothing to go on - and such a post is ranked as language-neutral
+  /// rather than being pushed out of every feed.
+  lang String? @db.VarChar(5)
+
   authorId String @map("author_id")
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
@@ -47,6 +53,7 @@ model Post {
   @@index([type])
   @@index([category])
   @@index([quotedPostId])
+  @@index([lang, createdAt])
   @@map("posts")
 }
 

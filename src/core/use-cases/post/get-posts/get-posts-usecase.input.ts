@@ -33,4 +33,12 @@ export interface GetPostsInput {
     followedOnly?: boolean;
     /** Optional array of categories to filter the feed */
     categories?: PostCategory[];
+
+    /**
+     * The request's raw `Accept-Language` header, when it carried one.
+     *
+     * Used only as a fallback: it decides the feed's language for a visitor
+     * who is not signed in, and for a signed-in user who never chose one.
+     */
+    acceptLanguage?: string;
 }

@@ -25,6 +25,8 @@ export class Post {
      * @param mediaUrls - Optional. An array of media URLs associated with the post. Defaults to an empty array.
      * @param categories - Optional. An array of categories assigned to the post. Defaults to an empty array.
      * @param quotedPostId - Optional. The id of the post this one quotes.
+     * @param lang - Optional. The detected language of the content, or null
+     * when the detector could not tell.
      * @returns A new Post instance with the specified properties.
      */
     public static create(
@@ -34,6 +36,7 @@ export class Post {
         mediaUrls: string[] = [],
         categories: PostCategory[] = [],
         quotedPostId?: string,
+        lang: string | null = null,
     ): Post {
         return new Post({
             content,
@@ -43,6 +46,7 @@ export class Post {
             tags: [],
             categories,
             quotedPostId,
+            lang,
         });
     }
 
@@ -165,6 +169,14 @@ export class Post {
      */
     get categories(): PostCategory[] {
         return this.props.categories ?? [];
+    }
+
+    /**
+     * Get the detected language of the post content
+     * @returns The BCP-47 language code, or null when the language is unknown
+     */
+    get lang(): string | null {
+        return this.props.lang ?? null;
     }
 
     /**

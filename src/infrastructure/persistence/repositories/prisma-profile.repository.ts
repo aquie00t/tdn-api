@@ -44,6 +44,15 @@ export class PrismaProfileRepository implements IProfileRepository {
         return profile?.avatarUrl ?? null;
     }
 
+    async findLanguagesByUserId(userId: string): Promise<string[]> {
+        const profile = await this.prisma.profile.findUnique({
+            where: { userId },
+            select: { languages: true },
+        });
+
+        return profile?.languages ?? [];
+    }
+
     async updateBanner(userId: string, bannerUrl: string): Promise<void> {
         await this.prisma.profile.update({
             where: { userId },

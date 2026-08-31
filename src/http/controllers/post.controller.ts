@@ -175,6 +175,10 @@ export class PostController {
             followedOnly,
             categories,
             currentUserId,
+            // Only ever a fallback: the ranker prefers the languages a signed-in
+            // user chose, and reads the header for visitors and for users who
+            // never set one.
+            acceptLanguage: request.headers["accept-language"],
         });
 
         const formattedData = PostPrismaMapper.toFeedResponse(
