@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/the-developer-network/tdn-api/compare/v1.12.3...v1.13.0) (2026-08-31)
+
+
+### Features
+
+* **post:** list a post's quotes and allow a quote with no text ([#242](https://github.com/the-developer-network/tdn-api/issues/242)) ([faa97c7](https://github.com/the-developer-network/tdn-api/commit/faa97c7eec9d00dcd85c77cf4e5a517cf1aad74f))
+
 ## [1.12.3](https://github.com/the-developer-network/tdn-api/compare/v1.12.2...v1.12.3) (2026-08-30)
 
 
