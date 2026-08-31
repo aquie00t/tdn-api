@@ -45,7 +45,7 @@
     },
     "packageManager": "pnpm@11.5.0",
     "dependencies": {
-        "@aws-sdk/client-s3": "^3.1115.0",
+        "@aws-sdk/client-s3": "^3.1120.0",
         "@fastify/awilix": "^8.2.1",
         "@fastify/cookie": "^11.1.2",
         "@fastify/cors": "^11.3.0",
@@ -58,17 +58,17 @@
         "@fastify/swagger-ui": "^6.1.1",
         "@fastify/type-provider-typebox": "^6.1.0",
         "@fastify/websocket": "^11.3.0",
-        "@prisma/adapter-pg": "^7.9.1",
-        "@prisma/client": "^7.9.1",
+        "@prisma/adapter-pg": "^7.10.0",
+        "@prisma/client": "^7.10.0",
         "@sinclair/typebox": "^0.34.52",
         "argon2": "^0.45.1",
         "awilix": "^13.0.5",
-        "axios": "^1.18.0",
+        "axios": "^1.20.0",
         "fastify": "^5.12.1",
         "fastify-plugin": "^6.0.0",
         "ioredis": "^6.0.0",
         "node-cron": "^4.6.0",
-        "resend": "^6.21.0"
+        "resend": "^6.24.0"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
