@@ -376,6 +376,7 @@ export const useCasesModule = {
             halfLifeHours: config.FEED_HALF_LIFE_HOURS,
             maxPostsPerAuthor: config.FEED_MAX_POSTS_PER_AUTHOR,
             foreignLanguageQuota: config.FEED_FOREIGN_LANGUAGE_QUOTA,
+            explorationRate: config.FEED_EXPLORATION_RATE,
         };
     }).singleton(),
 
@@ -440,6 +441,8 @@ export const useCasesModule = {
             profileRepository,
             userInterestRepository,
             cryptoService,
+            seenPostsService,
+            logger,
             feedRankingWeights,
             feedCandidatePoolSize,
             feedCandidateWindowDays,
@@ -451,6 +454,8 @@ export const useCasesModule = {
                 profileRepository,
                 userInterestRepository,
                 cryptoService,
+                seenPostsService,
+                logger,
                 feedRankingWeights,
                 feedCandidatePoolSize,
                 feedCandidateWindowDays,

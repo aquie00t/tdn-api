@@ -234,6 +234,36 @@ describe("GET /posts - Get Post Feed", () => {
         ).toBeGreaterThan(0);
     });
 
+    it("should not show a signed-in reader the same post twice across builds", async () => {
+        // Publishing retires the ranked pointer, so the second read rebuilds
+        // rather than replaying a cached order - which is exactly when the
+        // seen record has to earn its keep.
+        type FeedBody = { data: { id: string }[] };
+
+        const first = await authRequest(tokenB, {
+            method: "GET",
+            url: "/posts?limit=3",
+        });
+        expect(first.statusCode).toBe(200);
+        const firstIds = parseBody<FeedBody>(first).data.map((p) => p.id);
+        expect(firstIds.length).toBeGreaterThan(0);
+
+        await authRequest(accessToken, {
+            method: "POST",
+            url: "/posts",
+            payload: { content: "E2E seen-set rebuild trigger" },
+        });
+
+        const second = await authRequest(tokenB, {
+            method: "GET",
+            url: "/posts?limit=3",
+        });
+        expect(second.statusCode).toBe(200);
+        const secondIds = parseBody<FeedBody>(second).data.map((p) => p.id);
+
+        expect(secondIds.some((id) => firstIds.includes(id))).toBe(false);
+    });
+
     it("should carry the quote card through the feed, cached or not", async () => {
         const originalRes = await authRequest(accessToken, {
             method: "POST",

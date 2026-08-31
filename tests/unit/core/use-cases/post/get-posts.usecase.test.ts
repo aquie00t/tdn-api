@@ -11,6 +11,8 @@ import type { IUserInterestRepository } from "@core/ports/repositories/user-inte
 import { InterestKind } from "@core/domain/interfaces/user-interest.interface";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { CryptoPort } from "@core/ports/services/crypto.port";
+import type { SeenPostsPort } from "@core/ports/services/seen-posts.port";
+import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { FeedCandidate } from "@core/domain/interfaces/feed-candidate.interface";
 import { UnauthorizedError } from "@core/errors";
@@ -25,6 +27,9 @@ const WEIGHTS: FeedRankingWeights = {
     halfLifeHours: 18,
     maxPostsPerAuthor: 3,
     foreignLanguageQuota: 0.25,
+    // Off, so a test asserting on feed order is asserting on the ranking
+    // rather than on a coin flip. Exploration has its own tests.
+    explorationRate: 0,
 };
 
 const POOL_SIZE = 300;
@@ -100,6 +105,8 @@ describe("GetPostsUseCase", () => {
     let profileRepository: Pick<IProfileRepository, "findLanguagesByUserId">;
     let userInterestRepository: Pick<IUserInterestRepository, "findByUserId">;
     let cryptoService: Pick<CryptoPort, "generateRandomHex">;
+    let seenPostsService: SeenPostsPort;
+    let logger: Pick<LoggerPort, "error">;
     let tokenSequence: number;
 
     /** Hydrates whatever ids were asked for, so ordering assertions are real. */
@@ -148,6 +155,13 @@ describe("GetPostsUseCase", () => {
         cryptoService = {
             generateRandomHex: vi.fn(() => `token-${++tokenSequence}`),
         };
+        seenPostsService = {
+            markSeen: vi.fn().mockResolvedValue(undefined),
+            filterUnseen: vi.fn((_userId, postIds: string[]) =>
+                Promise.resolve(postIds),
+            ),
+        };
+        logger = { error: vi.fn() };
         useCase = new GetPostsUseCase(
             postRepository as IPostRepository,
             cacheService as unknown as CachePort,
@@ -155,9 +169,14 @@ describe("GetPostsUseCase", () => {
             profileRepository as IProfileRepository,
             userInterestRepository as IUserInterestRepository,
             cryptoService as CryptoPort,
+            seenPostsService,
+            logger as LoggerPort,
             WEIGHTS,
             POOL_SIZE,
             WINDOW_DAYS,
+            // Pinned, so an ordering assertion is about the ranking rather
+            // than about a coin flip.
+            () => 0.99,
         );
     });
 
@@ -490,6 +509,173 @@ describe("GetPostsUseCase", () => {
             });
 
             expect(result.posts.map((p) => p.id)).toEqual(["p1", "p2"]);
+        });
+    });
+
+    describe("posts the reader has already seen", () => {
+        it("should keep them out of the pool that gets ranked", async () => {
+            seedPool(20);
+            hydrateRequestedIds();
+            vi.mocked(seenPostsService.filterUnseen).mockResolvedValue(
+                Array.from({ length: 18 }, (_, i) => `p${i + 3}`),
+            );
+
+            const result = await useCase.execute({
+                limit: 2,
+                currentUserId: "user-1",
+            });
+
+            expect(result.posts.map((p) => p.id)).toEqual(["p3", "p4"]);
+        });
+
+        it("should filter when the order is built, not when a page is served", async () => {
+            // Filtering at serve time would hand a reader a page of four when
+            // six of the ten had been seen.
+            seedPool(20);
+            hydrateRequestedIds();
+            vi.mocked(seenPostsService.filterUnseen).mockResolvedValue(
+                Array.from({ length: 15 }, (_, i) => `p${i + 6}`),
+            );
+
+            const result = await useCase.execute({
+                limit: 10,
+                currentUserId: "user-1",
+            });
+
+            expect(result.posts).toHaveLength(10);
+        });
+
+        it("should record the page it served", async () => {
+            seedPool(4);
+            hydrateRequestedIds();
+
+            await useCase.execute({ limit: 2, currentUserId: "user-1" });
+
+            expect(seenPostsService.markSeen).toHaveBeenCalledWith("user-1", [
+                "p1",
+                "p2",
+            ]);
+        });
+
+        it("should record the chronological tail too", async () => {
+            seedPool(2);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: [buildPost({ id: "t1" })],
+                total: 50,
+            });
+
+            const first = await useCase.execute({
+                limit: 2,
+                currentUserId: "user-1",
+            });
+            await useCase.execute({
+                limit: 2,
+                currentUserId: "user-1",
+                cursor: first.nextCursor!,
+            });
+
+            expect(seenPostsService.markSeen).toHaveBeenLastCalledWith(
+                "user-1",
+                ["t1"],
+            );
+        });
+
+        it("should neither ask nor record for a signed-out visitor", async () => {
+            // There is no stable identity to remember anything against.
+            seedPool(4);
+            hydrateRequestedIds();
+
+            await useCase.execute({ limit: 2 });
+
+            expect(seenPostsService.filterUnseen).not.toHaveBeenCalled();
+            expect(seenPostsService.markSeen).not.toHaveBeenCalled();
+        });
+
+        it("should serve repeats rather than an empty feed when nearly everything is seen", async () => {
+            seedPool(20);
+            hydrateRequestedIds();
+            vi.mocked(seenPostsService.filterUnseen).mockResolvedValue(["p20"]);
+
+            const result = await useCase.execute({
+                limit: 5,
+                currentUserId: "user-1",
+            });
+
+            // A reader who has worked through the recent window should see
+            // something, not a blank page.
+            expect(result.posts).toHaveLength(5);
+            expect(result.posts[0].id).toBe("p1");
+        });
+
+        it("should serve repeats rather than a page shorter than asked for", async () => {
+            // Filtering a pool down below the requested page size turns "you
+            // have seen these" into "here is a stubby page", which is worse.
+            seedPool(40);
+            hydrateRequestedIds();
+            vi.mocked(seenPostsService.filterUnseen).mockResolvedValue(
+                Array.from({ length: 12 }, (_, i) => `p${i + 1}`),
+            );
+
+            const result = await useCase.execute({
+                limit: 20,
+                currentUserId: "user-1",
+            });
+
+            expect(result.posts).toHaveLength(20);
+        });
+
+        it("should still filter when enough unseen posts remain to fill the page", async () => {
+            seedPool(40);
+            hydrateRequestedIds();
+            vi.mocked(seenPostsService.filterUnseen).mockResolvedValue(
+                Array.from({ length: 25 }, (_, i) => `p${i + 16}`),
+            );
+
+            const result = await useCase.execute({
+                limit: 20,
+                currentUserId: "user-1",
+            });
+
+            expect(result.posts[0].id).toBe("p16");
+        });
+
+        it("should not fail the request when the record cannot be written", async () => {
+            seedPool(4);
+            hydrateRequestedIds();
+            vi.mocked(seenPostsService.markSeen).mockRejectedValue(
+                new Error("redis down"),
+            );
+
+            const result = await useCase.execute({
+                limit: 2,
+                currentUserId: "user-1",
+            });
+
+            // The page was already assembled; one repeated post later is a far
+            // smaller problem than a failed feed.
+            expect(result.posts).toHaveLength(2);
+            await Promise.resolve();
+            expect(logger.error).toHaveBeenCalled();
+        });
+
+        it("should reuse the snapshot rather than re-filtering on every page", async () => {
+            seedPool(20);
+            hydrateRequestedIds();
+
+            const first = await useCase.execute({
+                limit: 2,
+                currentUserId: "user-1",
+            });
+            vi.mocked(seenPostsService.filterUnseen).mockClear();
+
+            await useCase.execute({
+                limit: 2,
+                currentUserId: "user-1",
+                cursor: first.nextCursor!,
+            });
+
+            expect(seenPostsService.filterUnseen).not.toHaveBeenCalled();
         });
     });
 

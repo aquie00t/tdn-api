@@ -89,6 +89,14 @@ export const EnvSchema = Type.Object({
         minimum: 0,
         maximum: 1,
     }),
+    // Share of slots given to a post that did not win on score. Without it the
+    // feed can only narrow: affinity is learned from what a reader interacted
+    // with, and they can only interact with what they were shown.
+    FEED_EXPLORATION_RATE: Type.Number({
+        default: 0.1,
+        minimum: 0,
+        maximum: 1,
+    }),
     FEED_CANDIDATE_POOL_SIZE: Type.Number({ default: 300, minimum: 1 }),
     FEED_CANDIDATE_WINDOW_DAYS: Type.Number({ default: 7, minimum: 1 }),
 

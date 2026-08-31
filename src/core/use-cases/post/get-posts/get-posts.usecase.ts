@@ -4,9 +4,12 @@ import type { IProfileRepository } from "@core/ports/repositories/profile.reposi
 import type { IUserInterestRepository } from "@core/ports/repositories/user-interest.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { CryptoPort } from "@core/ports/services/crypto.port";
+import type { SeenPostsPort } from "@core/ports/services/seen-posts.port";
+import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { GetPostsInput } from "./get-posts-usecase.input";
 import type { GetPostsOutput } from "./get-posts-usecase.output";
 import type { Post } from "@core/domain/entities/post.entity";
+import type { FeedCandidate } from "@core/domain/interfaces/feed-candidate.interface";
 import { UnauthorizedError } from "@core/errors";
 import { PostType } from "@core/domain/enums";
 import {
@@ -57,6 +60,18 @@ const FEED_CACHE_VERSION = "v2";
 const SCROLL_TOKEN_BYTES = 16;
 
 /**
+ * Floor on how many unseen candidates make a pool worth filtering down to.
+ *
+ * The actual threshold is this or the requested page size, whichever is
+ * larger: filtering a pool down to fewer posts than the reader asked for turns
+ * "you have seen these" into "here is a short page", which is the worse
+ * outcome of the two. Below the threshold the filter is abandoned and the
+ * whole pool is ranked, so a reader who has worked through everything recent
+ * gets repeats rather than an empty feed.
+ */
+const MIN_UNSEEN_POOL = 10;
+
+/**
  * One snapshot of the ranked order, as it is cached.
  */
 interface RankedSnapshot {
@@ -91,9 +106,12 @@ export class GetPostsUseCase {
      * @param profileRepository - Repository used to read the viewer's feed languages
      * @param userInterestRepository - Repository holding each viewer's interest profile
      * @param cryptoService - Source of the random tokens that address snapshots
+     * @param seenPostsService - Record of what each reader has already been shown
+     * @param logger - Service for logging operations
      * @param feedRankingWeights - Tuning weights for the ranker
      * @param feedCandidatePoolSize - Hard cap on the candidate pool
      * @param feedCandidateWindowDays - How far back candidates may be drawn from
+     * @param random - Source of randomness for the ranker's exploration slots
      */
     constructor(
         private readonly postRepository: IPostRepository,
@@ -102,9 +120,12 @@ export class GetPostsUseCase {
         private readonly profileRepository: IProfileRepository,
         private readonly userInterestRepository: IUserInterestRepository,
         private readonly cryptoService: CryptoPort,
+        private readonly seenPostsService: SeenPostsPort,
+        private readonly logger: LoggerPort,
         private readonly feedRankingWeights: FeedRankingWeights,
         private readonly feedCandidatePoolSize: number,
         private readonly feedCandidateWindowDays: number,
+        private readonly random: () => number = Math.random,
     ) {}
 
     /**
@@ -174,6 +195,8 @@ export class GetPostsUseCase {
             input.currentUserId,
         );
 
+        this.recordSeen(input.currentUserId, pageIds);
+
         return {
             posts: this.reorder(posts, pageIds),
             total: snapshot.total,
@@ -221,6 +244,7 @@ export class GetPostsUseCase {
         // depth; a page number is translated into one.
         const { snapshot, token } = await this.currentRankedOrder(
             input,
+            limit,
             followedOnly,
         );
 
@@ -241,11 +265,13 @@ export class GetPostsUseCase {
      * readable for everyone still scrolling it.
      *
      * @param input - The feed request.
+     * @param limit - The page size the reader asked for.
      * @param followedOnly - Whether the pool is restricted to followed accounts.
      * @returns The snapshot and the token addressing it.
      */
     private async currentRankedOrder(
         input: GetPostsInput,
+        limit: number,
         followedOnly: boolean,
     ): Promise<{ snapshot: RankedSnapshot; token: string }> {
         const languages = await this.resolveViewerLanguages(input);
@@ -264,6 +290,7 @@ export class GetPostsUseCase {
         const snapshot = await this.buildRankedOrder(
             input,
             languages,
+            limit,
             followedOnly,
         );
         const token = this.cryptoService.generateRandomHex(SCROLL_TOKEN_BYTES);
@@ -306,12 +333,14 @@ export class GetPostsUseCase {
      *
      * @param input - The feed request.
      * @param languages - The viewer's languages.
+     * @param limit - The page size the reader asked for.
      * @param followedOnly - Whether the pool is restricted to followed accounts.
      * @returns The ranked ids and the total matching the filters.
      */
     private async buildRankedOrder(
         input: GetPostsInput,
         languages: string[],
+        limit: number,
         followedOnly: boolean,
     ): Promise<RankedSnapshot> {
         // A signed-in viewer's follow graph and interest profile are both
@@ -351,17 +380,87 @@ export class GetPostsUseCase {
         ]);
 
         const ranked = rankFeed(
-            candidates,
+            await this.dropSeen(candidates, limit, input.currentUserId),
             {
                 languages,
                 followingIds: new Set(followingIds),
                 interests: indexInterests(interests),
                 now: new Date(),
+                random: this.random,
             },
             this.feedRankingWeights,
         );
 
         return { ids: ranked.map((candidate) => candidate.id), total };
+    }
+
+    /**
+     * Records that a page was shown, without making the reader wait for it.
+     *
+     * Deliberately fire-and-forget: the page is already assembled, and holding
+     * the response open for a bookkeeping write would trade something the
+     * reader wants for something only the next request cares about. A failure
+     * costs one repeated post later, which is why it is logged rather than
+     * surfaced.
+     *
+     * @param currentUserId - The viewer, when there is one.
+     * @param pageIds - The ids that were served.
+     */
+    private recordSeen(
+        currentUserId: string | undefined,
+        pageIds: string[],
+    ): void {
+        if (!currentUserId || pageIds.length === 0) return;
+
+        void this.seenPostsService
+            .markSeen(currentUserId, pageIds)
+            .catch((err: unknown) => {
+                this.logger.error(
+                    { err, userId: currentUserId },
+                    "Failed to record which posts a reader was shown",
+                );
+            });
+    }
+
+    /**
+     * Removes posts the viewer has already been shown.
+     *
+     * Done here rather than when a page is served, so pages stay full:
+     * filtering at serve time would hand a reader a page of four when six of
+     * the ten had been seen.
+     *
+     * The filter is abandoned when it would leave too little to rank - see
+     * {@link MIN_UNSEEN_POOL}. A reader who has exhausted the recent window
+     * should get repeats rather than an empty or stubby feed, and on a quiet
+     * day, or behind a narrow tag filter, the pool can be that small to begin
+     * with.
+     *
+     * @param candidates - The pool to narrow.
+     * @param limit - The page size the reader asked for.
+     * @param currentUserId - The viewer, when there is one.
+     * @returns The pool, minus what they have seen.
+     */
+    private async dropSeen(
+        candidates: FeedCandidate[],
+        limit: number,
+        currentUserId?: string,
+    ): Promise<FeedCandidate[]> {
+        // A signed-out visitor has no stable identity to remember anything
+        // against, so there is nothing to filter and nothing to ask.
+        if (!currentUserId || candidates.length === 0) return candidates;
+
+        const unseenIds = new Set(
+            await this.seenPostsService.filterUnseen(
+                currentUserId,
+                candidates.map((candidate) => candidate.id),
+            ),
+        );
+
+        if (unseenIds.size < Math.max(MIN_UNSEEN_POOL, limit)) {
+            return candidates;
+        }
+
+        return candidates.filter((candidate) => unseenIds.has(candidate.id));
     }
 
     /**
@@ -501,6 +600,11 @@ export class GetPostsUseCase {
                   }
                 : {}),
         });
+
+        this.recordSeen(
+            input.currentUserId,
+            posts.map((post) => post.id),
+        );
 
         return {
             posts,

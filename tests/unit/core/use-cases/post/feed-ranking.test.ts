@@ -17,6 +17,9 @@ const WEIGHTS: FeedRankingWeights = {
     halfLifeHours: 18,
     maxPostsPerAuthor: 3,
     foreignLanguageQuota: 0.25,
+    // Off by default so the existing ordering assertions stay deterministic;
+    // the exploration block below turns it on explicitly.
+    explorationRate: 0,
 };
 
 function context(
@@ -27,6 +30,7 @@ function context(
         followingIds: new Set<string>(),
         interests: new Map<string, number>(),
         now: NOW,
+        random: () => 0.99,
         ...overrides,
     };
 }
@@ -334,5 +338,165 @@ describe("rankFeed", () => {
 
     it("should return an empty order for an empty pool", () => {
         expect(rankFeed([], context(), WEIGHTS)).toEqual([]);
+    });
+    describe("exploration", () => {
+        const EXPLORING: FeedRankingWeights = {
+            ...WEIGHTS,
+            explorationRate: 0.5,
+            maxPostsPerAuthor: 100,
+            foreignLanguageQuota: 1,
+        };
+
+        /** A random source that plays back a fixed sequence, then returns 0. */
+        function draws(...values: number[]): () => number {
+            let index = 0;
+            return () => values[index++] ?? 0;
+        }
+
+        it("should still return every candidate exactly once", () => {
+            const pool = Array.from({ length: 10 }, (_, i) =>
+                candidate({ id: `p${i}` }),
+            );
+
+            const ranked = rankFeed(
+                pool,
+                context({ random: draws(0.1, 0.9, 0.2, 0.4, 0.05, 0.7) }),
+                EXPLORING,
+            );
+
+            expect(ranked.map((c) => c.id).sort()).toEqual(
+                pool.map((c) => c.id).sort(),
+            );
+        });
+
+        it("should promote a candidate that did not win on score", () => {
+            const pool = Array.from({ length: 10 }, (_, i) =>
+                candidate({ id: `p${i}`, createdAt: hoursAgo(i) }),
+            );
+
+            // First draw is under the rate, so the slot explores; the second
+            // picks the last of the nine waiting behind the leader.
+            const ranked = rankFeed(
+                pool,
+                context({ random: draws(0.1, 0.99) }),
+                EXPLORING,
+            );
+
+            expect(ranked[0].id).not.toBe("p0");
+        });
+
+        it("should reach deep into the tail, not just behind the leader", () => {
+            // The post the ranking is most wrong about is the one furthest
+            // down; a draw that only ever swapped neighbours would never find
+            // it.
+            const pool = Array.from({ length: 20 }, (_, i) =>
+                candidate({ id: `p${i}`, createdAt: hoursAgo(i) }),
+            );
+
+            const ranked = rankFeed(
+                pool,
+                context({ random: draws(0.1, 0.99) }),
+                EXPLORING,
+            );
+
+            expect(ranked[0].id).toBe("p19");
+        });
+
+        it("should take the best remaining when the draw is above the rate", () => {
+            const pool = Array.from({ length: 5 }, (_, i) =>
+                candidate({ id: `p${i}`, createdAt: hoursAgo(i) }),
+            );
+
+            const ranked = rankFeed(
+                pool,
+                context({ random: () => 0.99 }),
+                EXPLORING,
+            );
+
+            expect(ranked.map((c) => c.id)).toEqual([
+                "p0",
+                "p1",
+                "p2",
+                "p3",
+                "p4",
+            ]);
+        });
+
+        it("should change nothing when the rate is zero", () => {
+            const pool = Array.from({ length: 6 }, (_, i) =>
+                candidate({ id: `p${i}`, createdAt: hoursAgo(i) }),
+            );
+
+            const exploited = rankFeed(pool, context({ random: () => 0 }), {
+                ...EXPLORING,
+                explorationRate: 0,
+            });
+
+            expect(exploited.map((c) => c.id)).toEqual([
+                "p0",
+                "p1",
+                "p2",
+                "p3",
+                "p4",
+                "p5",
+            ]);
+        });
+
+        it("should not let a promoted post escape the per-author cap", () => {
+            // Exploration runs before the constraints precisely so it cannot
+            // become a hole one author fills a page through.
+            const pool = [
+                ...Array.from({ length: 10 }, (_, i) =>
+                    candidate({
+                        id: `spam-${i}`,
+                        authorId: "prolific",
+                        createdAt: hoursAgo(i),
+                    }),
+                ),
+                ...Array.from({ length: 5 }, (_, i) =>
+                    candidate({ id: `other-${i}`, authorId: `human-${i}` }),
+                ),
+            ];
+
+            const ranked = rankFeed(pool, context({ random: () => 0 }), {
+                ...WEIGHTS,
+                explorationRate: 0.9,
+                foreignLanguageQuota: 1,
+            });
+
+            const head = ranked.slice(0, WEIGHTS.maxPostsPerAuthor + 2);
+            expect(
+                head.filter((c) => c.authorId === "prolific").length,
+            ).toBeLessThanOrEqual(WEIGHTS.maxPostsPerAuthor);
+        });
+
+        it("should not let a promoted post break the language quota", () => {
+            const pool = [
+                ...Array.from({ length: 10 }, (_, i) =>
+                    candidate({ id: `en-${i}`, lang: "en" }),
+                ),
+                ...Array.from({ length: 10 }, (_, i) =>
+                    candidate({ id: `tr-${i}`, lang: "tr" }),
+                ),
+            ];
+
+            const ranked = rankFeed(pool, context({ random: () => 0 }), {
+                ...WEIGHTS,
+                explorationRate: 0.9,
+            });
+
+            const head = ranked.slice(0, 8);
+            expect(
+                head.filter((c) => c.lang === "en").length,
+            ).toBeLessThanOrEqual(Math.ceil(8 * WEIGHTS.foreignLanguageQuota));
+        });
+
+        it("should leave a single-candidate pool alone", () => {
+            const pool = [candidate({ id: "only" })];
+
+            expect(
+                rankFeed(pool, context({ random: () => 0 }), EXPLORING),
+            ).toHaveLength(1);
+        });
     });
 });

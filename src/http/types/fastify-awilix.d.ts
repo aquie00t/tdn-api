@@ -16,6 +16,7 @@ import type { LikeController } from "@controllers/like.controller";
 import type { BookmarkController } from "@controllers/bookmark.controller";
 import type { TrendController } from "@controllers/trend.controller";
 import type { CachePort } from "@core/ports/services/cache.port";
+import type { SeenPostsPort } from "@core/ports/services/seen-posts.port";
 import type { TranslationController } from "@controllers/translation.controller";
 import type { ArticleController } from "@controllers/article.controller";
 /**
@@ -77,6 +78,9 @@ declare module "@fastify/awilix" {
 
         /** Redis-backed cache service */
         cacheService: CachePort;
+
+        /** Redis-backed record of what each reader has already been shown */
+        seenPostsService: SeenPostsPort;
 
         /** Controller for translation operations */
         translationController: TranslationController;

@@ -50,6 +50,17 @@ export interface FeedRankingWeights {
      * does not read, between 0 and 1.
      */
     foreignLanguageQuota: number;
+
+    /**
+     * Share of slots given to a candidate that did not win on score, between
+     * 0 and 1.
+     *
+     * Without this the feed can only ever narrow. Affinity is learned from
+     * what a reader interacted with, and they can only interact with what they
+     * were shown, so a purely exploitative ranking spends every slot
+     * confirming what it already believes and never finds out it was wrong.
+     */
+    explorationRate: number;
 }
 
 /**
@@ -72,6 +83,16 @@ export interface FeedRankingContext {
 
     /** The reference time decay is measured against. */
     now: Date;
+
+    /**
+     * Source of randomness for exploration, returning [0, 1).
+     *
+     * Injected rather than reached for, so the ranker stays a pure function of
+     * its arguments and a test can pin the draw. Production passes
+     * `Math.random`; the result is baked into a snapshot once, so a reader
+     * never sees the order change mid-scroll.
+     */
+    random: () => number;
 }
 
 /**
@@ -234,13 +255,60 @@ function timeDecay(createdAt: Date, now: Date, halfLifeHours: number): number {
 }
 
 /**
+ * Reorders a scored list so a share of the slots goes to candidates that did
+ * not win.
+ *
+ * Walks the output positions and, with probability `explorationRate`, promotes
+ * a candidate drawn uniformly from those still waiting rather than taking the
+ * next best. Drawing from the whole remainder rather than from just behind the
+ * leader is the point: the post the ranking is most wrong about is the one
+ * furthest down, and only a uniform draw ever reaches it.
+ *
+ * Every candidate still comes out exactly once - this changes the order, never
+ * the membership.
+ *
+ * @param sorted - The candidates in score order; not mutated.
+ * @param explorationRate - Share of slots to give away, between 0 and 1.
+ * @param random - Source of randomness returning [0, 1).
+ * @returns The candidates, with exploration slots mixed in.
+ */
+function withExploration(
+    sorted: FeedCandidate[],
+    explorationRate: number,
+    random: () => number,
+): FeedCandidate[] {
+    if (explorationRate <= 0 || sorted.length < 2) return sorted;
+
+    const remaining = [...sorted];
+    const ordered: FeedCandidate[] = [];
+
+    while (remaining.length > 0) {
+        const exploring = remaining.length > 1 && random() < explorationRate;
+        // Index 0 is the best of what is left, so a non-exploring slot is
+        // simply the next in score order.
+        const index = exploring
+            ? 1 + Math.floor(random() * (remaining.length - 1))
+            : 0;
+
+        ordered.push(remaining.splice(index, 1)[0]);
+    }
+
+    return ordered;
+}
+
+/**
  * Orders a candidate pool into the feed the viewer sees.
  *
- * Scoring alone cannot express the two rules that keep a feed readable, so
- * ranking runs in two stages. Candidates are scored and sorted, then merged
- * back together under those rules: no author may hold more than
+ * Scoring alone cannot express the rules that keep a feed readable and honest,
+ * so ranking runs in stages. Candidates are scored and sorted, a share of the
+ * slots is handed to candidates that did not win, and the result is merged
+ * back together under two constraints: no author may hold more than
  * `maxPostsPerAuthor` slots, and posts in a language the viewer does not read
- * take at most `foreignLanguageQuota` of the slots.
+ * take at most `foreignLanguageQuota` of them.
+ *
+ * Exploration runs before the constraints rather than after, so a promoted
+ * candidate is still subject to them - otherwise exploration would be a hole
+ * through which one author could fill a page.
  *
  * The quota is applied by interleaving rather than by filtering the sorted
  * list. Filtering would have made the quota a ceiling that is never reached -
@@ -283,10 +351,16 @@ export function rankFeed(
         })
         .map(({ candidate }) => candidate);
 
-    const foreign = sorted.filter((candidate) =>
+    const explored = withExploration(
+        sorted,
+        weights.explorationRate,
+        context.random,
+    );
+
+    const foreign = explored.filter((candidate) =>
         isForeign(candidate.lang, context.languages),
     );
-    const native = sorted.filter(
+    const native = explored.filter(
         (candidate) => !isForeign(candidate.lang, context.languages),
     );
 
