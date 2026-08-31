@@ -11,8 +11,22 @@ export interface GetPostsInput {
     /**
      * The page number for pagination (1-based).
      * Defaults to 1 if not provided.
+     *
+     * @deprecated Superseded by `cursor`, which is ignored when a usable
+     * cursor is present. Page numbers are computed against whatever ranked
+     * order exists at request time, so a feed that is being written to shifts
+     * underneath them.
      */
     page?: number;
+
+    /**
+     * An opaque cursor from a previous response's `nextCursor`.
+     *
+     * Pins the request to the ranked order the reader started on. A cursor
+     * that no longer resolves is not an error: the feed rebuilds and serves
+     * the same depth in the new order.
+     */
+    cursor?: string;
 
     /**
      * The number of posts to retrieve per page.

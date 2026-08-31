@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GetPostsUseCase } from "@core/use-cases/post/get-posts";
 import type { FeedRankingWeights } from "@core/use-cases/post/get-posts/feed-ranking";
+import {
+    decodeFeedCursor,
+    encodeFeedCursor,
+} from "@core/use-cases/post/get-posts/feed-cursor";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
+import type { CryptoPort } from "@core/ports/services/crypto.port";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { FeedCandidate } from "@core/domain/interfaces/feed-candidate.interface";
 import { UnauthorizedError } from "@core/errors";
@@ -21,6 +26,46 @@ const WEIGHTS: FeedRankingWeights = {
 
 const POOL_SIZE = 300;
 const WINDOW_DAYS = 7;
+
+/**
+ * A cache that actually stores things.
+ *
+ * The feed keeps two entries that expire for different reasons - a pointer to
+ * the current order and the snapshot it addresses - and asserting on that
+ * relationship through a bare `vi.fn()` would mean re-implementing it in every
+ * test. This models it once, and exposes the key space so a test can expire
+ * exactly one of the two.
+ */
+class FakeCache implements Pick<CachePort, "get" | "set"> {
+    readonly entries = new Map<string, string>();
+
+    get(key: string): Promise<string | null> {
+        return Promise.resolve(this.entries.get(key) ?? null);
+    }
+
+    set(key: string, value: string): Promise<void> {
+        this.entries.set(key, value);
+        return Promise.resolve();
+    }
+
+    /** Mimics the purge that publishing a post performs. */
+    expirePointers(): void {
+        for (const key of this.entries.keys()) {
+            if (key.startsWith("posts:feed:")) this.entries.delete(key);
+        }
+    }
+
+    /** Mimics a scroll snapshot aging out while a reader is still paging. */
+    expireSnapshots(): void {
+        for (const key of this.entries.keys()) {
+            if (key.startsWith("feed:scroll:")) this.entries.delete(key);
+        }
+    }
+
+    keysMatching(prefix: string): string[] {
+        return [...this.entries.keys()].filter((key) => key.startsWith(prefix));
+    }
+}
 
 /**
  * Builds a candidate with sane defaults, so each test states only what it is
@@ -45,32 +90,61 @@ describe("GetPostsUseCase", () => {
         IPostRepository,
         "findAll" | "findFeedCandidates" | "findByIds" | "countAll"
     >;
-    let cacheService: Pick<CachePort, "get" | "set">;
+    let cacheService: FakeCache;
     let followUserRepository: Pick<IFollowRepository, "getFollowingIds">;
     let profileRepository: Pick<IProfileRepository, "findLanguagesByUserId">;
+    let cryptoService: Pick<CryptoPort, "generateRandomHex">;
+    let tokenSequence: number;
+
+    /** Hydrates whatever ids were asked for, so ordering assertions are real. */
+    const hydrateRequestedIds = (): void => {
+        vi.mocked(postRepository.findByIds).mockImplementation((ids) =>
+            Promise.resolve(ids.map((id) => buildPost({ id }))),
+        );
+    };
+
+    /** Seeds a ranked pool of `count` posts, each by a different author. */
+    const seedPool = (count: number): string[] => {
+        const ids = Array.from({ length: count }, (_, i) => `p${i + 1}`);
+        vi.mocked(postRepository.findFeedCandidates).mockResolvedValue(
+            ids.map((id, i) =>
+                buildCandidate({
+                    id,
+                    authorId: `a${i + 1}`,
+                    // Descending age, so the ranked order matches the seeded
+                    // order and a test can assert on ids rather than on scores.
+                    createdAt: new Date(Date.now() - i * 60 * 1000),
+                }),
+            ),
+        );
+        vi.mocked(postRepository.countAll).mockResolvedValue(count);
+        return ids;
+    };
 
     beforeEach(() => {
+        tokenSequence = 0;
         postRepository = {
             findAll: vi.fn().mockResolvedValue({ posts: [], total: 0 }),
             findFeedCandidates: vi.fn().mockResolvedValue([]),
             findByIds: vi.fn().mockResolvedValue([]),
             countAll: vi.fn().mockResolvedValue(0),
         };
-        cacheService = {
-            get: vi.fn().mockResolvedValue(null),
-            set: vi.fn().mockResolvedValue(undefined),
-        };
+        cacheService = new FakeCache();
         followUserRepository = {
             getFollowingIds: vi.fn().mockResolvedValue([]),
         };
         profileRepository = {
             findLanguagesByUserId: vi.fn().mockResolvedValue([]),
         };
+        cryptoService = {
+            generateRandomHex: vi.fn(() => `token-${++tokenSequence}`),
+        };
         useCase = new GetPostsUseCase(
             postRepository as IPostRepository,
-            cacheService as CachePort,
+            cacheService as unknown as CachePort,
             followUserRepository as IFollowRepository,
             profileRepository as IProfileRepository,
+            cryptoService as CryptoPort,
             WEIGHTS,
             POOL_SIZE,
             WINDOW_DAYS,
@@ -85,15 +159,7 @@ describe("GetPostsUseCase", () => {
 
     describe("ranked page", () => {
         it("should serve the page in ranked order, not the order the rows came back in", async () => {
-            const candidates = [
-                buildCandidate({ id: "p1", authorId: "a1" }),
-                buildCandidate({ id: "p2", authorId: "a2" }),
-                buildCandidate({ id: "p3", authorId: "a3" }),
-            ];
-            vi.mocked(postRepository.findFeedCandidates).mockResolvedValue(
-                candidates,
-            );
-            vi.mocked(postRepository.countAll).mockResolvedValue(3);
+            seedPool(3);
             // Deliberately shuffled: Postgres gives no order for an IN lookup.
             vi.mocked(postRepository.findByIds).mockResolvedValue([
                 buildPost({ id: "p3" }),
@@ -101,83 +167,194 @@ describe("GetPostsUseCase", () => {
                 buildPost({ id: "p2" }),
             ]);
 
-            const result = await useCase.execute({ page: 1, limit: 10 });
+            const result = await useCase.execute({ limit: 10 });
 
-            const served = result.posts.map((post) => post.id);
             const requested = vi.mocked(postRepository.findByIds).mock
                 .calls[0][0];
-            expect(served).toEqual(requested);
+            expect(result.posts.map((post) => post.id)).toEqual(requested);
             expect(result.total).toBe(3);
         });
 
-        it("should page through the ranked order without repeating a post", async () => {
-            const ids = ["p1", "p2", "p3", "p4"];
-            const ranked = JSON.stringify({ ids, total: 4 });
-            vi.mocked(cacheService.get).mockResolvedValue(ranked);
-            vi.mocked(postRepository.findByIds).mockImplementation((wanted) =>
-                Promise.resolve(wanted.map((id) => buildPost({ id }))),
-            );
-
-            const first = await useCase.execute({ page: 1, limit: 2 });
-            const second = await useCase.execute({ page: 2, limit: 2 });
-
-            expect(first.posts.map((p) => p.id)).toEqual(["p1", "p2"]);
-            expect(second.posts.map((p) => p.id)).toEqual(["p3", "p4"]);
-        });
-
         it("should drop an id that no longer resolves instead of leaving a hole", async () => {
-            vi.mocked(cacheService.get).mockResolvedValue(
-                JSON.stringify({ ids: ["p1", "p2"], total: 2 }),
-            );
+            seedPool(2);
             vi.mocked(postRepository.findByIds).mockResolvedValue([
                 buildPost({ id: "p2" }),
             ]);
 
-            const result = await useCase.execute({ page: 1, limit: 10 });
+            const result = await useCase.execute({ limit: 10 });
 
             expect(result.posts.map((p) => p.id)).toEqual(["p2"]);
         });
 
-        it("should reuse the cached order rather than rebuilding it", async () => {
-            vi.mocked(cacheService.get).mockResolvedValue(
-                JSON.stringify({ ids: ["p1"], total: 1 }),
-            );
+        it("should advance the cursor past a deleted post rather than serving the gap again", async () => {
+            seedPool(4);
+            vi.mocked(postRepository.findByIds).mockResolvedValue([
+                buildPost({ id: "p1" }),
+            ]);
 
-            await useCase.execute({ page: 1, limit: 10 });
+            const result = await useCase.execute({ limit: 2 });
 
-            expect(postRepository.findFeedCandidates).not.toHaveBeenCalled();
-            expect(cacheService.set).not.toHaveBeenCalled();
+            // Two ids were consumed even though one no longer resolves.
+            // Advancing by the post count would re-serve the gap forever.
+            expect(decodeFeedCursor(result.nextCursor!)?.offset).toBe(2);
         });
 
-        it("should cache the ids and the total, never the posts themselves", async () => {
+        it("should hydrate the page fresh rather than caching whole posts", async () => {
             // Caching hydrated posts would freeze the viewer's own isLiked and
             // isBookmarked for the life of the entry.
-            vi.mocked(postRepository.findFeedCandidates).mockResolvedValue([
-                buildCandidate({ id: "p1" }),
-            ]);
-            vi.mocked(postRepository.countAll).mockResolvedValue(1);
+            seedPool(1);
+            hydrateRequestedIds();
 
-            await useCase.execute({ page: 1, limit: 10 });
+            await useCase.execute({ limit: 10 });
 
-            const [, payload] = vi.mocked(cacheService.set).mock.calls[0];
-            expect(JSON.parse(payload)).toEqual({ ids: ["p1"], total: 1 });
-        });
-
-        it("should keep the cache key under the posts:feed: prefix that post creation purges", async () => {
-            await useCase.execute({ page: 1, limit: 10 });
-
-            expect(cacheService.get).toHaveBeenCalledWith(
-                expect.stringContaining("posts:feed:"),
-            );
+            const [snapshotKey] = cacheService.keysMatching("feed:scroll:");
+            expect(JSON.parse(cacheService.entries.get(snapshotKey)!)).toEqual({
+                ids: ["p1"],
+                total: 1,
+            });
         });
 
         it("should not share a ranked order between viewers reading different languages", async () => {
-            await useCase.execute({ page: 1, limit: 10, acceptLanguage: "tr" });
-            await useCase.execute({ page: 1, limit: 10, acceptLanguage: "en" });
+            await useCase.execute({ limit: 10, acceptLanguage: "tr" });
+            await useCase.execute({ limit: 10, acceptLanguage: "en" });
 
-            const [[turkishKey], [englishKey]] = vi.mocked(cacheService.get)
-                .mock.calls;
-            expect(turkishKey).not.toBe(englishKey);
+            expect(cacheService.keysMatching("posts:feed:ranked")).toHaveLength(
+                2,
+            );
+        });
+    });
+
+    describe("cursor paging", () => {
+        it("should walk the feed without repeating or skipping a post", async () => {
+            const ids = seedPool(6);
+            hydrateRequestedIds();
+
+            const seen: string[] = [];
+            let cursor: string | undefined;
+
+            for (let page = 0; page < 3; page++) {
+                const result = await useCase.execute({ limit: 2, cursor });
+                seen.push(...result.posts.map((post) => post.id));
+                cursor = result.nextCursor ?? undefined;
+            }
+
+            expect(seen).toEqual(ids);
+        });
+
+        it("should keep a reader on their order when a new post rebuilds the feed", async () => {
+            // The failure page numbers cannot avoid: publishing invalidates the
+            // ranked order, and the reader's next page would be computed
+            // against an order they never saw the previous page of.
+            seedPool(4);
+            hydrateRequestedIds();
+
+            const first = await useCase.execute({ limit: 2 });
+
+            cacheService.expirePointers();
+            vi.mocked(postRepository.findFeedCandidates).mockResolvedValue([
+                buildCandidate({ id: "brand-new", authorId: "a9" }),
+            ]);
+
+            const second = await useCase.execute({
+                limit: 2,
+                cursor: first.nextCursor!,
+            });
+
+            expect(second.posts.map((p) => p.id)).toEqual(["p3", "p4"]);
+            expect(second.posts.map((p) => p.id)).not.toContain("brand-new");
+        });
+
+        it("should reuse the snapshot rather than re-ranking on every page", async () => {
+            seedPool(6);
+            hydrateRequestedIds();
+
+            const first = await useCase.execute({ limit: 2 });
+            vi.mocked(postRepository.findFeedCandidates).mockClear();
+
+            await useCase.execute({ limit: 2, cursor: first.nextCursor! });
+
+            expect(postRepository.findFeedCandidates).not.toHaveBeenCalled();
+        });
+
+        it("should rebuild at the same depth when the snapshot has lapsed", async () => {
+            seedPool(6);
+            hydrateRequestedIds();
+
+            const first = await useCase.execute({ limit: 2 });
+            cacheService.expireSnapshots();
+            cacheService.expirePointers();
+
+            const second = await useCase.execute({
+                limit: 2,
+                cursor: first.nextCursor!,
+            });
+
+            // Serving a rebuilt order from the same depth beats failing the
+            // request over an expired cache entry.
+            expect(second.posts.map((p) => p.id)).toEqual(["p3", "p4"]);
+            expect(postRepository.findFeedCandidates).toHaveBeenCalledTimes(2);
+        });
+
+        it("should start from the top when the cursor is malformed", async () => {
+            seedPool(4);
+            hydrateRequestedIds();
+
+            const result = await useCase.execute({
+                limit: 2,
+                cursor: "not-a-real-cursor",
+            });
+
+            expect(result.posts.map((p) => p.id)).toEqual(["p1", "p2"]);
+        });
+
+        it("should ignore a page number once a cursor is given", async () => {
+            seedPool(6);
+            hydrateRequestedIds();
+
+            const first = await useCase.execute({ limit: 2 });
+            const second = await useCase.execute({
+                page: 5,
+                limit: 2,
+                cursor: first.nextCursor!,
+            });
+
+            expect(second.posts.map((p) => p.id)).toEqual(["p3", "p4"]);
+        });
+
+        it("should not hand out a cursor once the feed is exhausted", async () => {
+            seedPool(2);
+            hydrateRequestedIds();
+
+            const first = await useCase.execute({ limit: 2 });
+            const second = await useCase.execute({
+                limit: 2,
+                cursor: first.nextCursor!,
+            });
+
+            expect(second.posts).toEqual([]);
+            expect(second.nextCursor).toBeNull();
+        });
+    });
+
+    describe("page numbers, for clients that have not moved over", () => {
+        it("should still serve a page number", async () => {
+            seedPool(6);
+            hydrateRequestedIds();
+
+            const result = await useCase.execute({ page: 2, limit: 2 });
+
+            expect(result.posts.map((p) => p.id)).toEqual(["p3", "p4"]);
+        });
+
+        it("should hand back a cursor so a client can move over mid-scroll", async () => {
+            seedPool(6);
+            hydrateRequestedIds();
+
+            const result = await useCase.execute({ page: 1, limit: 2 });
+
+            expect(decodeFeedCursor(result.nextCursor!)).toMatchObject({
+                offset: 2,
+            });
         });
     });
 
@@ -190,9 +367,9 @@ describe("GetPostsUseCase", () => {
                 buildCandidate({ id: "tr-post", lang: "tr", authorId: "a1" }),
                 buildCandidate({ id: "en-post", lang: "en", authorId: "a2" }),
             ]);
+            hydrateRequestedIds();
 
-            await useCase.execute({
-                page: 1,
+            const result = await useCase.execute({
                 limit: 10,
                 currentUserId: "user-1",
                 // The stored preference has to beat the header, or changing the
@@ -200,13 +377,7 @@ describe("GetPostsUseCase", () => {
                 acceptLanguage: "tr-TR,tr;q=0.9",
             });
 
-            const [payload] = vi.mocked(cacheService.set).mock.calls.map(
-                ([, value]) =>
-                    JSON.parse(value) as {
-                        ids: string[];
-                    },
-            );
-            expect(payload.ids[0]).toBe("en-post");
+            expect(result.posts[0].id).toBe("en-post");
         });
 
         it("should fall back to Accept-Language when the user never chose", async () => {
@@ -214,18 +385,15 @@ describe("GetPostsUseCase", () => {
                 buildCandidate({ id: "tr-post", lang: "tr", authorId: "a1" }),
                 buildCandidate({ id: "en-post", lang: "en", authorId: "a2" }),
             ]);
+            hydrateRequestedIds();
 
-            await useCase.execute({
-                page: 1,
+            const result = await useCase.execute({
                 limit: 10,
                 currentUserId: "user-1",
                 acceptLanguage: "en-GB,en;q=0.9",
             });
 
-            const [, payload] = vi.mocked(cacheService.set).mock.calls[0];
-            expect((JSON.parse(payload) as { ids: string[] }).ids[0]).toBe(
-                "en-post",
-            );
+            expect(result.posts[0].id).toBe("en-post");
         });
 
         it("should default a visitor with no header to Turkish", async () => {
@@ -233,13 +401,11 @@ describe("GetPostsUseCase", () => {
                 buildCandidate({ id: "en-post", lang: "en", authorId: "a1" }),
                 buildCandidate({ id: "tr-post", lang: "tr", authorId: "a2" }),
             ]);
+            hydrateRequestedIds();
 
-            await useCase.execute({ page: 1, limit: 10 });
+            const result = await useCase.execute({ limit: 10 });
 
-            const [, payload] = vi.mocked(cacheService.set).mock.calls[0];
-            expect((JSON.parse(payload) as { ids: string[] }).ids[0]).toBe(
-                "tr-post",
-            );
+            expect(result.posts[0].id).toBe("tr-post");
         });
     });
 
@@ -247,7 +413,7 @@ describe("GetPostsUseCase", () => {
         it("should draw candidates from the configured window and cap", async () => {
             const before = Date.now();
 
-            await useCase.execute({ page: 1, limit: 10 });
+            await useCase.execute({ limit: 10 });
 
             const [params] = vi.mocked(postRepository.findFeedCandidates).mock
                 .calls[0];
@@ -299,36 +465,46 @@ describe("GetPostsUseCase", () => {
 
     describe("beyond the ranked window", () => {
         it("should continue chronologically, excluding everything already ranked", async () => {
-            vi.mocked(cacheService.get).mockResolvedValue(
-                JSON.stringify({ ids: ["p1", "p2"], total: 50 }),
-            );
+            seedPool(2);
+            hydrateRequestedIds();
             const tail = [buildPost({ id: "p3" })];
             vi.mocked(postRepository.findAll).mockResolvedValue({
                 posts: tail,
                 total: 50,
             });
 
-            const result = await useCase.execute({ page: 2, limit: 2 });
+            const first = await useCase.execute({ limit: 2 });
+            const second = await useCase.execute({
+                limit: 2,
+                cursor: first.nextCursor!,
+            });
 
             const [params] = vi.mocked(postRepository.findAll).mock.calls[0];
-            // Page 2 at limit 2 starts at offset 2, exactly where the two
-            // ranked posts ran out, so the tail starts at its own first row.
             expect(params.skip).toBe(0);
             expect(params.excludeIds).toEqual(["p1", "p2"]);
-            expect(result.posts).toEqual(tail);
-            expect(result.total).toBe(50);
+            expect(second.posts).toEqual(tail);
         });
 
-        it("should offset the tail by how far past the ranked head the page starts", async () => {
-            vi.mocked(cacheService.get).mockResolvedValue(
-                JSON.stringify({ ids: ["p1", "p2"], total: 50 }),
-            );
+        it("should keep counting in the same coordinates as the ranked head", async () => {
+            // A cursor that reset to the start of the tail would serve the
+            // tail's first page over and over.
+            seedPool(2);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: [buildPost({ id: "t1" }), buildPost({ id: "t2" })],
+                total: 50,
+            });
 
-            await useCase.execute({ page: 3, limit: 5 });
+            const first = await useCase.execute({ limit: 2 });
+            const second = await useCase.execute({
+                limit: 2,
+                cursor: first.nextCursor!,
+            });
+            await useCase.execute({ limit: 2, cursor: second.nextCursor! });
 
             expect(
-                vi.mocked(postRepository.findAll).mock.calls[0][0].skip,
-            ).toBe(8);
+                vi.mocked(postRepository.findAll).mock.calls[1][0].skip,
+            ).toBe(2);
         });
     });
 
@@ -347,15 +523,32 @@ describe("GetPostsUseCase", () => {
             });
 
             expect(result.posts).toEqual(posts);
+            expect(result.nextCursor).toBeNull();
             expect(postRepository.findFeedCandidates).not.toHaveBeenCalled();
-            expect(cacheService.get).not.toHaveBeenCalled();
+        });
+
+        it("should ignore a cursor aimed at a chronological feed", async () => {
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: [],
+                total: 0,
+            });
+
+            await useCase.execute({
+                limit: 10,
+                type: PostType.SYSTEM_UPDATE,
+                cursor: encodeFeedCursor({ token: "stale", offset: 40 }),
+            });
+
+            expect(
+                vi.mocked(postRepository.findAll).mock.calls[0][0].skip,
+            ).toBeUndefined();
         });
 
         it("should still rank news and job postings", async () => {
             for (const type of [PostType.TECH_NEWS, PostType.JOB_POSTING]) {
                 vi.mocked(postRepository.findFeedCandidates).mockClear();
 
-                await useCase.execute({ page: 1, limit: 10, type });
+                await useCase.execute({ limit: 10, type });
 
                 expect(postRepository.findFeedCandidates).toHaveBeenCalled();
             }

@@ -8,7 +8,22 @@ import { PostCategory } from "@core/domain/enums/post-category-enum";
 import { PostItemSchema } from "./get-post.schema";
 
 export const getPostsQuerySchema = Type.Object({
-    page: Type.Optional(Type.Number({ default: 1, minimum: 1 })),
+    page: Type.Optional(
+        Type.Number({
+            default: 1,
+            minimum: 1,
+            deprecated: true,
+            description:
+                "Deprecated: use `cursor`. Page numbers are computed against whatever ranked order exists at request time, so a feed being written to shifts underneath them.",
+        }),
+    ),
+    cursor: Type.Optional(
+        Type.String({
+            maxLength: 512,
+            description:
+                "Opaque cursor from a previous response's `meta.nextCursor`. Takes precedence over `page`. A cursor that has expired is not an error - the feed rebuilds and serves the same depth.",
+        }),
+    ),
     limit: Type.Optional(
         Type.Number({
             default: 10,
@@ -37,6 +52,10 @@ export const GetFeedResponseSchema = FBType.Object({
         currentPage: FBType.Number(),
         limit: FBType.Number(),
         totalPages: FBType.Number(),
+        // Null once the feed is exhausted, and on the chronological feeds that
+        // have no ranked order to pin a reader to.
+        nextCursor: FBType.Union([FBType.String(), FBType.Null()]),
+        hasMore: FBType.Boolean(),
     }),
 });
 export type GetFeedResponse = FBStatic<typeof GetFeedResponseSchema>;

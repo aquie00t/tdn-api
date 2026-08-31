@@ -91,6 +91,8 @@ describe("GET /posts - Get Post Feed", () => {
                 currentPage: number;
                 limit: number;
                 totalPages: number;
+                nextCursor: string | null;
+                hasMore: boolean;
             };
         }>(response);
 
@@ -101,6 +103,7 @@ describe("GET /posts - Get Post Feed", () => {
             currentPage: 1,
             limit: 10,
             totalPages: expect.any(Number),
+            hasMore: expect.any(Boolean),
         });
     });
 
@@ -180,6 +183,55 @@ describe("GET /posts - Get Post Feed", () => {
 
         expect(response.statusCode).toBe(200);
         expect(body.data.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should walk the whole feed by cursor without repeating a post", async () => {
+        // The reason cursors exist here: page numbers are recomputed against
+        // whatever ranked order is current, and this feed is written to
+        // constantly.
+        type FeedBody = {
+            data: { id: string }[];
+            meta: { nextCursor: string | null; hasMore: boolean };
+        };
+
+        const seen: string[] = [];
+        let cursor: string | null = null;
+
+        for (let page = 0; page < 5; page++) {
+            const url: string =
+                cursor === null
+                    ? "/posts?limit=2"
+                    : `/posts?limit=2&cursor=${encodeURIComponent(cursor)}`;
+
+            const response = await authRequest(accessToken, {
+                method: "GET",
+                url,
+            });
+            expect(response.statusCode).toBe(200);
+
+            const body = parseBody<FeedBody>(response);
+            seen.push(...body.data.map((post) => post.id));
+
+            if (!body.meta.hasMore) break;
+            cursor = body.meta.nextCursor;
+        }
+
+        expect(seen.length).toBeGreaterThan(0);
+        expect(new Set(seen).size).toBe(seen.length);
+    });
+
+    it("should serve the first page when handed a cursor it cannot read", async () => {
+        // A truncated or stale cursor should not fail a feed request; the
+        // reader gets the top of the feed, which is what they wanted anyway.
+        const response = await authRequest(accessToken, {
+            method: "GET",
+            url: "/posts?limit=2&cursor=obviously-not-a-cursor",
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(
+            parseBody<{ data: unknown[] }>(response).data.length,
+        ).toBeGreaterThan(0);
     });
 
     it("should carry the quote card through the feed, cached or not", async () => {

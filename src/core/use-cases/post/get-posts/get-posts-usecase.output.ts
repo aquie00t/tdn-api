@@ -16,4 +16,12 @@ export interface GetPostsOutput {
      * Total number of posts matching the query criteria.
      */
     total: number;
+
+    /**
+     * The cursor that continues from where this page ended.
+     *
+     * Null when the feed has no more to give, and on feeds that are served
+     * chronologically and therefore have nothing to pin.
+     */
+    nextCursor: string | null;
 }

@@ -2,6 +2,7 @@ import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
+import type { CryptoPort } from "@core/ports/services/crypto.port";
 import type { GetPostsInput } from "./get-posts-usecase.input";
 import type { GetPostsOutput } from "./get-posts-usecase.output";
 import type { Post } from "@core/domain/entities/post.entity";
@@ -13,29 +14,58 @@ import {
     parseLanguagePreferenceHeader,
 } from "@core/domain/constants/language.constants";
 import { rankFeed, type FeedRankingWeights } from "./feed-ranking";
+import { decodeFeedCursor, encodeFeedCursor } from "./feed-cursor";
 
 /**
- * How long a viewer's ranked order is reused before it is rebuilt.
+ * How long the pointer to a viewer's current ranked order lives.
  *
- * Short enough that a new post reaches the feed quickly, long enough that
- * paging through a feed does not re-rank underneath the reader - which is the
- * failure the previous per-page shuffle had, where the same post could appear
- * on two pages and another on none.
+ * This is the "what should a fresh visit see" entry, so it is short: a new
+ * post should reach the top of the feed quickly. Readers already scrolling are
+ * unaffected by it expiring - they hold a cursor into a snapshot, which has
+ * its own lifetime.
  */
-const RANKED_FEED_TTL_SECONDS = 5 * 60;
+const RANKED_POINTER_TTL_SECONDS = 5 * 60;
 
 /**
- * Bumped whenever the cached shape changes, so entries written by the previous
+ * How long a reader may keep scrolling one snapshot of the ranked order.
+ *
+ * Generous compared with the pointer, because this is the window in which
+ * paging stays coherent. A reader who comes back after it lapses is served a
+ * freshly built order from the same depth, which is the right outcome anyway -
+ * an hour-old ranking is not worth preserving.
+ */
+const SCROLL_SNAPSHOT_TTL_SECONDS = 30 * 60;
+
+/**
+ * Bumped whenever a cached shape changes, so entries written by the previous
  * deploy are ignored rather than misread.
  */
-const RANKED_FEED_CACHE_VERSION = "v1";
+const FEED_CACHE_VERSION = "v2";
 
 /**
- * The ranked order and the size of the result set it was built from.
+ * Bytes of randomness behind a scroll token.
+ *
+ * A token addresses one reader's snapshot, so it has to be unguessable rather
+ * than merely unique: the ids in a `followedOnly` snapshot say something about
+ * who that reader follows.
  */
-interface CachedRankedFeed {
+const SCROLL_TOKEN_BYTES = 16;
+
+/**
+ * One snapshot of the ranked order, as it is cached.
+ */
+interface RankedSnapshot {
     ids: string[];
     total: number;
+}
+
+/**
+ * Where in a snapshot a request starts, and under which token.
+ */
+interface ScrollPosition {
+    snapshot: RankedSnapshot;
+    token: string;
+    offset: number;
 }
 
 /**
@@ -44,16 +74,17 @@ interface CachedRankedFeed {
  * Builds a ranked feed rather than a chronological one: the candidate pool for
  * the viewer's filters is scored by {@link rankFeed} - language first, then
  * who they follow, engagement and freshness - and the resulting order is
- * cached per viewer so that paging through it stays stable.
+ * snapshotted so a reader can page through it while the world keeps writing.
  */
 export class GetPostsUseCase {
     /**
      * Creates a new instance of GetPostsUseCase.
      *
      * @param postRepository - Repository for reading posts and feed candidates
-     * @param cacheService - Cache holding each viewer's ranked order
+     * @param cacheService - Cache holding ranked orders and scroll snapshots
      * @param followUserRepository - Repository used to resolve who the viewer follows
      * @param profileRepository - Repository used to read the viewer's feed languages
+     * @param cryptoService - Source of the random tokens that address snapshots
      * @param feedRankingWeights - Tuning weights for the ranker
      * @param feedCandidatePoolSize - Hard cap on the candidate pool
      * @param feedCandidateWindowDays - How far back candidates may be drawn from
@@ -63,6 +94,7 @@ export class GetPostsUseCase {
         private readonly cacheService: CachePort,
         private readonly followUserRepository: IFollowRepository,
         private readonly profileRepository: IProfileRepository,
+        private readonly cryptoService: CryptoPort,
         private readonly feedRankingWeights: FeedRankingWeights,
         private readonly feedCandidatePoolSize: number,
         private readonly feedCandidateWindowDays: number,
@@ -71,25 +103,34 @@ export class GetPostsUseCase {
     /**
      * Retrieves one page of the feed.
      *
-     * @param input - Pagination, filters, the viewer and their Accept-Language
-     * @returns The page of posts and the total number matching the filters
+     * @param input - Pagination or cursor, filters, the viewer and their Accept-Language
+     * @returns The page of posts, the total matching the filters, and the
+     * cursor that continues from where this page ended
      *
      * @throws UnauthorizedError - When followedOnly is used without a viewer
      *
      * @remarks
-     * The ranked order is built once per viewer and reused for
-     * {@link RANKED_FEED_TTL_SECONDS}; only the ids are cached, and the page
-     * itself is loaded fresh every time. That is deliberate: caching whole
-     * posts would freeze the viewer's own like and bookmark state for the life
-     * of the entry, and reading ten rows by primary key is cheap next to
-     * getting that wrong.
+     * Paging is by cursor. A cursor pins the reader to one snapshot of the
+     * ranked order and records how deep into it they are, which is the only
+     * way paging can stay coherent here: publishing a post invalidates the
+     * ranked order, and on a network with a hundred-odd news bots that happens
+     * constantly. Under page numbers the reader's page 3 would be computed
+     * against an order they never saw page 2 of.
+     *
+     * Page numbers still work, for clients that have not moved over. They
+     * behave as before - each request re-derives the order - so they carry the
+     * shifting they always did; the response hands back a cursor either way.
+     *
+     * Only ids are cached; the page itself is hydrated fresh on every request.
+     * Caching whole posts would freeze the viewer's own like and bookmark
+     * state for the life of the entry, and reading ten rows by primary key is
+     * cheap next to getting that wrong.
      *
      * Ranking covers a bounded window of recent posts. Paging past it falls
      * through to the chronological tail, which excludes everything the ranked
      * head already served so that no post is shown twice or skipped.
      */
     async execute(input: GetPostsInput): Promise<GetPostsOutput> {
-        const page = input.page || 1;
         const limit = input.limit || 10;
         const followedOnly = input.followedOnly ?? false;
 
@@ -100,39 +141,213 @@ export class GetPostsUseCase {
         }
 
         if (!this.isRankable(input.type)) {
-            return this.chronologicalPage(input, page, limit);
+            return this.chronologicalPage(input, input.page || 1, limit);
         }
 
+        const { snapshot, token, offset } = await this.resolveScrollPosition(
+            input,
+            limit,
+            followedOnly,
+        );
+
+        if (offset >= snapshot.ids.length) {
+            return this.chronologicalTail(
+                input,
+                offset - snapshot.ids.length,
+                limit,
+                snapshot,
+                token,
+                offset,
+            );
+        }
+
+        const pageIds = snapshot.ids.slice(offset, offset + limit);
+        const posts = await this.postRepository.findByIds(
+            pageIds,
+            input.currentUserId,
+        );
+
+        return {
+            posts: this.reorder(posts, pageIds),
+            total: snapshot.total,
+            // Counted in ids consumed, not posts returned: a post deleted
+            // between ranking and hydration shortens the page, and advancing
+            // by the shorter count would serve that gap again forever.
+            nextCursor: encodeFeedCursor({
+                token,
+                offset: offset + pageIds.length,
+            }),
+        };
+    }
+
+    /**
+     * Works out which snapshot this request reads and where in it to start.
+     *
+     * A cursor is followed when it still resolves. When it does not - the
+     * snapshot lapsed, or the cursor was malformed - the order is rebuilt and
+     * the reader is placed at the same depth in the new one under a fresh
+     * token. That trades a little duplication at the seam for continuing to
+     * serve a feed, which beats failing the request over an expired cache
+     * entry.
+     *
+     * @param input - The feed request.
+     * @param limit - Page size, used to translate a page number into a depth.
+     * @param followedOnly - Whether the pool is restricted to followed accounts.
+     * @returns The snapshot, its token, and the offset to read from.
+     */
+    private async resolveScrollPosition(
+        input: GetPostsInput,
+        limit: number,
+        followedOnly: boolean,
+    ): Promise<ScrollPosition> {
+        const cursor = input.cursor ? decodeFeedCursor(input.cursor) : null;
+
+        if (cursor) {
+            const snapshot = await this.readSnapshot(cursor.token);
+            if (snapshot) {
+                return { snapshot, token: cursor.token, offset: cursor.offset };
+            }
+        }
+
+        // Without a usable cursor the request starts a scroll, so it reads the
+        // current order rather than a pinned one. A stale cursor keeps its
+        // depth; a page number is translated into one.
+        const { snapshot, token } = await this.currentRankedOrder(
+            input,
+            followedOnly,
+        );
+
+        return {
+            snapshot,
+            token,
+            offset: cursor ? cursor.offset : ((input.page || 1) - 1) * limit,
+        };
+    }
+
+    /**
+     * Returns the order a fresh visit should see, building it when cold.
+     *
+     * The order itself is stored under a random token and the per-viewer key
+     * holds only that token. Two levels, because they expire for different
+     * reasons: the pointer is invalidated whenever someone publishes, so fresh
+     * visits pick up new posts, while the snapshot it pointed at stays
+     * readable for everyone still scrolling it.
+     *
+     * @param input - The feed request.
+     * @param followedOnly - Whether the pool is restricted to followed accounts.
+     * @returns The snapshot and the token addressing it.
+     */
+    private async currentRankedOrder(
+        input: GetPostsInput,
+        followedOnly: boolean,
+    ): Promise<{ snapshot: RankedSnapshot; token: string }> {
         const languages = await this.resolveViewerLanguages(input);
+        const pointerKey = this.rankedPointerKey(
+            input,
+            languages,
+            followedOnly,
+        );
+
+        const pointer = await this.cacheService.get(pointerKey);
+        if (pointer) {
+            const snapshot = await this.readSnapshot(pointer);
+            if (snapshot) return { snapshot, token: pointer };
+        }
+
+        const snapshot = await this.buildRankedOrder(
+            input,
+            languages,
+            followedOnly,
+        );
+        const token = this.cryptoService.generateRandomHex(SCROLL_TOKEN_BYTES);
+
+        await this.cacheService.set(
+            this.snapshotKey(token),
+            JSON.stringify(snapshot),
+            SCROLL_SNAPSHOT_TTL_SECONDS,
+        );
+        await this.cacheService.set(
+            pointerKey,
+            token,
+            RANKED_POINTER_TTL_SECONDS,
+        );
+
+        return { snapshot, token };
+    }
+
+    /**
+     * Reads a snapshot back, treating anything unreadable as absent.
+     *
+     * @param token - The token addressing the snapshot.
+     * @returns The snapshot, or null when it has lapsed or cannot be parsed.
+     */
+    private async readSnapshot(token: string): Promise<RankedSnapshot | null> {
+        const raw = await this.cacheService.get(this.snapshotKey(token));
+        if (!raw) return null;
+
+        try {
+            return JSON.parse(raw) as RankedSnapshot;
+        } catch {
+            // An entry written by an older encoding is worth no more than a
+            // missing one, and is not worth failing the feed over.
+            return null;
+        }
+    }
+
+    /**
+     * Scores the candidate pool into one ranked order.
+     *
+     * @param input - The feed request.
+     * @param languages - The viewer's languages.
+     * @param followedOnly - Whether the pool is restricted to followed accounts.
+     * @returns The ranked ids and the total matching the filters.
+     */
+    private async buildRankedOrder(
+        input: GetPostsInput,
+        languages: string[],
+        followedOnly: boolean,
+    ): Promise<RankedSnapshot> {
         const followingIds = input.currentUserId
             ? await this.followUserRepository.getFollowingIds(
                   input.currentUserId,
               )
             : [];
 
-        const { ids, total } = await this.rankedFeed(
-            input,
-            languages,
-            followingIds,
-            followedOnly,
+        const since = new Date(
+            Date.now() - this.feedCandidateWindowDays * 24 * 60 * 60 * 1000,
         );
 
-        const offset = (page - 1) * limit;
+        const scopedFollowingIds =
+            followedOnly && input.currentUserId ? followingIds : undefined;
 
-        if (offset >= ids.length) {
-            return this.chronologicalTail(input, offset - ids.length, limit, {
-                ids,
-                total,
-            });
-        }
+        const [candidates, total] = await Promise.all([
+            this.postRepository.findFeedCandidates({
+                type: input.type,
+                tag: input.tag,
+                categories: input.categories,
+                followingIds: scopedFollowingIds,
+                since,
+                limit: this.feedCandidatePoolSize,
+            }),
+            this.postRepository.countAll({
+                type: input.type,
+                tag: input.tag,
+                categories: input.categories,
+                followingIds: scopedFollowingIds,
+            }),
+        ]);
 
-        const pageIds = ids.slice(offset, offset + limit);
-        const posts = await this.postRepository.findByIds(
-            pageIds,
-            input.currentUserId,
+        const ranked = rankFeed(
+            candidates,
+            {
+                languages,
+                followingIds: new Set(followingIds),
+                now: new Date(),
+            },
+            this.feedRankingWeights,
         );
 
-        return { posts: this.reorder(posts, pageIds), total };
+        return { ids: ranked.map((candidate) => candidate.id), total };
     }
 
     /**
@@ -184,96 +399,21 @@ export class GetPostsUseCase {
     }
 
     /**
-     * Returns the viewer's ranked order, building it when the cache is cold.
-     *
-     * @param input - The feed request.
-     * @param languages - The viewer's languages.
-     * @param followingIds - The accounts the viewer follows.
-     * @param followedOnly - Whether the pool is restricted to those accounts.
-     * @returns The ranked post ids and the total matching the filters.
-     */
-    private async rankedFeed(
-        input: GetPostsInput,
-        languages: string[],
-        followingIds: string[],
-        followedOnly: boolean,
-    ): Promise<CachedRankedFeed> {
-        const cacheKey = this.rankedFeedCacheKey(
-            input,
-            languages,
-            followedOnly,
-        );
-
-        const cached = await this.cacheService.get(cacheKey);
-        if (cached) {
-            return JSON.parse(cached) as CachedRankedFeed;
-        }
-
-        const since = new Date(
-            Date.now() - this.feedCandidateWindowDays * 24 * 60 * 60 * 1000,
-        );
-
-        const scopedFollowingIds =
-            followedOnly && input.currentUserId ? followingIds : undefined;
-
-        const [candidates, total] = await Promise.all([
-            this.postRepository.findFeedCandidates({
-                type: input.type,
-                tag: input.tag,
-                categories: input.categories,
-                followingIds: scopedFollowingIds,
-                since,
-                limit: this.feedCandidatePoolSize,
-            }),
-            this.postRepository.countAll({
-                type: input.type,
-                tag: input.tag,
-                categories: input.categories,
-                followingIds: scopedFollowingIds,
-            }),
-        ]);
-
-        const ranked = rankFeed(
-            candidates,
-            {
-                languages,
-                followingIds: new Set(followingIds),
-                now: new Date(),
-            },
-            this.feedRankingWeights,
-        );
-
-        const feed: CachedRankedFeed = {
-            ids: ranked.map((candidate) => candidate.id),
-            total,
-        };
-
-        await this.cacheService.set(
-            cacheKey,
-            JSON.stringify(feed),
-            RANKED_FEED_TTL_SECONDS,
-        );
-
-        return feed;
-    }
-
-    /**
-     * Builds the cache key a viewer's ranked order is stored under.
+     * The key holding the token of a viewer's current ranked order.
      *
      * The languages are part of the key, not just the viewer: two anonymous
      * visitors with different `Accept-Language` headers must not share an
      * order, and the same user changing their preference must not keep the old
      * one until it expires.
      *
-     * Kept under the `posts:feed:` prefix so the existing invalidation on post
-     * creation clears it.
+     * Kept under the `posts:feed:` prefix so publishing a post clears it.
      *
      * @param input - The feed request.
      * @param languages - The viewer's resolved languages.
      * @param followedOnly - Whether the pool is restricted to followed accounts.
-     * @returns The cache key.
+     * @returns The pointer key.
      */
-    private rankedFeedCacheKey(
+    private rankedPointerKey(
         input: GetPostsInput,
         languages: string[],
         followedOnly: boolean,
@@ -285,7 +425,7 @@ export class GetPostsUseCase {
 
         return [
             "posts:feed:ranked",
-            RANKED_FEED_CACHE_VERSION,
+            FEED_CACHE_VERSION,
             `user:${input.currentUserId || "guest"}`,
             `langs:${languages.join(",")}`,
             `type:${input.type || "ALL"}`,
@@ -296,19 +436,38 @@ export class GetPostsUseCase {
     }
 
     /**
+     * The key one scroll snapshot is stored under.
+     *
+     * Deliberately outside the `posts:feed:` prefix: publishing a post must
+     * retire the pointer so the next fresh visit re-ranks, but it must not
+     * pull the order out from under everyone mid-scroll, which is the whole
+     * reason snapshots exist.
+     *
+     * @param token - The token addressing the snapshot.
+     * @returns The snapshot key.
+     */
+    private snapshotKey(token: string): string {
+        return `feed:scroll:${FEED_CACHE_VERSION}:${token}`;
+    }
+
+    /**
      * Serves a page from beyond the ranked window.
      *
      * @param input - The feed request.
      * @param skip - How far past the ranked head the page starts.
      * @param limit - Page size.
-     * @param ranked - The ranked order, whose ids this page must not repeat.
-     * @returns The page of posts and the unchanged total.
+     * @param snapshot - The snapshot, whose ids this page must not repeat.
+     * @param token - The token the returned cursor keeps pointing at.
+     * @param offset - Where this page started, in snapshot coordinates.
+     * @returns The page of posts, the unchanged total, and the next cursor.
      */
     private async chronologicalTail(
         input: GetPostsInput,
         skip: number,
         limit: number,
-        ranked: CachedRankedFeed,
+        snapshot: RankedSnapshot,
+        token: string,
+        offset: number,
     ): Promise<GetPostsOutput> {
         const { posts } = await this.postRepository.findAll({
             page: 1,
@@ -318,7 +477,7 @@ export class GetPostsUseCase {
             currentUserId: input.currentUserId,
             tag: input.tag,
             categories: input.categories,
-            excludeIds: ranked.ids,
+            excludeIds: snapshot.ids,
             ...(input.followedOnly && input.currentUserId
                 ? {
                       followingIds:
@@ -329,7 +488,20 @@ export class GetPostsUseCase {
                 : {}),
         });
 
-        return { posts, total: ranked.total };
+        return {
+            posts,
+            total: snapshot.total,
+            // The tail keeps counting in the same coordinates the ranked head
+            // used, so the next cursor lands one page further into the tail
+            // rather than back at its start.
+            nextCursor:
+                posts.length > 0
+                    ? encodeFeedCursor({
+                          token,
+                          offset: offset + posts.length,
+                      })
+                    : null,
+        };
     }
 
     /**
@@ -345,7 +517,7 @@ export class GetPostsUseCase {
         page: number,
         limit: number,
     ): Promise<GetPostsOutput> {
-        return this.postRepository.findAll({
+        const { posts, total } = await this.postRepository.findAll({
             page,
             limit,
             type: input.type,
@@ -361,6 +533,10 @@ export class GetPostsUseCase {
                   }
                 : {}),
         });
+
+        // An unranked feed has no snapshot to pin, and needs none: it is
+        // chronological, so page numbers describe it exactly.
+        return { posts, total, nextCursor: null };
     }
 
     /**
