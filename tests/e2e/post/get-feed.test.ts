@@ -238,6 +238,21 @@ describe("GET /posts - Get Post Feed", () => {
         // Publishing retires the ranked pointer, so the second read rebuilds
         // rather than replaying a cached order - which is exactly when the
         // seen record has to earn its keep.
+        //
+        // Seeded generously on purpose. The filter is abandoned when it would
+        // leave fewer unseen posts than the reader asked for, and the E2E
+        // database is otherwise small enough to trip that fallback - which
+        // would make this assert something the feed deliberately does not
+        // promise.
+        for (let i = 0; i < 16; i++) {
+            const created = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: { content: `E2E seen-set pool post ${i}` },
+            });
+            expect(created.statusCode).toBe(201);
+        }
+
         type FeedBody = { data: { id: string }[] };
 
         const first = await authRequest(tokenB, {
@@ -246,7 +261,7 @@ describe("GET /posts - Get Post Feed", () => {
         });
         expect(first.statusCode).toBe(200);
         const firstIds = parseBody<FeedBody>(first).data.map((p) => p.id);
-        expect(firstIds.length).toBeGreaterThan(0);
+        expect(firstIds).toHaveLength(3);
 
         await authRequest(accessToken, {
             method: "POST",
@@ -261,6 +276,7 @@ describe("GET /posts - Get Post Feed", () => {
         expect(second.statusCode).toBe(200);
         const secondIds = parseBody<FeedBody>(second).data.map((p) => p.id);
 
+        expect(secondIds).toHaveLength(3);
         expect(secondIds.some((id) => firstIds.includes(id))).toBe(false);
     });
 

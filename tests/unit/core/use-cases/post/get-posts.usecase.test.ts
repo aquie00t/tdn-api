@@ -655,8 +655,31 @@ describe("GetPostsUseCase", () => {
             // The page was already assembled; one repeated post later is a far
             // smaller problem than a failed feed.
             expect(result.posts).toHaveLength(2);
-            await Promise.resolve();
             expect(logger.error).toHaveBeenCalled();
+        });
+
+        it("should record the page before the response goes out", async () => {
+            // Not awaiting loses the race the record exists to win: a reader
+            // scrolling fast issues the next request while the write is still
+            // in flight, and the order rebuilt for them repeats the page they
+            // just read.
+            seedPool(4);
+            hydrateRequestedIds();
+
+            let settled = false;
+            vi.mocked(seenPostsService.markSeen).mockImplementation(
+                () =>
+                    new Promise<void>((resolve) => {
+                        setTimeout(() => {
+                            settled = true;
+                            resolve();
+                        }, 0);
+                    }),
+            );
+
+            await useCase.execute({ limit: 2, currentUserId: "user-1" });
+
+            expect(settled).toBe(true);
         });
 
         it("should reuse the snapshot rather than re-filtering on every page", async () => {

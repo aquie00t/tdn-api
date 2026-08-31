@@ -126,6 +126,8 @@ describe("PrismaUserInterestRepository (integration)", () => {
         });
 
         it("should return nothing for a user with no profile", async () => {
+            // authorId is only ever written to as a post author, never as the
+            // subject of a profile rebuild.
             expect(await repo.findByUserId(authorId)).toEqual([]);
         });
     });
@@ -216,8 +218,18 @@ describe("PrismaUserInterestRepository (integration)", () => {
         });
 
         it("should return nothing for a user who has done nothing", async () => {
+            // A genuinely inert account. `authorId` wrote the fixture post, so
+            // it has an AUTHORED signal of its own.
+            const inert = await new PrismaUserRepository(prisma, {
+                gracePeriodDays: 30,
+            }).create({
+                email: `inert${EMAIL_DOMAIN}`,
+                username: "inert_interestrepo",
+                passwordHash: "hashed",
+            });
+
             expect(
-                await repo.findInteractionSignals(authorId, since, 100),
+                await repo.findInteractionSignals(inert.id, since, 100),
             ).toEqual([]);
         });
     });

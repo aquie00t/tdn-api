@@ -195,7 +195,7 @@ export class GetPostsUseCase {
             input.currentUserId,
         );
 
-        this.recordSeen(input.currentUserId, pageIds);
+        await this.recordSeen(input.currentUserId, pageIds);
 
         return {
             posts: this.reorder(posts, pageIds),
@@ -395,31 +395,37 @@ export class GetPostsUseCase {
     }
 
     /**
-     * Records that a page was shown, without making the reader wait for it.
+     * Records that a page was shown, before the response goes out.
      *
-     * Deliberately fire-and-forget: the page is already assembled, and holding
-     * the response open for a bookkeeping write would trade something the
-     * reader wants for something only the next request cares about. A failure
-     * costs one repeated post later, which is why it is logged rather than
-     * surfaced.
+     * Awaited rather than fired and forgotten. The write is one pipelined
+     * Redis round trip next to a hydration query that already cost more, and
+     * not waiting for it loses the race this whole record exists to win: a
+     * reader scrolling fast issues the next request while the previous write
+     * is still in flight, and the order rebuilt for them then repeats exactly
+     * the page they just read.
+     *
+     * The port promises never to throw and the shipped adapter keeps that
+     * promise, but the failure it guards against - a whole feed 500ing because
+     * Redis blinked - is bad enough not to rest on a future implementation
+     * having read the contract. Caught here too.
      *
      * @param currentUserId - The viewer, when there is one.
      * @param pageIds - The ids that were served.
      */
-    private recordSeen(
+    private async recordSeen(
         currentUserId: string | undefined,
         pageIds: string[],
-    ): void {
+    ): Promise<void> {
         if (!currentUserId || pageIds.length === 0) return;
 
-        void this.seenPostsService
-            .markSeen(currentUserId, pageIds)
-            .catch((err: unknown) => {
-                this.logger.error(
-                    { err, userId: currentUserId },
-                    "Failed to record which posts a reader was shown",
-                );
-            });
+        try {
+            await this.seenPostsService.markSeen(currentUserId, pageIds);
+        } catch (err: unknown) {
+            this.logger.error(
+                { err, userId: currentUserId },
+                "Failed to record which posts a reader was shown",
+            );
+        }
     }
 
     /**
@@ -601,7 +607,7 @@ export class GetPostsUseCase {
                 : {}),
         });
 
-        this.recordSeen(
+        await this.recordSeen(
             input.currentUserId,
             posts.map((post) => post.id),
         );
