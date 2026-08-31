@@ -1,0 +1,39 @@
+/// What an interest is about: a hashtag, or one of the fixed categories.
+///
+/// One table rather than two because the feed reads every interest a user has
+/// in a single query and scores them the same way; splitting by kind would
+/// double that read to no benefit.
+enum InterestKind {
+  TAG
+  CATEGORY
+}
+
+/// A user's affinity for one tag or category, derived from what they have
+/// actually interacted with.
+///
+/// Materialised by a cron job rather than computed per request: the underlying
+/// aggregate walks a user's likes, bookmarks, comments and posts across a
+/// multi-week window, which is far too much work to do while a feed request
+/// waits. Rows are disposable - the job rebuilds a user's whole set at once,
+/// and a user with none is simply ranked without the affinity term.
+model UserInterest {
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind InterestKind
+  /// The tag name, or the Category enum value. Lowercased for TAG so it
+  /// matches how tags are stored.
+  key  String
+
+  /// Affinity in (0, 1], normalised per user so that the strongest interest is
+  /// always 1. Without normalising, a heavy user's every interest would
+  /// outweigh a light user's strongest one, and the feed's affinity weight
+  /// would mean something different for each of them.
+  weight Float
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([userId, kind, key])
+  @@index([userId])
+  @@map("user_interests")
+}

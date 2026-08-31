@@ -1,4 +1,8 @@
 import type { FeedCandidate } from "@core/domain/interfaces/feed-candidate.interface";
+import {
+    InterestKind,
+    type UserInterest,
+} from "@core/domain/interfaces/user-interest.interface";
 
 /**
  * The feed ranker.
@@ -22,6 +26,15 @@ export interface FeedRankingWeights {
 
     /** Added when the viewer follows the author. */
     social: number;
+
+    /**
+     * Multiplies the viewer's affinity for what the post is about.
+     *
+     * Zero for a viewer with no profile yet, which is what makes cold start
+     * degrade cleanly into the language-and-freshness feed rather than into
+     * nothing.
+     */
+    affinity: number;
 
     /** Multiplies the post's damped engagement score. */
     engagement: number;
@@ -48,6 +61,14 @@ export interface FeedRankingContext {
 
     /** Ids of the accounts the viewer follows. */
     followingIds: Set<string>;
+
+    /**
+     * The viewer's interest weights, keyed by `KIND:key`.
+     *
+     * Empty for a viewer the interest job has never run for - a new account,
+     * or a visitor who is not signed in.
+     */
+    interests: Map<string, number>;
 
     /** The reference time decay is measured against. */
     now: Date;
@@ -105,6 +126,8 @@ export function scoreCandidate(
         score += weights.social;
     }
 
+    score += weights.affinity * affinityFor(candidate, context.interests);
+
     const engagement =
         candidate.likeCount +
         COMMENT_WEIGHT * candidate.commentCount +
@@ -114,6 +137,63 @@ export function scoreCandidate(
     return (
         score *
         timeDecay(candidate.createdAt, context.now, weights.halfLifeHours)
+    );
+}
+
+/**
+ * Rates a post against what the viewer has shown interest in.
+ *
+ * Takes the strongest matching interest rather than the sum of them. Summing
+ * would make a post tagged `react, hooks, frontend, javascript` outrank a
+ * better post tagged `react` for someone who likes all four, which rewards tag
+ * stuffing and buries the focused posts the reader actually wants.
+ *
+ * @param candidate - The post being scored.
+ * @param interests - The viewer's interest weights, keyed by `KIND:key`.
+ * @returns The strongest matching weight, or 0 when nothing matches.
+ */
+function affinityFor(
+    candidate: FeedCandidate,
+    interests: Map<string, number>,
+): number {
+    if (interests.size === 0) return 0;
+
+    let best = 0;
+
+    for (const tag of candidate.tags) {
+        best = Math.max(
+            best,
+            interests.get(`${InterestKind.TAG}:${tag.toLowerCase()}`) ?? 0,
+        );
+    }
+
+    for (const category of candidate.categories) {
+        best = Math.max(
+            best,
+            interests.get(
+                `${InterestKind.CATEGORY}:${category.toLowerCase()}`,
+            ) ?? 0,
+        );
+    }
+
+    return best;
+}
+
+/**
+ * Indexes a stored interest profile for scoring.
+ *
+ * Built once per feed request and handed to every candidate, so that scoring
+ * one post is a handful of map lookups rather than a scan of the profile.
+ *
+ * @param interests - The profile as it was stored.
+ * @returns The weights, keyed by `KIND:key`.
+ */
+export function indexInterests(interests: UserInterest[]): Map<string, number> {
+    return new Map(
+        interests.map((interest) => [
+            `${interest.kind}:${interest.key.toLowerCase()}`,
+            interest.weight,
+        ]),
     );
 }
 

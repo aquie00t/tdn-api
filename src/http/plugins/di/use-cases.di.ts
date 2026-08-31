@@ -39,6 +39,8 @@ import { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-q
 import { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
 import { GetPostsUseCase } from "@core/use-cases/post/get-posts";
 import type { FeedRankingWeights } from "@core/use-cases/post/get-posts/feed-ranking";
+import { RebuildUserInterestsUseCase } from "@core/use-cases/user-interest/rebuild-user-interests";
+import type { InterestScoringWeights } from "@core/use-cases/user-interest/rebuild-user-interests";
 import { DeletePostUseCase } from "@core/use-cases/post/delete-post";
 import { LikePostUseCase } from "@core/use-cases/post/like-post";
 import { UnlikePostUseCase } from "@core/use-cases/post/unlike-post";
@@ -369,6 +371,7 @@ export const useCasesModule = {
         return {
             language: config.FEED_WEIGHT_LANGUAGE,
             social: config.FEED_WEIGHT_SOCIAL,
+            affinity: config.FEED_WEIGHT_AFFINITY,
             engagement: config.FEED_WEIGHT_ENGAGEMENT,
             halfLifeHours: config.FEED_HALF_LIFE_HOURS,
             maxPostsPerAuthor: config.FEED_MAX_POSTS_PER_AUTHOR,
@@ -386,6 +389,46 @@ export const useCasesModule = {
         (config): number => config.FEED_CANDIDATE_WINDOW_DAYS,
     ).singleton(),
 
+    /** Tuning weights for the nightly interest profile scorer */
+    interestScoringWeights: asFunction((config): InterestScoringWeights => {
+        return {
+            halfLifeDays: config.USER_INTEREST_HALF_LIFE_DAYS,
+            maxInterests: config.USER_INTEREST_MAX,
+            minWeight: config.USER_INTEREST_MIN_WEIGHT,
+        };
+    }).singleton(),
+
+    /** How far back the interest job reads a user's interactions */
+    interestWindowDays: asFunction(
+        (config): number => config.USER_INTEREST_WINDOW_DAYS,
+    ).singleton(),
+
+    /** Cap on signals the interest job reads per interaction type */
+    interestSignalLimit: asFunction(
+        (config): number => config.USER_INTEREST_SIGNAL_LIMIT,
+    ).singleton(),
+
+    /**
+     * Use case that rebuilds the materialised interest profiles the feed
+     * ranks on
+     */
+    rebuildUserInterestsUseCase: asFunction(
+        (
+            userInterestRepository,
+            interestScoringWeights,
+            interestWindowDays,
+            interestSignalLimit,
+            logger,
+        ) =>
+            new RebuildUserInterestsUseCase(
+                userInterestRepository,
+                interestScoringWeights,
+                interestWindowDays,
+                interestSignalLimit,
+                logger,
+            ),
+    ).singleton(),
+
     /**
      * Use case for retrieving posts
      */
@@ -395,6 +438,7 @@ export const useCasesModule = {
             cacheService,
             followUserRepository,
             profileRepository,
+            userInterestRepository,
             cryptoService,
             feedRankingWeights,
             feedCandidatePoolSize,
@@ -405,6 +449,7 @@ export const useCasesModule = {
                 cacheService,
                 followUserRepository,
                 profileRepository,
+                userInterestRepository,
                 cryptoService,
                 feedRankingWeights,
                 feedCandidatePoolSize,

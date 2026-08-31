@@ -77,6 +77,10 @@ export const EnvSchema = Type.Object({
     // half-lives - is needed to overcome.
     FEED_WEIGHT_LANGUAGE: Type.Number({ default: 3 }),
     FEED_WEIGHT_SOCIAL: Type.Number({ default: 2 }),
+    // Sits just under the language weight: what a reader is into should shape
+    // their feed strongly, but not enough on its own to serve them a language
+    // they cannot read.
+    FEED_WEIGHT_AFFINITY: Type.Number({ default: 2.5 }),
     FEED_WEIGHT_ENGAGEMENT: Type.Number({ default: 0.6 }),
     FEED_HALF_LIFE_HOURS: Type.Number({ default: 18, minimum: 1 }),
     FEED_MAX_POSTS_PER_AUTHOR: Type.Number({ default: 3, minimum: 1 }),
@@ -87,6 +91,25 @@ export const EnvSchema = Type.Object({
     }),
     FEED_CANDIDATE_POOL_SIZE: Type.Number({ default: 300, minimum: 1 }),
     FEED_CANDIDATE_WINDOW_DAYS: Type.Number({ default: 7, minimum: 1 }),
+
+    // --- User interest profiles ---
+    // Rebuilt nightly. Interests move over weeks, so a profile that is a day
+    // stale ranks a feed indistinguishably from a fresh one.
+    USER_INTEREST_REBUILD_CRON: Type.String({ default: "0 4 * * *" }),
+    USER_INTEREST_WINDOW_DAYS: Type.Number({ default: 30, minimum: 1 }),
+    USER_INTEREST_HALF_LIFE_DAYS: Type.Number({ default: 10, minimum: 1 }),
+    USER_INTEREST_MAX: Type.Number({ default: 40, minimum: 1 }),
+    // Below this a normalised interest is a stray like on something the reader
+    // never went back to, and keeping it would hand unrelated posts a small
+    // bonus forever.
+    USER_INTEREST_MIN_WEIGHT: Type.Number({
+        default: 0.05,
+        minimum: 0,
+        maximum: 1,
+    }),
+    // Cap per interaction type, so one prolific account cannot make the
+    // nightly job unbounded.
+    USER_INTEREST_SIGNAL_LIMIT: Type.Number({ default: 500, minimum: 1 }),
 
     // Set to true to bypass rate limiting (e.g. in test environments)
     DISABLE_RATE_LIMIT: Type.Boolean({ default: false }),

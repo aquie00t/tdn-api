@@ -5,12 +5,15 @@ import { UserPurgeScheduler } from "@infrastructure/jobs/user/user-purge.schedul
 import { RefreshTokenPurgeScheduler } from "@infrastructure/jobs/refresh-token/refresh-token-purge.scheduler";
 import { NotificationPurgeJob } from "@infrastructure/jobs/notification/notification-purge.job";
 import { NotificationPurgeScheduler } from "@infrastructure/jobs/notification/notification-purge.scheduler";
+import { UserInterestRebuildJob } from "@infrastructure/jobs/user-interest/user-interest-rebuild.job";
+import { UserInterestRebuildScheduler } from "@infrastructure/jobs/user-interest/user-interest-rebuild.scheduler";
 
 export const jobsModule = {
     // --- Jobs ---
     userPurgeJob: asClass(UserPurgeJob).singleton(),
     refreshTokenPurgeJob: asClass(RefreshTokenPurgeJob).singleton(),
     notificationPurgeJob: asClass(NotificationPurgeJob),
+    userInterestRebuildJob: asClass(UserInterestRebuildJob).singleton(),
 
     // --- Schedulers ---
     userPurgeScheduler: asFunction((userPurgeJob, config, logger) => {
@@ -44,4 +47,14 @@ export const jobsModule = {
             );
         },
     ),
+
+    userInterestRebuildScheduler: asFunction(
+        (userInterestRebuildJob, config, logger) => {
+            return new UserInterestRebuildScheduler(
+                userInterestRebuildJob,
+                { cronExpression: config.USER_INTEREST_REBUILD_CRON },
+                logger,
+            );
+        },
+    ).singleton(),
 };

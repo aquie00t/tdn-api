@@ -27,4 +27,16 @@ export interface FeedCandidate {
 
     /** Denormalised quote count. */
     quoteCount: number;
+
+    /**
+     * Tag names carried by the post, lowercased as they are stored.
+     *
+     * Read by the affinity term. Loaded for the pool rather than only for the
+     * served page, because a post's tags are what decide whether it makes the
+     * page at all.
+     */
+    tags: string[];
+
+    /** Categories carried by the post. */
+    categories: string[];
 }

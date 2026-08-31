@@ -199,10 +199,11 @@ export class PrismaPostRepository implements IPostRepository {
     /**
      * Loads the pool of recent posts the feed ranker scores.
      *
-     * Selects the ranking inputs and nothing else - no author, no tags, no
-     * quote card. The pool is a few hundred rows where the served page is ten,
+     * Selects the ranking inputs and nothing else - no author, no quote card,
+     * no content. The pool is a few hundred rows where the served page is ten,
      * so every column the ranker does not read is paid for a few hundred times
-     * over and thrown away.
+     * over and thrown away. Tags are the exception that has to be paid for:
+     * they decide whether a post makes the page at all.
      *
      * @param params - Filters, time window and pool size.
      * @returns The candidates, newest first.
@@ -234,10 +235,22 @@ export class PrismaPostRepository implements IPostRepository {
                 likeCount: true,
                 commentCount: true,
                 quoteCount: true,
+                category: true,
+                tags: { select: { name: true } },
             },
         });
 
-        return rows;
+        return rows.map((row) => ({
+            id: row.id,
+            authorId: row.authorId,
+            lang: row.lang,
+            createdAt: row.createdAt,
+            likeCount: row.likeCount,
+            commentCount: row.commentCount,
+            quoteCount: row.quoteCount,
+            tags: row.tags.map((tag) => tag.name),
+            categories: row.category,
+        }));
     }
 
     /**

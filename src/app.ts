@@ -24,6 +24,7 @@ import websocketPlugin from "./http/plugins/websocket.plugin";
 import realtimeRoutes from "@routes/realtime.routes";
 import notificationRoutes from "@routes/notification.routes";
 import notificationPurgePlugin from "@plugins/custom/notification-purge.plugin";
+import userInterestRebuildPlugin from "@plugins/custom/user-interest-rebuild.plugin";
 import { postRoutes } from "@routes/post/post.routes";
 import { commentRoutes } from "@routes/post/comment.routes";
 import { likeRoutes } from "@routes/post/like.routes";
@@ -103,6 +104,7 @@ export class App {
         this.server.register(refreshTokenPurgePlugin);
         this.server.register(userPurgePlugin);
         this.server.register(notificationPurgePlugin);
+        this.server.register(userInterestRebuildPlugin);
     }
 
     /**

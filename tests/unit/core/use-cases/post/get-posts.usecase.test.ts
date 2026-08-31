@@ -7,6 +7,8 @@ import {
 } from "@core/use-cases/post/get-posts/feed-cursor";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
+import type { IUserInterestRepository } from "@core/ports/repositories/user-interest.repository";
+import { InterestKind } from "@core/domain/interfaces/user-interest.interface";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { CryptoPort } from "@core/ports/services/crypto.port";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
@@ -18,6 +20,7 @@ import { buildPost } from "../../../helpers/mock-factories";
 const WEIGHTS: FeedRankingWeights = {
     language: 3,
     social: 2,
+    affinity: 2.5,
     engagement: 0.6,
     halfLifeHours: 18,
     maxPostsPerAuthor: 3,
@@ -80,6 +83,8 @@ function buildCandidate(overrides: Partial<FeedCandidate> = {}): FeedCandidate {
         likeCount: 0,
         commentCount: 0,
         quoteCount: 0,
+        tags: [],
+        categories: [],
         ...overrides,
     };
 }
@@ -93,6 +98,7 @@ describe("GetPostsUseCase", () => {
     let cacheService: FakeCache;
     let followUserRepository: Pick<IFollowRepository, "getFollowingIds">;
     let profileRepository: Pick<IProfileRepository, "findLanguagesByUserId">;
+    let userInterestRepository: Pick<IUserInterestRepository, "findByUserId">;
     let cryptoService: Pick<CryptoPort, "generateRandomHex">;
     let tokenSequence: number;
 
@@ -136,6 +142,9 @@ describe("GetPostsUseCase", () => {
         profileRepository = {
             findLanguagesByUserId: vi.fn().mockResolvedValue([]),
         };
+        userInterestRepository = {
+            findByUserId: vi.fn().mockResolvedValue([]),
+        };
         cryptoService = {
             generateRandomHex: vi.fn(() => `token-${++tokenSequence}`),
         };
@@ -144,6 +153,7 @@ describe("GetPostsUseCase", () => {
             cacheService as unknown as CachePort,
             followUserRepository as IFollowRepository,
             profileRepository as IProfileRepository,
+            userInterestRepository as IUserInterestRepository,
             cryptoService as CryptoPort,
             WEIGHTS,
             POOL_SIZE,
@@ -406,6 +416,80 @@ describe("GetPostsUseCase", () => {
             const result = await useCase.execute({ limit: 10 });
 
             expect(result.posts[0].id).toBe("tr-post");
+        });
+    });
+
+    describe("interest affinity", () => {
+        it("should lift a post matching what the viewer is into", async () => {
+            vi.mocked(userInterestRepository.findByUserId).mockResolvedValue([
+                { kind: InterestKind.TAG, key: "rust", weight: 1 },
+            ]);
+            vi.mocked(postRepository.findFeedCandidates).mockResolvedValue([
+                buildCandidate({
+                    id: "js",
+                    authorId: "a1",
+                    tags: ["javascript"],
+                }),
+                buildCandidate({ id: "rust", authorId: "a2", tags: ["rust"] }),
+            ]);
+            hydrateRequestedIds();
+
+            const result = await useCase.execute({
+                limit: 10,
+                currentUserId: "user-1",
+            });
+
+            expect(result.posts[0].id).toBe("rust");
+        });
+
+        it("should match a category as well as a tag", async () => {
+            vi.mocked(userInterestRepository.findByUserId).mockResolvedValue([
+                { kind: InterestKind.CATEGORY, key: "ai", weight: 1 },
+            ]);
+            vi.mocked(postRepository.findFeedCandidates).mockResolvedValue([
+                buildCandidate({
+                    id: "game",
+                    authorId: "a1",
+                    categories: ["GAME"],
+                }),
+                buildCandidate({
+                    id: "ai",
+                    authorId: "a2",
+                    categories: ["AI"],
+                }),
+            ]);
+            hydrateRequestedIds();
+
+            const result = await useCase.execute({
+                limit: 10,
+                currentUserId: "user-1",
+            });
+
+            expect(result.posts[0].id).toBe("ai");
+        });
+
+        it("should rank a visitor without asking for a profile", async () => {
+            seedPool(2);
+            hydrateRequestedIds();
+
+            const result = await useCase.execute({ limit: 10 });
+
+            // Cold start has to degrade into the language-and-freshness feed,
+            // not into an extra query that can only come back empty.
+            expect(userInterestRepository.findByUserId).not.toHaveBeenCalled();
+            expect(result.posts).toHaveLength(2);
+        });
+
+        it("should rank a brand new account without a profile", async () => {
+            seedPool(2);
+            hydrateRequestedIds();
+
+            const result = await useCase.execute({
+                limit: 10,
+                currentUserId: "brand-new-user",
+            });
+
+            expect(result.posts.map((p) => p.id)).toEqual(["p1", "p2"]);
         });
     });
 

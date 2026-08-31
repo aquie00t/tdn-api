@@ -1,6 +1,7 @@
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
+import type { IUserInterestRepository } from "@core/ports/repositories/user-interest.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { CryptoPort } from "@core/ports/services/crypto.port";
 import type { GetPostsInput } from "./get-posts-usecase.input";
@@ -13,7 +14,11 @@ import {
     normalizeLanguageTag,
     parseLanguagePreferenceHeader,
 } from "@core/domain/constants/language.constants";
-import { rankFeed, type FeedRankingWeights } from "./feed-ranking";
+import {
+    indexInterests,
+    rankFeed,
+    type FeedRankingWeights,
+} from "./feed-ranking";
 import { decodeFeedCursor, encodeFeedCursor } from "./feed-cursor";
 
 /**
@@ -84,6 +89,7 @@ export class GetPostsUseCase {
      * @param cacheService - Cache holding ranked orders and scroll snapshots
      * @param followUserRepository - Repository used to resolve who the viewer follows
      * @param profileRepository - Repository used to read the viewer's feed languages
+     * @param userInterestRepository - Repository holding each viewer's interest profile
      * @param cryptoService - Source of the random tokens that address snapshots
      * @param feedRankingWeights - Tuning weights for the ranker
      * @param feedCandidatePoolSize - Hard cap on the candidate pool
@@ -94,6 +100,7 @@ export class GetPostsUseCase {
         private readonly cacheService: CachePort,
         private readonly followUserRepository: IFollowRepository,
         private readonly profileRepository: IProfileRepository,
+        private readonly userInterestRepository: IUserInterestRepository,
         private readonly cryptoService: CryptoPort,
         private readonly feedRankingWeights: FeedRankingWeights,
         private readonly feedCandidatePoolSize: number,
@@ -307,11 +314,17 @@ export class GetPostsUseCase {
         languages: string[],
         followedOnly: boolean,
     ): Promise<RankedSnapshot> {
-        const followingIds = input.currentUserId
-            ? await this.followUserRepository.getFollowingIds(
-                  input.currentUserId,
-              )
-            : [];
+        // A signed-in viewer's follow graph and interest profile are both
+        // reads that only the ranker needs, so they go out together rather
+        // than one after the other.
+        const [followingIds, interests] = input.currentUserId
+            ? await Promise.all([
+                  this.followUserRepository.getFollowingIds(
+                      input.currentUserId,
+                  ),
+                  this.userInterestRepository.findByUserId(input.currentUserId),
+              ])
+            : [[], []];
 
         const since = new Date(
             Date.now() - this.feedCandidateWindowDays * 24 * 60 * 60 * 1000,
@@ -342,6 +355,7 @@ export class GetPostsUseCase {
             {
                 languages,
                 followingIds: new Set(followingIds),
+                interests: indexInterests(interests),
                 now: new Date(),
             },
             this.feedRankingWeights,

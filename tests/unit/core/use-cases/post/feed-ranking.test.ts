@@ -12,6 +12,7 @@ const NOW = new Date("2026-08-31T12:00:00Z");
 const WEIGHTS: FeedRankingWeights = {
     language: 3,
     social: 2,
+    affinity: 2.5,
     engagement: 0.6,
     halfLifeHours: 18,
     maxPostsPerAuthor: 3,
@@ -24,6 +25,7 @@ function context(
     return {
         languages: ["tr"],
         followingIds: new Set<string>(),
+        interests: new Map<string, number>(),
         now: NOW,
         ...overrides,
     };
@@ -41,6 +43,8 @@ function candidate(overrides: Partial<FeedCandidate> = {}): FeedCandidate {
         likeCount: 0,
         commentCount: 0,
         quoteCount: 0,
+        tags: [],
+        categories: [],
         ...overrides,
     };
 }
