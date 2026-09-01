@@ -152,3 +152,94 @@ describe("flattenSightengineFrames()", () => {
         ).toEqual({ "gore.prob": 0.92 });
     });
 });
+
+describe("a real Sightengine response", () => {
+    /**
+     * Captured from the live API on 2026-09-01, trimmed to the sections the
+     * parser reads. Written from a real body rather than an invented one:
+     * every model nests its answer differently, and the shape this has to
+     * survive is the provider's, not ours.
+     */
+    const response = {
+        status: "success",
+        nudity: {
+            sexual_activity: 0.001,
+            sexual_display: 0.001,
+            erotica: 0.001,
+            very_suggestive: 0.001,
+            suggestive: 0.001,
+            mildly_suggestive: 0.001,
+            suggestive_classes: { bikini: 0.001, cleavage: 0.001 },
+            none: 0.99,
+            context: { sea_lake_pool: 0.001, outdoor_other: 0.5 },
+        },
+        gore: {
+            prob: 0.001,
+            classes: { very_bloody: 0.001, corpse: 0.001 },
+            type: { real: 0.001 },
+        },
+        violence: { prob: 0.001, classes: { physical_violence: 0.001 } },
+        weapon: {
+            classes: {
+                firearm: 0.001,
+                firearm_gesture: 0.001,
+                firearm_toy: 0.02,
+                knife: 0.001,
+            },
+            firearm_type: { animated: 0.001 },
+            firearm_action: { aiming_threat: 0.001 },
+        },
+        "self-harm": { prob: 0.001, type: { real: 0.001 } },
+        offensive: { prob: 0.01, nazi: 0.001, supremacist: 0.01 },
+        media: { id: "med_x", uri: "https://cdn.example.com/avatar.png" },
+    };
+
+    it("should read every model the request asks for", () => {
+        expect(flattenSightengineScores(response)).toEqual({
+            "nudity.sexual_activity": 0.001,
+            "nudity.sexual_display": 0.001,
+            "nudity.erotica": 0.001,
+            "nudity.very_suggestive": 0.001,
+            "nudity.suggestive": 0.001,
+            "nudity.mildly_suggestive": 0.001,
+            "gore.prob": 0.001,
+            "violence.prob": 0.001,
+            "self-harm.prob": 0.001,
+            "offensive.prob": 0.01,
+            // The highest weapon class, not the whole map.
+            "weapon.prob": 0.02,
+        });
+    });
+
+    it("should ignore the descriptive fields sitting beside the scores", () => {
+        // `none`, `context`, `suggestive_classes`, `type` and `media` are not
+        // class probabilities. Reading one as a score would flag a clean file:
+        // `none` is 0.99 on exactly the images nothing is wrong with.
+        const scores = flattenSightengineScores(response);
+
+        expect(scores["nudity.none"]).toBeUndefined();
+        expect(scores["gore.type"]).toBeUndefined();
+        expect(Object.keys(scores)).toHaveLength(11);
+    });
+
+    it("should approve a clean file", () => {
+        expect(
+            scoreToVerdict(flattenSightengineScores(response), THRESHOLDS)
+                .verdict,
+        ).toBe(MediaModerationStatus.APPROVED);
+    });
+
+    it("should reject the same body carrying an explicit score", () => {
+        const explicit = {
+            ...response,
+            nudity: { ...response.nudity, sexual_activity: 0.97 },
+        };
+
+        expect(
+            scoreToVerdict(flattenSightengineScores(explicit), THRESHOLDS),
+        ).toEqual({
+            verdict: MediaModerationStatus.REJECTED,
+            categories: [MediaModerationCategory.SEXUAL_ACTIVITY],
+        });
+    });
+});
