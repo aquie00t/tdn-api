@@ -234,6 +234,44 @@ describe("GET /posts - Get Post Feed", () => {
         ).toBeGreaterThan(0);
     });
 
+    it("should keep the feed going past the ranked window", async () => {
+        // The production bug this guards: a reader whose language matched only
+        // a couple of posts was handed those and told the feed was over, while
+        // hundreds of older ones sat behind the ranked window.
+        type FeedBody = {
+            data: { id: string }[];
+            meta: { nextCursor: string | null; hasMore: boolean };
+        };
+
+        const response = await authRequest(accessToken, {
+            method: "GET",
+            url: "/posts?limit=10",
+        });
+        expect(response.statusCode).toBe(200);
+
+        const body = parseBody<FeedBody>(response);
+
+        // Either a full page, or a short one that honestly says it is the end.
+        if (body.meta.hasMore) {
+            expect(body.data).toHaveLength(10);
+            expect(body.meta.nextCursor).not.toBeNull();
+        } else {
+            expect(body.meta.nextCursor).toBeNull();
+        }
+    });
+
+    it("should report hasMore from the cursor, not from the page length", async () => {
+        const response = await authRequest(accessToken, {
+            method: "GET",
+            url: "/posts?limit=10",
+        });
+        const body = parseBody<{
+            meta: { nextCursor: string | null; hasMore: boolean };
+        }>(response);
+
+        expect(body.meta.hasMore).toBe(body.meta.nextCursor !== null);
+    });
+
     it("should not show a signed-in reader the same post twice across builds", async () => {
         // Publishing retires the ranked pointer, so the second read rebuilds
         // rather than replaying a cached order - which is exactly when the

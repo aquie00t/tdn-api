@@ -197,12 +197,14 @@ export class PostController {
                 limit,
                 totalPages: Math.ceil(result.total / limit),
                 nextCursor: result.nextCursor,
-                // A short page is the end of the feed. Comparing against the
-                // total would be wrong here: the ranked window is narrower
-                // than the total, and the total keeps moving.
-                hasMore:
-                    result.nextCursor !== null &&
-                    formattedData.length === limit,
+                // Read straight off the cursor, never inferred from the page
+                // length. A short page used to be treated as the end of the
+                // feed, which is wrong exactly where the ranked window runs
+                // out mid-page: readers of a quiet feed were told there was
+                // nothing left while hundreds of older posts sat behind it.
+                // The use case knows when it has run out; it says so by
+                // returning no cursor.
+                hasMore: result.nextCursor !== null,
             },
         });
     }

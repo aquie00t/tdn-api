@@ -190,23 +190,51 @@ export class GetPostsUseCase {
         }
 
         const pageIds = snapshot.ids.slice(offset, offset + limit);
-        const posts = await this.postRepository.findByIds(
+        const hydrated = await this.postRepository.findByIds(
             pageIds,
             input.currentUserId,
         );
+        const ranked = this.reorder(hydrated, pageIds);
 
-        await this.recordSeen(input.currentUserId, pageIds);
+        // The ranked window is narrow - a bounded pool of recent posts - and
+        // on a quiet feed it can hold fewer posts than the reader asked for.
+        // Ending the page there would tell them the feed is over while
+        // hundreds of older posts sit behind it, which is exactly what
+        // happened to Turkish readers of the community feed: two matching
+        // posts, then "no more posts".
+        const topUp =
+            pageIds.length < limit
+                ? await this.tailPosts(
+                      input,
+                      0,
+                      limit - pageIds.length,
+                      snapshot,
+                  )
+                : [];
+
+        const posts = [...ranked, ...topUp];
+
+        await this.recordSeen(
+            input.currentUserId,
+            posts.map((post) => post.id),
+        );
 
         return {
-            posts: this.reorder(posts, pageIds),
+            posts,
             total: snapshot.total,
-            // Counted in ids consumed, not posts returned: a post deleted
-            // between ranking and hydration shortens the page, and advancing
-            // by the shorter count would serve that gap again forever.
-            nextCursor: encodeFeedCursor({
-                token,
-                offset: offset + pageIds.length,
-            }),
+            // Advanced by ids consumed rather than posts returned, so a post
+            // deleted between ranking and hydration shortens this page instead
+            // of leaving a gap that is served again forever. The top-up counts
+            // too: the tail keeps counting in the snapshot's coordinates.
+            nextCursor:
+                pageIds.length < limit && topUp.length < limit - pageIds.length
+                    ? // The ranked window ran out and the tail could not fill
+                      // the rest, so there is genuinely nothing behind this.
+                      null
+                    : encodeFeedCursor({
+                          token,
+                          offset: offset + pageIds.length + topUp.length,
+                      }),
         };
     }
 
@@ -570,24 +598,27 @@ export class GetPostsUseCase {
     }
 
     /**
-     * Serves a page from beyond the ranked window.
+     * Reads posts from behind the ranked window, newest first.
+     *
+     * Shared by the two ways a reader reaches past the ranking: paging clean
+     * off the end of the snapshot, and a ranked page too short to fill the
+     * limit on its own. Both must skip everything the snapshot holds, or the
+     * reader is served a post they have already been given.
      *
      * @param input - The feed request.
-     * @param skip - How far past the ranked head the page starts.
-     * @param limit - Page size.
-     * @param snapshot - The snapshot, whose ids this page must not repeat.
-     * @param token - The token the returned cursor keeps pointing at.
-     * @param offset - Where this page started, in snapshot coordinates.
-     * @returns The page of posts, the unchanged total, and the next cursor.
+     * @param skip - How many tail rows have already been served this scroll.
+     * @param limit - How many rows to read.
+     * @param snapshot - The snapshot whose ids the tail must not repeat.
+     * @returns The posts, at most `limit` of them.
      */
-    private async chronologicalTail(
+    private async tailPosts(
         input: GetPostsInput,
         skip: number,
         limit: number,
         snapshot: RankedSnapshot,
-        token: string,
-        offset: number,
-    ): Promise<GetPostsOutput> {
+    ): Promise<Post[]> {
+        if (limit <= 0) return [];
+
         const { posts } = await this.postRepository.findAll({
             page: 1,
             skip,
@@ -607,6 +638,30 @@ export class GetPostsUseCase {
                 : {}),
         });
 
+        return posts;
+    }
+
+    /**
+     * Serves a page from beyond the ranked window.
+     *
+     * @param input - The feed request.
+     * @param skip - How far past the ranked head the page starts.
+     * @param limit - Page size.
+     * @param snapshot - The snapshot, whose ids this page must not repeat.
+     * @param token - The token the returned cursor keeps pointing at.
+     * @param offset - Where this page started, in snapshot coordinates.
+     * @returns The page of posts, the unchanged total, and the next cursor.
+     */
+    private async chronologicalTail(
+        input: GetPostsInput,
+        skip: number,
+        limit: number,
+        snapshot: RankedSnapshot,
+        token: string,
+        offset: number,
+    ): Promise<GetPostsOutput> {
+        const posts = await this.tailPosts(input, skip, limit, snapshot);
+
         await this.recordSeen(
             input.currentUserId,
             posts.map((post) => post.id),
@@ -615,11 +670,12 @@ export class GetPostsUseCase {
         return {
             posts,
             total: snapshot.total,
-            // The tail keeps counting in the same coordinates the ranked head
-            // used, so the next cursor lands one page further into the tail
-            // rather than back at its start.
+            // A short read is the end of the feed: the query asked for `limit`
+            // rows and the database had fewer left. A full one keeps counting
+            // in the snapshot's coordinates, so the next cursor lands one page
+            // further into the tail rather than back at its start.
             nextCursor:
-                posts.length > 0
+                posts.length === limit
                     ? encodeFeedCursor({
                           token,
                           offset: offset + posts.length,

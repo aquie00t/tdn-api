@@ -801,6 +801,168 @@ describe("GetPostsUseCase", () => {
         });
     });
 
+    describe("when the ranked window runs out mid-page", () => {
+        it("should fill the page from the tail rather than serving a short one", async () => {
+            // The production bug: a Turkish reader of the community feed got
+            // the two matching posts that existed and then "no more posts",
+            // while hundreds of older ones sat behind the ranked window.
+            seedPool(2);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: Array.from({ length: 8 }, (_, i) =>
+                    buildPost({ id: `tail-${i}` }),
+                ),
+                total: 500,
+            });
+
+            const result = await useCase.execute({
+                limit: 10,
+                currentUserId: "user-1",
+            });
+
+            expect(result.posts).toHaveLength(10);
+            expect(result.posts.slice(0, 2).map((p) => p.id)).toEqual([
+                "p1",
+                "p2",
+            ]);
+            expect(result.posts[2].id).toBe("tail-0");
+        });
+
+        it("should keep handing out a cursor so the reader can go on", async () => {
+            seedPool(2);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: Array.from({ length: 8 }, (_, i) =>
+                    buildPost({ id: `tail-${i}` }),
+                ),
+                total: 500,
+            });
+
+            const result = await useCase.execute({ limit: 10 });
+
+            expect(result.nextCursor).not.toBeNull();
+            // Two ranked plus eight from the tail, so the next page starts at
+            // ten in the snapshot's coordinates.
+            expect(decodeFeedCursor(result.nextCursor!)?.offset).toBe(10);
+        });
+
+        it("should not repeat the ranked posts in the top-up", async () => {
+            seedPool(2);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: [buildPost({ id: "tail-0" })],
+                total: 500,
+            });
+
+            await useCase.execute({ limit: 10 });
+
+            expect(
+                vi.mocked(postRepository.findAll).mock.calls[0][0].excludeIds,
+            ).toEqual(["p1", "p2"]);
+        });
+
+        it("should continue from the right place on the next page", async () => {
+            seedPool(2);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: Array.from({ length: 4 }, (_, i) =>
+                    buildPost({ id: `tail-${i}` }),
+                ),
+                total: 500,
+            });
+
+            const first = await useCase.execute({ limit: 6 });
+            await useCase.execute({ limit: 6, cursor: first.nextCursor! });
+
+            // Four tail rows were already served, so the next read skips them
+            // rather than starting the tail over.
+            expect(
+                vi.mocked(postRepository.findAll).mock.calls[1][0].skip,
+            ).toBe(4);
+        });
+
+        it("should stop only when the tail is genuinely empty", async () => {
+            seedPool(2);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: [],
+                total: 2,
+            });
+
+            const result = await useCase.execute({ limit: 10 });
+
+            expect(result.posts).toHaveLength(2);
+            expect(result.nextCursor).toBeNull();
+        });
+
+        it("should record the topped-up posts as seen as well", async () => {
+            seedPool(2);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: [buildPost({ id: "tail-0" })],
+                total: 500,
+            });
+
+            await useCase.execute({ limit: 5, currentUserId: "user-1" });
+
+            expect(seenPostsService.markSeen).toHaveBeenCalledWith("user-1", [
+                "p1",
+                "p2",
+                "tail-0",
+            ]);
+        });
+
+        it("should not reach for the tail when the ranked window filled the page", async () => {
+            seedPool(20);
+            hydrateRequestedIds();
+
+            await useCase.execute({ limit: 10 });
+
+            expect(postRepository.findAll).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("reaching the end of the tail", () => {
+        it("should stop handing out a cursor once the tail runs short", async () => {
+            // A short read means the database had fewer rows left, which is
+            // the only honest end-of-feed signal available.
+            seedPool(4);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: [buildPost({ id: "t1" })],
+                total: 500,
+            });
+
+            const first = await useCase.execute({ limit: 4 });
+            const second = await useCase.execute({
+                limit: 4,
+                cursor: first.nextCursor!,
+            });
+
+            expect(second.posts.map((p) => p.id)).toEqual(["t1"]);
+            expect(second.nextCursor).toBeNull();
+        });
+
+        it("should keep going while the tail keeps filling the page", async () => {
+            seedPool(4);
+            hydrateRequestedIds();
+            vi.mocked(postRepository.findAll).mockResolvedValue({
+                posts: Array.from({ length: 4 }, (_, i) =>
+                    buildPost({ id: `t${i}` }),
+                ),
+                total: 500,
+            });
+
+            const first = await useCase.execute({ limit: 4 });
+            const second = await useCase.execute({
+                limit: 4,
+                cursor: first.nextCursor!,
+            });
+
+            expect(second.nextCursor).not.toBeNull();
+        });
+    });
+
     describe("feeds that are not ranked", () => {
         it("should serve release notes chronologically", async () => {
             const posts = [buildPost({ id: "p1" }), buildPost({ id: "p2" })];
