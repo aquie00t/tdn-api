@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/the-developer-network/tdn-api/compare/v1.14.1...v1.15.0) (2026-09-01)
+
+
+### Features
+
+* **media:** moderate every uploaded image and video ([#253](https://github.com/the-developer-network/tdn-api/issues/253)) ([7d42386](https://github.com/the-developer-network/tdn-api/commit/7d423869309b6d0e1a9aa0a1f4b1380c4479c438))
+
 ## [1.14.1](https://github.com/the-developer-network/tdn-api/compare/v1.14.0...v1.14.1) (2026-09-01)
 
 
