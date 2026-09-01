@@ -9,9 +9,13 @@ import type { CommentTarget } from "@core/ports/repositories/comment.repository"
 import { Comment } from "@core/domain/entities/comment.entity";
 import { Notification } from "@core/domain/entities/notification.entity";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
+import { MediaChannel, MediaOwnerKind } from "@core/domain/enums";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import { resolveAttachableMedia } from "@core/use-cases/shared/media/resolve-attachable-media";
 import {
     ArticleNotPublishedError,
     BadRequestError,
+    MediaNotOwnedError,
     NotFoundError,
 } from "@core/errors";
 import type { CreateCommentUseCaseInput } from "./create-comment-usecase.input";
@@ -21,10 +25,15 @@ export class CreateCommentUseCase {
      * Creates a new CreateCommentUseCase instance
      * @param transactionService - Service for handling database transactions
      * @param realtimeService - Service for sending real-time notifications
+     * @param mediaAssetRepository - Repository the submitted media keys are checked against
+     * @param r2PublicUrl - CDN origin media URLs are served from, used to
+     * recover the storage key behind a submitted URL
      */
     constructor(
         private readonly transactionService: TransactionPort,
         private readonly realtimeService: RealtimePort,
+        private readonly mediaAssetRepository: IMediaAssetRepository,
+        private readonly r2PublicUrl: string,
     ) {}
 
     /**
@@ -77,8 +86,24 @@ export class CreateCommentUseCase {
      * @throws NotFoundError if the target or the parent comment is not found
      * @throws BadRequestError if the parent comment belongs to something else
      * @throws ArticleNotPublishedError if the article is still a draft
+     * @throws MediaNotOwnedError if a submitted media URL is not one this
+     * author uploaded, or was rejected by moderation
+     *
+     * @remarks
+     * Comment media comes off the same upload endpoint as post media, so it
+     * gets the same ownership check. Without it a comment would be an open
+     * side door into publishing any URL the client likes, which is the one
+     * thing the moderation pipeline has to prevent.
      */
     async execute(input: CreateCommentUseCaseInput): Promise<Comment> {
+        const media = await resolveAttachableMedia({
+            mediaUrls: input.mediaUrls || [],
+            uploaderId: input.authorId,
+            channel: MediaChannel.POST_MEDIA,
+            cdnBaseUrl: this.r2PublicUrl,
+            mediaAssetRepository: this.mediaAssetRepository,
+        });
+
         return await this.transactionService.runInTransaction(async (ctx) => {
             const { target } = input;
             const { authorId: targetAuthorId, slug: targetSlug } =
@@ -125,6 +150,8 @@ export class CreateCommentUseCase {
                           input.authorId,
                           input.parentId,
                           input.mediaUrls || [],
+                          media.isSensitive,
+                          media.mediaStatus,
                       )
                     : Comment.createForArticle(
                           input.content,
@@ -132,10 +159,27 @@ export class CreateCommentUseCase {
                           input.authorId,
                           input.parentId,
                           input.mediaUrls || [],
+                          media.isSensitive,
+                          media.mediaStatus,
                       );
 
             const savedComment =
                 await ctx.commentRepository.create(tempComment);
+
+            if (media.storageKeys.length > 0) {
+                // The attach is the atomic claim, not the check above it: two
+                // requests carrying the same key both pass that check, and only
+                // one can come back with every row written.
+                const attached = await ctx.mediaAssetRepository.attachToOwner(
+                    media.storageKeys,
+                    MediaOwnerKind.COMMENT,
+                    savedComment.id,
+                );
+
+                if (attached !== media.storageKeys.length) {
+                    throw new MediaNotOwnedError();
+                }
+            }
 
             // Articles derive their comment count from a relation count, so
             // only posts carry a counter to maintain.

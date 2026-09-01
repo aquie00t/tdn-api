@@ -3,9 +3,13 @@ import {
     UploadArticleCoverUseCase,
     detectImageType,
 } from "@core/use-cases/article/upload-article-cover";
+import { UploadModeratedMediaUseCase } from "@core/use-cases/media/upload-moderated-media";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 import type { CryptoPort } from "@core/ports/services/crypto.port";
+import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { StoragePort } from "@core/ports/services/storage.port";
 import { InvalidFileTypeError, PayloadTooLargeError } from "@core/errors";
+import { fakeModeration, mp4 } from "../../../helpers/media-fixtures";
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const UUID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
@@ -104,9 +108,21 @@ describe("UploadArticleCoverUseCase", () => {
         };
         cryptoService = { generateUuid: vi.fn().mockReturnValue(UUID) };
 
+        const mediaAssetRepository: Pick<IMediaAssetRepository, "create"> = {
+            create: vi.fn().mockImplementation((asset) => asset),
+        };
+
+        // The real shared upload path rather than a stub: what this suite is
+        // checking is that a cover goes through the same byte sniffing and
+        // moderation as everything else.
         useCase = new UploadArticleCoverUseCase(
-            storageService as StoragePort,
-            cryptoService as CryptoPort,
+            new UploadModeratedMediaUseCase(
+                storageService as StoragePort,
+                fakeModeration(),
+                mediaAssetRepository as IMediaAssetRepository,
+                cryptoService as CryptoPort,
+                { error: vi.fn(), warn: vi.fn() } as unknown as LoggerPort,
+            ),
         );
     });
 
@@ -179,6 +195,14 @@ describe("UploadArticleCoverUseCase", () => {
                 truncated: true,
             }),
         ).rejects.toThrow(PayloadTooLargeError);
+    });
+
+    it("should reject a video, which a cover can never be", async () => {
+        await expect(
+            useCase.execute({ userId: USER, fileBuffer: mp4() }),
+        ).rejects.toThrow(InvalidFileTypeError);
+
+        expect(storageService.upload).not.toHaveBeenCalled();
     });
 
     it("should produce a key that the article body validator accepts", async () => {

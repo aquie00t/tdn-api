@@ -37,6 +37,8 @@ import { CreatePostUseCase } from "@core/use-cases/post/create-post";
 import { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
 import { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
+import { UploadModeratedMediaUseCase } from "@core/use-cases/media/upload-moderated-media";
+import { ModeratePendingMediaUseCase } from "@core/use-cases/media/moderate-pending-media";
 import { GetPostsUseCase } from "@core/use-cases/post/get-posts";
 import type { FeedRankingWeights } from "@core/use-cases/post/get-posts/feed-ranking";
 import { RebuildUserInterestsUseCase } from "@core/use-cases/user-interest/rebuild-user-interests";
@@ -332,6 +334,8 @@ export const useCasesModule = {
             notifyNewPostUseCase,
             notifyQuotedAuthorUseCase,
             languageDetectionService,
+            mediaAssetRepository,
+            config,
             logger,
         ) =>
             new CreatePostUseCase(
@@ -341,6 +345,8 @@ export const useCasesModule = {
                 notifyNewPostUseCase,
                 notifyQuotedAuthorUseCase,
                 languageDetectionService,
+                mediaAssetRepository,
+                config.R2_PUBLIC_URL,
                 logger,
             ),
     ).singleton(),
@@ -359,6 +365,45 @@ export const useCasesModule = {
      * Use case for uploading post media files
      */
     uploadPostMediaUseCase: asClass(UploadPostMediaUseCase).singleton(),
+
+    /**
+     * Shared upload path behind every media endpoint: byte-level type
+     * detection, moderation, storage and the asset record.
+     */
+    uploadModeratedMediaUseCase: asClass(
+        UploadModeratedMediaUseCase,
+    ).singleton(),
+
+    /**
+     * Background worker resolving the videos waiting for a verdict.
+     */
+    moderatePendingMediaUseCase: asFunction(
+        (
+            mediaAssetRepository,
+            mediaModerationService,
+            storageService,
+            postRepository,
+            commentRepository,
+            notificationRepository,
+            config,
+            logger,
+        ) =>
+            new ModeratePendingMediaUseCase(
+                mediaAssetRepository,
+                mediaModerationService,
+                storageService,
+                postRepository,
+                commentRepository,
+                notificationRepository,
+                {
+                    batchSize: config.MEDIA_MODERATION_BATCH_SIZE,
+                    maxAttempts: config.MEDIA_MODERATION_MAX_ATTEMPTS,
+                    leaseSeconds: config.MEDIA_MODERATION_LEASE_SECONDS,
+                    r2PublicUrl: config.R2_PUBLIC_URL,
+                },
+                logger,
+            ),
+    ).singleton(),
 
     /**
      * Tuning weights for the feed ranker.
@@ -495,7 +540,15 @@ export const useCasesModule = {
     /**
      * Use case for creating a comment on a post
      */
-    createCommentUseCase: asClass(CreateCommentUseCase).singleton(),
+    createCommentUseCase: asFunction(
+        (transactionService, realtimeService, mediaAssetRepository, config) =>
+            new CreateCommentUseCase(
+                transactionService,
+                realtimeService,
+                mediaAssetRepository,
+                config.R2_PUBLIC_URL,
+            ),
+    ).singleton(),
     /**
      *
      */

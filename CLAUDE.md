@@ -75,6 +75,19 @@ Auth decorators: `fastify.authenticate` (required) and `fastify.optionalAuthenti
 
 `RateLimitPolicies` in `src/http/plugins/rate-limit.plugin.ts`: `STRICT` (3/15 min, `continueExceeding`) for login/register, `SENSITIVE` (5/min) for password reset, verification, and write/social actions, `STANDARD` (60/min) for authenticated reads, `PUBLIC` (100/min). Global default is 100/min. Requests with `Authorization: Bot <token>` are allow-listed after a sha256 lookup against `user.botToken`.
 
+### Media moderation
+
+Every upload endpoint — `POST /media` (post *and* comment media), `POST /articles/cover`, `PATCH /me/avatar`, `PATCH /me/banner` — goes through `UploadModeratedMediaUseCase` (`src/core/use-cases/media/upload-moderated-media/`). It sniffs the format from the file's magic bytes (`src/core/use-cases/shared/media/detect-media-type.ts`; the client's MIME type and filename are never trusted), then splits:
+
+- **Images** are scanned before a byte reaches R2, so a refused file never gets a URL. A provider error fails the upload closed (`ModerationUnavailableError`, 503).
+- **Videos** are stored as `PENDING` and scanned by the `media-moderation` cron worker, because the provider has to fetch and sample them.
+
+Each stored file gets a `MediaAsset` row. **That row is what makes an uploaded key trustworthy:** `CreatePostUseCase` and `CreateCommentUseCase` resolve every submitted `mediaUrls` entry back to an asset via `resolveAttachableMedia` and reject it (`MediaNotOwnedError`, 400) unless this author uploaded it, through the matching `MediaChannel`, and moderation did not reject it. Without that check the pipeline is decorative — the request body accepts arbitrary URLs.
+
+Verdicts are tiered: explicit sexual content, gore, self-harm and hate imagery are rejected; suggestive content, weapons and depicted violence only set `isSensitive` so the client blurs them (this platform is full of game screenshots). Thresholds and the class-to-tier map live in `src/infrastructure/external/moderation/score-to-verdict.ts`, and raw provider scores are stored on every asset so they can be retuned.
+
+Posts, comments and articles carry denormalised `isSensitive` / `mediaStatus` columns; the mappers withhold `mediaUrls` while `mediaStatus !== APPROVED` but still serve the text. `MODERATION_ENABLED=false` (test and local) swaps in `NoopModerationService`, which approves everything — it is never a fallback for a provider that is down.
+
 ### Realtime and background jobs
 
 `FastifyRealtimeService` publishes to the Redis `realtime_events` channel; each instance subscribes and fans out to locally connected sockets via `WebSocketManager` — so notifications work across multiple processes. Never write to sockets directly from a use-case; go through `RealtimePort`.

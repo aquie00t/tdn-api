@@ -6,6 +6,8 @@ import type { Article } from "@core/domain/entities/article.entity";
 import { ArticleStatus } from "@core/domain/enums/article-status.enum";
 import { PostCategory } from "@core/domain/enums/post-category-enum";
 import { BadRequestError } from "@core/errors";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import { MediaModerationStatus, MediaOwnerKind } from "@core/domain/enums";
 
 const AUTHOR = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -15,6 +17,10 @@ describe("CreateArticleUseCase", () => {
     let useCase: CreateArticleUseCase;
     let articleRepository: Pick<IArticleRepository, "create">;
     let cryptoService: Pick<CryptoPort, "generateRandomHex">;
+    let mediaAssetRepository: Pick<
+        IMediaAssetRepository,
+        "findByStorageKeys" | "attachToOwner"
+    >;
 
     /**
      * Returns the entity the use case handed to the repository.
@@ -29,9 +35,14 @@ describe("CreateArticleUseCase", () => {
         cryptoService = {
             generateRandomHex: vi.fn().mockReturnValue("1a2b3c4d"),
         };
+        mediaAssetRepository = {
+            findByStorageKeys: vi.fn().mockResolvedValue([]),
+            attachToOwner: vi.fn().mockResolvedValue(1),
+        };
         useCase = new CreateArticleUseCase(
             articleRepository as IArticleRepository,
             cryptoService as CryptoPort,
+            mediaAssetRepository as IMediaAssetRepository,
         );
     });
 
@@ -135,5 +146,72 @@ describe("CreateArticleUseCase", () => {
         });
 
         expect(created().categories).toEqual([PostCategory.BACKEND]);
+    });
+    describe("cover moderation", () => {
+        const KEY = `articles/covers/${AUTHOR}/${FILE}.png`;
+
+        it("should leave an article with no cover unflagged", async () => {
+            await useCase.execute({
+                authorId: AUTHOR,
+                title: "My article",
+                body: "Some prose.",
+            });
+
+            expect(created().isSensitive).toBe(false);
+            expect(mediaAssetRepository.attachToOwner).not.toHaveBeenCalled();
+        });
+
+        it("should carry a borderline cover's verdict onto the article", async () => {
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [
+                    {
+                        storageKey: KEY,
+                        status: MediaModerationStatus.SENSITIVE,
+                    } as never,
+                ],
+            );
+
+            await useCase.execute({
+                authorId: AUTHOR,
+                title: "My article",
+                body: "Some prose.",
+                coverImageKey: KEY,
+            });
+
+            expect(created().isSensitive).toBe(true);
+        });
+
+        it("should accept a cover with no asset row, as pre-pipeline articles have", async () => {
+            // The key is already bound to this author by its prefix, so a
+            // missing row means "uploaded before moderation existed", not
+            // "unmoderated content".
+            await useCase.execute({
+                authorId: AUTHOR,
+                title: "My article",
+                body: "Some prose.",
+                coverImageKey: KEY,
+            });
+
+            expect(created().isSensitive).toBe(false);
+        });
+
+        it("should bind the cover asset to the stored article", async () => {
+            vi.mocked(articleRepository.create).mockResolvedValue({
+                id: "article-1",
+            } as unknown as Article);
+
+            await useCase.execute({
+                authorId: AUTHOR,
+                title: "My article",
+                body: "Some prose.",
+                coverImageKey: KEY,
+            });
+
+            expect(mediaAssetRepository.attachToOwner).toHaveBeenCalledWith(
+                [KEY],
+                MediaOwnerKind.ARTICLE,
+                "article-1",
+            );
+        });
     });
 });

@@ -25,6 +25,7 @@ import realtimeRoutes from "@routes/realtime.routes";
 import notificationRoutes from "@routes/notification.routes";
 import notificationPurgePlugin from "@plugins/custom/notification-purge.plugin";
 import userInterestRebuildPlugin from "@plugins/custom/user-interest-rebuild.plugin";
+import mediaModerationPlugin from "@plugins/custom/media-moderation.plugin";
 import { postRoutes } from "@routes/post/post.routes";
 import { commentRoutes } from "@routes/post/comment.routes";
 import { likeRoutes } from "@routes/post/like.routes";
@@ -105,6 +106,7 @@ export class App {
         this.server.register(userPurgePlugin);
         this.server.register(notificationPurgePlugin);
         this.server.register(userInterestRebuildPlugin);
+        this.server.register(mediaModerationPlugin);
     }
 
     /**

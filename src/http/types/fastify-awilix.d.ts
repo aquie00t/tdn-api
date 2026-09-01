@@ -19,6 +19,9 @@ import type { CachePort } from "@core/ports/services/cache.port";
 import type { SeenPostsPort } from "@core/ports/services/seen-posts.port";
 import type { TranslationController } from "@controllers/translation.controller";
 import type { ArticleController } from "@controllers/article.controller";
+import type { MediaModerationScheduler } from "@infrastructure/jobs/media-moderation/media-moderation.scheduler";
+import type { MediaModerationPort } from "@core/ports/services/media-moderation.port";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 /**
  * Fastify Awilix cradle interface for dependency injection
  * Defines all injectable services and components available in the application
@@ -87,6 +90,15 @@ declare module "@fastify/awilix" {
 
         /** Controller for article write operations */
         articleController: ArticleController;
+
+        /** Scheduler for the video moderation worker */
+        mediaModerationScheduler: MediaModerationScheduler;
+
+        /** Automated content moderation for uploaded media */
+        mediaModerationService: MediaModerationPort;
+
+        /** Repository backing the media moderation pipeline */
+        mediaAssetRepository: IMediaAssetRepository;
     }
 }
 

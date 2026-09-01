@@ -16,14 +16,10 @@ export interface UpdateAvatarUseCaseInput {
     fileBuffer: Buffer;
 
     /**
-     * The MIME type of the image file (e.g., "image/jpeg", "image/png").
-     * Used for validation and proper handling of the file.
+     * Whether the multipart layer cut the file short at its size limit.
+     *
+     * A truncated file is refused rather than stored: the bytes that were cut
+     * off are exactly the ones moderation never got to look at.
      */
-    mimeType: string;
-
-    /**
-     * The original filename of the uploaded image file.
-     * Used for generating the storage filename and extension detection.
-     */
-    originalFileName: string;
+    truncated?: boolean;
 }

@@ -118,11 +118,13 @@ export class PostController {
             }
 
             const fileBuffer = await part.toBuffer();
+            // The client's MIME type and file name are deliberately not passed
+            // on: both are attacker-controlled, and the use case reads the
+            // format out of the bytes instead.
             const uploadedPath = await this.uploadPostMediaUseCase.execute({
                 userId,
                 fileBuffer,
-                mimeType: part.mimetype,
-                originalFileName: part.filename,
+                truncated: part.file.truncated,
             });
 
             uploadedUrls.push(`${r2PublicUrl}/${uploadedPath}`);

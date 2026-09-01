@@ -3,8 +3,16 @@ import { UpdateAvatarUseCase } from "@core/use-cases/profile/update-avatar";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { StoragePort } from "@core/ports/services/storage.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
-import { InvalidFileTypeError } from "@core/errors";
+import type { UploadModeratedMediaUseCase } from "@core/use-cases/media/upload-moderated-media";
+import {
+    MediaChannel,
+    MediaKind,
+    MediaModerationStatus,
+} from "@core/domain/enums";
+import { MediaRejectedError } from "@core/errors";
 import { DEFAULT_AVATAR_KEY } from "@core/domain/constants/default-media.constants";
+
+const NEW_KEY = "avatars/user-1/new.jpg";
 
 describe("UpdateAvatarUseCase", () => {
     let useCase: UpdateAvatarUseCase;
@@ -12,14 +20,16 @@ describe("UpdateAvatarUseCase", () => {
         IProfileRepository,
         "findAvatarByUserId" | "updateAvatar"
     >;
-    let storageService: Pick<StoragePort, "upload" | "delete">;
+    let storageService: Pick<StoragePort, "delete">;
     let logger: Pick<LoggerPort, "error">;
+    let uploadModeratedMediaUseCase: Pick<
+        UploadModeratedMediaUseCase,
+        "execute"
+    >;
 
     const baseInput = {
         userId: "user-1",
         fileBuffer: Buffer.from("image-data"),
-        mimeType: "image/jpeg",
-        originalFileName: "photo.jpg",
     };
 
     beforeEach(() => {
@@ -28,50 +38,61 @@ describe("UpdateAvatarUseCase", () => {
             updateAvatar: vi.fn().mockResolvedValue(undefined),
         };
         storageService = {
-            upload: vi.fn().mockResolvedValue("avatars/user-1-123.jpg"),
             delete: vi.fn().mockResolvedValue(undefined),
         };
-        logger = {
-            error: vi.fn(),
+        logger = { error: vi.fn() };
+        uploadModeratedMediaUseCase = {
+            execute: vi.fn().mockResolvedValue({
+                storageKey: NEW_KEY,
+                kind: MediaKind.IMAGE,
+                status: MediaModerationStatus.APPROVED,
+            }),
         };
+
         useCase = new UpdateAvatarUseCase(
             profileRepository as IProfileRepository,
+            uploadModeratedMediaUseCase as UploadModeratedMediaUseCase,
             storageService as StoragePort,
             logger as LoggerPort,
         );
     });
 
-    it("should throw InvalidFileTypeError when mimeType does not start with 'image/'", async () => {
-        await expect(
-            useCase.execute({ ...baseInput, mimeType: "application/pdf" }),
-        ).rejects.toThrow(InvalidFileTypeError);
-
-        expect(storageService.upload).not.toHaveBeenCalled();
-        expect(profileRepository.updateAvatar).not.toHaveBeenCalled();
-    });
-
-    it("should upload the file and update the profile with the new URL", async () => {
-        vi.mocked(storageService.upload).mockResolvedValue(
-            "avatars/user-1-new.jpg",
-        );
-
-        const result = await useCase.execute(baseInput);
-
-        expect(storageService.upload).toHaveBeenCalledOnce();
-        expect(profileRepository.updateAvatar).toHaveBeenCalledWith(
-            "user-1",
-            "avatars/user-1-new.jpg",
-        );
-        expect(result).toBe("avatars/user-1-new.jpg");
-    });
-
-    it("should generate the filename with userId and extension from originalFileName", async () => {
+    it("should upload through the avatar channel and refuse video", async () => {
         await useCase.execute(baseInput);
 
-        const uploadCall = vi.mocked(storageService.upload).mock.calls[0];
-        expect(uploadCall[0]).toMatch(/^avatars\/user-1-\d+\.jpg$/);
-        expect(uploadCall[1]).toBe(baseInput.fileBuffer);
-        expect(uploadCall[2]).toBe("image/jpeg");
+        expect(uploadModeratedMediaUseCase.execute).toHaveBeenCalledWith({
+            userId: "user-1",
+            fileBuffer: baseInput.fileBuffer,
+            channel: MediaChannel.AVATAR,
+            keyPrefix: "avatars/user-1",
+            truncated: undefined,
+            maxBytes: 5 * 1024 * 1024,
+            allowVideo: false,
+        });
+    });
+
+    it("should update the profile with the stored key and return it", async () => {
+        const result = await useCase.execute(baseInput);
+
+        expect(profileRepository.updateAvatar).toHaveBeenCalledWith(
+            "user-1",
+            NEW_KEY,
+        );
+        expect(result).toBe(NEW_KEY);
+    });
+
+    it("should not touch the profile when moderation refuses the image", async () => {
+        vi.mocked(uploadModeratedMediaUseCase.execute).mockRejectedValue(
+            new MediaRejectedError(),
+        );
+
+        await expect(useCase.execute(baseInput)).rejects.toThrow(
+            MediaRejectedError,
+        );
+
+        // An avatar travels into every feed and notification the user appears
+        // in, so a refused one must leave the old one in place.
+        expect(profileRepository.updateAvatar).not.toHaveBeenCalled();
     });
 
     it("should not call storageService.delete when there is no old avatar", async () => {
@@ -112,21 +133,7 @@ describe("UpdateAvatarUseCase", () => {
             new Error("Storage unavailable"),
         );
 
-        await expect(useCase.execute(baseInput)).resolves.toBeDefined();
+        await expect(useCase.execute(baseInput)).resolves.toBe(NEW_KEY);
         expect(logger.error).toHaveBeenCalledOnce();
-    });
-
-    it("should still return the uploaded path even when old avatar deletion fails", async () => {
-        vi.mocked(profileRepository.findAvatarByUserId).mockResolvedValue(
-            "avatars/user-1-old.jpg",
-        );
-        vi.mocked(storageService.upload).mockResolvedValue(
-            "avatars/user-1-new.jpg",
-        );
-        vi.mocked(storageService.delete).mockRejectedValue(new Error("fail"));
-
-        const result = await useCase.execute(baseInput);
-
-        expect(result).toBe("avatars/user-1-new.jpg");
     });
 });

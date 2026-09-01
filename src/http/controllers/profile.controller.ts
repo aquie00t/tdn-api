@@ -107,8 +107,7 @@ export class ProfileController {
         const avatarUrl = await this.updateAvatarUseCase.execute({
             userId,
             fileBuffer,
-            mimeType: data.mimetype,
-            originalFileName: data.filename,
+            truncated: data.file.truncated,
         });
 
         reply.status(200).send({
@@ -135,8 +134,7 @@ export class ProfileController {
         const bannerUrl = await this.updateBannerUseCase.execute({
             userId,
             fileBuffer,
-            mimeType: data.mimetype,
-            originalFileName: data.filename,
+            truncated: data.file.truncated,
         });
 
         reply.status(200).send({

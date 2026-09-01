@@ -18,6 +18,9 @@ import type { Comment } from "@core/domain/entities/comment.entity";
 import { ArticleStatus } from "@core/domain/enums/article-status.enum";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import { buildArticle, buildComment } from "../../../helpers/mock-factories";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+
+const CDN_URL = "https://cdn.example.com";
 
 const AUTHOR = "article-author-1";
 const COMMENTER = "commenter-1";
@@ -32,6 +35,10 @@ describe("CreateCommentUseCase (article target)", () => {
     let useCase: CreateCommentUseCase;
     let transactionSvc: Pick<TransactionPort, "runInTransaction">;
     let realtimeSvc: Pick<RealtimePort, "emitToUser">;
+    let mediaAssetRepo: Pick<
+        IMediaAssetRepository,
+        "findByStorageKeys" | "attachToOwner"
+    >;
     let txArticleRepo: Pick<IArticleRepository, "findById">;
     let txPostRepo: Pick<
         IPostRepository,
@@ -67,6 +74,10 @@ describe("CreateCommentUseCase (article target)", () => {
         };
         txNotificationRepo = { create: vi.fn() };
         realtimeSvc = { emitToUser: vi.fn() };
+        mediaAssetRepo = {
+            findByStorageKeys: vi.fn().mockResolvedValue([]),
+            attachToOwner: vi.fn().mockResolvedValue(1),
+        };
         transactionSvc = {
             runInTransaction: vi.fn().mockImplementation(async (work) =>
                 work({
@@ -75,6 +86,8 @@ describe("CreateCommentUseCase (article target)", () => {
                     commentRepository: txCommentRepo as ICommentRepository,
                     notificationRepository:
                         txNotificationRepo as INotificationRepository,
+                    mediaAssetRepository:
+                        mediaAssetRepo as IMediaAssetRepository,
                 } as TransactionContext),
             ),
         };
@@ -82,6 +95,8 @@ describe("CreateCommentUseCase (article target)", () => {
         useCase = new CreateCommentUseCase(
             transactionSvc as TransactionPort,
             realtimeSvc as RealtimePort,
+            mediaAssetRepo as IMediaAssetRepository,
+            CDN_URL,
         );
     });
 

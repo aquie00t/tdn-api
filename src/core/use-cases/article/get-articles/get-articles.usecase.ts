@@ -31,6 +31,7 @@ interface CachedArticle {
     excerpt: string | null;
     coverImageKey: string | null;
     coverImageAlt: string | null;
+    isSensitive: boolean;
     status: string;
     publishedAt: string | null;
     readingTimeMinutes: number;
@@ -228,6 +229,10 @@ export class GetArticlesUseCase {
             excerpt: article.excerpt,
             coverImageKey: article.coverImageKey,
             coverImageAlt: article.coverImageAlt,
+            // Carried through the cache like every other stored field. Dropping
+            // it would serve a cover moderation judged borderline unblurred on
+            // the one endpoint where most people meet it.
+            isSensitive: article.isSensitive,
             status: article.status,
             publishedAt: article.publishedAt
                 ? article.publishedAt.toISOString()
@@ -265,6 +270,9 @@ export class GetArticlesUseCase {
             excerpt: entry.excerpt,
             coverImageKey: entry.coverImageKey,
             coverImageAlt: entry.coverImageAlt,
+            // Older cache entries predate the field; a missing one reads as
+            // "not flagged", which matches how those articles were stored.
+            isSensitive: entry.isSensitive ?? false,
             status: entry.status as ArticleStatus,
             publishedAt: entry.publishedAt ? new Date(entry.publishedAt) : null,
             readingTimeMinutes: entry.readingTimeMinutes,

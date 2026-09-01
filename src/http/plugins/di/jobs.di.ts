@@ -7,6 +7,8 @@ import { NotificationPurgeJob } from "@infrastructure/jobs/notification/notifica
 import { NotificationPurgeScheduler } from "@infrastructure/jobs/notification/notification-purge.scheduler";
 import { UserInterestRebuildJob } from "@infrastructure/jobs/user-interest/user-interest-rebuild.job";
 import { UserInterestRebuildScheduler } from "@infrastructure/jobs/user-interest/user-interest-rebuild.scheduler";
+import { MediaModerationJob } from "@infrastructure/jobs/media-moderation/media-moderation.job";
+import { MediaModerationScheduler } from "@infrastructure/jobs/media-moderation/media-moderation.scheduler";
 
 export const jobsModule = {
     // --- Jobs ---
@@ -14,6 +16,7 @@ export const jobsModule = {
     refreshTokenPurgeJob: asClass(RefreshTokenPurgeJob).singleton(),
     notificationPurgeJob: asClass(NotificationPurgeJob),
     userInterestRebuildJob: asClass(UserInterestRebuildJob).singleton(),
+    mediaModerationJob: asClass(MediaModerationJob).singleton(),
 
     // --- Schedulers ---
     userPurgeScheduler: asFunction((userPurgeJob, config, logger) => {
@@ -47,6 +50,16 @@ export const jobsModule = {
             );
         },
     ),
+
+    mediaModerationScheduler: asFunction(
+        (mediaModerationJob, config, logger) => {
+            return new MediaModerationScheduler(
+                mediaModerationJob,
+                { cronExpression: config.MEDIA_MODERATION_CRON },
+                logger,
+            );
+        },
+    ).singleton(),
 
     userInterestRebuildScheduler: asFunction(
         (userInterestRebuildJob, config, logger) => {

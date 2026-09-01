@@ -11,6 +11,12 @@ projects:
       repo: https://github.com/the-developer-network/tdn-api
       plan: free
       envVars:
+      - key: MODERATION_ENABLED
+        sync: false
+      - key: SIGHTENGINE_API_USER
+        sync: false
+      - key: SIGHTENGINE_API_SECRET
+        sync: false
       - key: OTP_EXPIRY_SECONDS
         sync: false
       - key: USER_PURGE_GRACE_PERIOD_DAYS

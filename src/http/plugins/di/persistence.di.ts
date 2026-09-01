@@ -17,6 +17,7 @@ import { PrismaTagRepository } from "@infrastructure/persistence/repositories/pr
 import { PrismaArticleRepository } from "@infrastructure/persistence/repositories/prisma-article.repository";
 import { PrismaArticleLikeRepository } from "@infrastructure/persistence/repositories/prisma-article-like.repository";
 import { PrismaArticleBookmarkRepository } from "@infrastructure/persistence/repositories/prisma-article-bookmark.repository";
+import { PrismaMediaAssetRepository } from "@infrastructure/persistence/repositories/prisma-media-asset.repository";
 
 /**
  * Dependency injection module for persistence layer
@@ -27,6 +28,12 @@ import { PrismaArticleBookmarkRepository } from "@infrastructure/persistence/rep
  */
 export const persistenceModule = {
     // --- Repositories ---
+
+    /**
+     * Media asset repository, backing the moderation pipeline and the
+     * ownership check that keeps unmoderated URLs out of stored content.
+     */
+    mediaAssetRepository: asClass(PrismaMediaAssetRepository).singleton(),
 
     /**
      * User repository for managing user data persistence

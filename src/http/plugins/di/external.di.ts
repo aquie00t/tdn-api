@@ -5,6 +5,8 @@ import { GoogleAuthService } from "@infrastructure/external/google-auth.service"
 import { S3StorageService } from "@infrastructure/external/s3-storage.service";
 import { DeepLTranslationService } from "@infrastructure/external/deepl-translation.service";
 import { HeuristicLanguageDetectionService } from "@infrastructure/external/heuristic-language-detection.service";
+import { SightengineModerationService } from "@infrastructure/external/moderation/sightengine-moderation.service";
+import { NoopModerationService } from "@infrastructure/external/moderation/noop-moderation.service";
 
 export const externalModule = {
     // --- Services ---
@@ -42,4 +44,29 @@ export const externalModule = {
     languageDetectionService: asClass(
         HeuristicLanguageDetectionService,
     ).singleton(),
+
+    /**
+     * Automated content moderation for uploaded media.
+     *
+     * The stand-in is chosen only when moderation is explicitly turned off -
+     * the test environment, and local setups without credentials. It is never
+     * a fallback for a provider that is down: an upload that could not be
+     * checked is refused rather than waved through.
+     */
+    mediaModerationService: asFunction((config, logger) => {
+        if (!config.MODERATION_ENABLED) return new NoopModerationService();
+
+        return new SightengineModerationService(
+            {
+                apiUser: config.SIGHTENGINE_API_USER,
+                apiSecret: config.SIGHTENGINE_API_SECRET,
+                thresholds: {
+                    reject: config.MODERATION_REJECT_THRESHOLD,
+                    sensitive: config.MODERATION_SENSITIVE_THRESHOLD,
+                },
+                timeoutMs: config.MODERATION_REQUEST_TIMEOUT_MS,
+            },
+            logger,
+        );
+    }).singleton(),
 };
