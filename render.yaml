@@ -1,11 +1,17 @@
 # Originally exported from Render on 2026-05-04T18:29:38Z, edited since.
 #
-# Region: the service, the Neon database and the Upstash Redis instance all
-# live in eu-central-1, and so do almost all of the readers. Measured from
-# Turkey, Frankfurt answers in 88 ms against 266 ms for Ohio and 287 ms for
-# Oregon, and the API pays that distance again on every database and cache
-# round trip - a ranked feed page makes about a dozen. Splitting these across
-# regions cost roughly a second per community feed request.
+# Region: this says `oregon` because that is where the service runs, and this
+# file has to describe the service rather than the one we would like. Render
+# refuses a blueprint whose region differs from the running service - "changing
+# region not supported" - and refusing it fails the whole sync, so a hopeful
+# value here blocks every other change in the file as well.
+#
+# It should be `frankfurt`. Redis is already in eu-central-1 and the readers are
+# in Turkey, where Frankfurt answers in 88 ms against 266 ms for Ohio and 287 ms
+# for Oregon; the API pays that distance again on every database and cache round
+# trip, and a ranked feed page makes about a dozen. Getting there means creating
+# a new service in Frankfurt and moving the domain to it. Edit this line in the
+# same change that does so, not before.
 #
 # Plan: `starter`, not `free`. A free instance sleeps after fifteen minutes and
 # then makes the next visitor wait out a cold start, which on a site this quiet
@@ -90,7 +96,7 @@ projects:
         sync: false
       - key: ACCESS_TOKEN_EXPIRES_IN
         sync: false
-      region: frankfurt
+      region: oregon
       dockerContext: .
       dockerfilePath: ./Dockerfile
       domains:
