@@ -1,3 +1,10 @@
+## [1.14.1](https://github.com/the-developer-network/tdn-api/compare/v1.14.0...v1.14.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **post:** stop the feed ending where the ranked window does ([#251](https://github.com/the-developer-network/tdn-api/issues/251)) ([86e19e4](https://github.com/the-developer-network/tdn-api/commit/86e19e451f4cdacb8df63bedd225e6cac7dc6032))
+
 # [1.14.0](https://github.com/the-developer-network/tdn-api/compare/v1.13.0...v1.14.0) (2026-09-01)
 
 
