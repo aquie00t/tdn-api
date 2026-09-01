@@ -39,6 +39,15 @@ projects:
         sync: false
       - key: MODERATION_ENABLED
         sync: false
+      # Set these on the service before merging the moderation work. With
+      # MODERATION_ENABLED true and either of them empty the provider refuses
+      # to construct, which fails the boot - deliberately, so a deploy that
+      # forgot them cannot come up healthy and answer 503 to every upload
+      # while nobody notices.
+      - key: SIGHTENGINE_API_USER
+        sync: false
+      - key: SIGHTENGINE_API_SECRET
+        sync: false
       - key: FEED_EXPLORATION_RATE
         sync: false
       - key: USER_INTEREST_SIGNAL_LIMIT
