@@ -84,8 +84,12 @@ export const EnvSchema = Type.Object({
     FEED_WEIGHT_ENGAGEMENT: Type.Number({ default: 0.6 }),
     FEED_HALF_LIFE_HOURS: Type.Number({ default: 18, minimum: 1 }),
     FEED_MAX_POSTS_PER_AUTHOR: Type.Number({ default: 3, minimum: 1 }),
+    // A ceiling on content the reader cannot read, not a target: it applies
+    // only while there is content in their own language to spend the other
+    // slots on. When there is none the feed serves what exists rather than
+    // running dry.
     FEED_FOREIGN_LANGUAGE_QUOTA: Type.Number({
-        default: 0.25,
+        default: 0.2,
         minimum: 0,
         maximum: 1,
     }),

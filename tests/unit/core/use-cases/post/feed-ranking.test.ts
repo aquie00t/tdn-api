@@ -336,6 +336,47 @@ describe("rankFeed", () => {
         expect(head.filter((c) => c.lang === "en").length).toBeGreaterThan(0);
     });
 
+    it("should keep serving when the viewer's language runs out", () => {
+        // The quota is a ceiling on content the reader cannot read, not a
+        // floor on content they can. With two Turkish posts and a wall of
+        // English, the feed serves the two and then keeps going.
+        const pool = [
+            candidate({ id: "tr-1", lang: "tr" }),
+            candidate({ id: "tr-2", lang: "tr" }),
+            ...Array.from({ length: 30 }, (_, i) =>
+                candidate({ id: `en-${i}`, lang: "en" }),
+            ),
+        ];
+
+        const ranked = rankFeed(pool, context(), WEIGHTS);
+
+        expect(ranked).toHaveLength(pool.length);
+        expect(
+            ranked
+                .slice(0, 2)
+                .map((c) => c.id)
+                .sort(),
+        ).toEqual(["tr-1", "tr-2"]);
+        expect(ranked[2].lang).toBe("en");
+    });
+
+    it("should hold foreign content to the quota while native content lasts", () => {
+        const pool = [
+            ...Array.from({ length: 20 }, (_, i) =>
+                candidate({ id: `tr-${i}`, lang: "tr" }),
+            ),
+            ...Array.from({ length: 20 }, (_, i) =>
+                candidate({ id: `en-${i}`, lang: "en", likeCount: 500 }),
+            ),
+        ];
+
+        const head = rankFeed(pool, context(), WEIGHTS).slice(0, 10);
+
+        expect(head.filter((c) => c.lang === "en").length).toBeLessThanOrEqual(
+            Math.ceil(10 * WEIGHTS.foreignLanguageQuota),
+        );
+    });
+
     it("should return an empty order for an empty pool", () => {
         expect(rankFeed([], context(), WEIGHTS)).toEqual([]);
     });
