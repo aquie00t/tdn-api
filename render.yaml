@@ -1,4 +1,15 @@
-# Exported from Render on 2026-05-04T18:29:38Z
+# Originally exported from Render on 2026-05-04T18:29:38Z, edited since.
+#
+# Region: the service, the Neon database and the Upstash Redis instance all
+# live in eu-central-1, and so do almost all of the readers. Measured from
+# Turkey, Frankfurt answers in 88 ms against 266 ms for Ohio and 287 ms for
+# Oregon, and the API pays that distance again on every database and cache
+# round trip - a ranked feed page makes about a dozen. Splitting these across
+# regions cost roughly a second per community feed request.
+#
+# Plan: `starter`, not `free`. A free instance sleeps after fifteen minutes and
+# then makes the next visitor wait out a cold start, which on a site this quiet
+# is most of them.
 version: "1"
 projects:
 - name: My project
@@ -9,7 +20,7 @@ projects:
       name: tdn-api
       runtime: docker
       repo: https://github.com/the-developer-network/tdn-api
-      plan: free
+      plan: starter
       envVars:
       - key: OTP_EXPIRY_SECONDS
         sync: false
@@ -73,7 +84,7 @@ projects:
         sync: false
       - key: ACCESS_TOKEN_EXPIRES_IN
         sync: false
-      region: oregon
+      region: frankfurt
       dockerContext: .
       dockerfilePath: ./Dockerfile
       domains:
