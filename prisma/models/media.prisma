@@ -1,0 +1,84 @@
+/// Moderation lifecycle of a stored file.
+///
+/// Images never sit in PENDING: they are scanned inside the upload request and
+/// are only written to storage once a verdict exists. Videos do, because the
+/// provider needs to fetch and sample them, which is far too slow to hold an
+/// HTTP request open for.
+enum MediaModerationStatus {
+  PENDING
+  SCANNING
+  APPROVED
+  SENSITIVE
+  REJECTED
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
+/// The upload endpoint a file came through. Chosen at upload time, so an avatar
+/// can never be attached to a post afterwards. Posts and comments share one
+/// endpoint, so the channel deliberately does not say which of the two claimed
+/// the file - `ownerId` does that, once something has.
+enum MediaChannel {
+  POST_MEDIA
+  ARTICLE_COVER
+  AVATAR
+  BANNER
+}
+
+/// Which table `ownerId` points into. Posts and comments share one upload
+/// endpoint, so the channel cannot say, and a verdict has to know where to be
+/// written back to.
+enum MediaOwnerKind {
+  POST
+  COMMENT
+  ARTICLE
+}
+
+/// One stored file and everything the moderation pipeline knows about it.
+///
+/// The row is what makes an uploaded key trustworthy: content creation looks a
+/// key up here and refuses it unless this uploader owns it and it passed
+/// moderation. Without that check the pipeline would be decorative, since a
+/// client can put any URL it likes in a post body.
+model MediaAsset {
+  id String @id @default(uuid())
+
+  /// The R2 object key, without any CDN prefix.
+  storageKey String    @unique @map("storage_key")
+  kind       MediaKind
+  /// Derived from the file's magic bytes, never from the client's claim.
+  mimeType   String    @map("mime_type")
+  byteSize   Int       @map("byte_size")
+
+  uploaderId String @map("uploader_id")
+  uploader   User   @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  channel   MediaChannel    @map("channel")
+  /// The post or comment the asset ended up on. Null until the content that
+  /// uses it is created, which is what lets a purge job find abandoned uploads.
+  ownerId   String?         @map("owner_id")
+  ownerKind MediaOwnerKind? @map("owner_kind")
+
+  status     MediaModerationStatus @default(PENDING)
+  /// Flagged category labels, kept for auditing a rejection after the fact.
+  categories String[]              @default([])
+  /// Raw provider scores. Stored so thresholds can be retuned against real
+  /// traffic instead of guesses.
+  scores     Json?
+  provider   String?
+
+  moderatedAt DateTime? @map("moderated_at")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([uploaderId])
+  @@index([ownerKind, ownerId])
+  @@map("media_assets")
+}

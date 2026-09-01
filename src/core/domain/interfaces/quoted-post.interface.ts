@@ -1,3 +1,5 @@
+import type { MediaModerationStatus } from "@core/domain/enums";
+
 /**
  * The snapshot of a post as it appears embedded inside a quote post.
  *
@@ -16,6 +18,16 @@ export interface QuotedPostSnapshot {
 
     /** Media attached to the quoted post */
     mediaUrls: string[];
+
+    /** Whether the quoted post's media was judged borderline by moderation */
+    isSensitive?: boolean;
+
+    /**
+     * Moderation state of the quoted post's media. A quote card must withhold
+     * unscanned media on the same terms as the post itself, or quoting would
+     * be a way to publish a video before it was cleared.
+     */
+    mediaStatus?: MediaModerationStatus;
 
     /** When the quoted post was created */
     createdAt: Date;

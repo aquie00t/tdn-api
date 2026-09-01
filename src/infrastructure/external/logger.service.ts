@@ -7,4 +7,8 @@ export class LoggerService implements LoggerPort {
     error(object: object, message: string): void {
         return this.logger.error(object, message);
     }
+
+    warn(object: object, message: string): void {
+        return this.logger.warn(object, message);
+    }
 }

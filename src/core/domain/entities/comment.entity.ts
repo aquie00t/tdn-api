@@ -2,6 +2,7 @@
  * Comment entity representing a user comment on a post or an article
  * Supports nested comments through optional parent-child relationships
  */
+import { MediaModerationStatus } from "@core/domain/enums";
 import type { CommentProps } from "@core/domain/interfaces/comment-props.interface";
 import type { CommentTarget } from "@core/ports/repositories/comment.repository";
 
@@ -34,6 +35,35 @@ export class Comment {
      */
     public get mediaUrls(): string[] {
         return this.props.mediaUrls || [];
+    }
+
+    /**
+     * Whether moderation judged the attached media borderline
+     * @returns True when the client should blur the media behind a tap
+     */
+    public get isSensitive(): boolean {
+        return this.props.isSensitive ?? false;
+    }
+
+    /**
+     * Moderation state of the comment's own media
+     * @returns The stored status, defaulting to APPROVED for a text-only comment
+     */
+    public get mediaStatus(): MediaModerationStatus {
+        return this.props.mediaStatus ?? MediaModerationStatus.APPROVED;
+    }
+
+    /**
+     * Whether the read path may serve this comment's media URLs.
+     *
+     * A comment whose video has not been cleared is still served - the text
+     * was never in question - but its media is held back until a verdict
+     * exists.
+     *
+     * @returns True once the attached media has been cleared
+     */
+    public get isMediaServable(): boolean {
+        return this.mediaStatus === MediaModerationStatus.APPROVED;
     }
 
     /**
@@ -142,6 +172,8 @@ export class Comment {
         authorId: string,
         parentId: string | null = null,
         mediaUrls: string[] = [],
+        isSensitive = false,
+        mediaStatus: MediaModerationStatus = MediaModerationStatus.APPROVED,
     ): Comment {
         return new Comment({
             content,
@@ -150,6 +182,8 @@ export class Comment {
             authorId,
             parentId,
             mediaUrls,
+            isSensitive,
+            mediaStatus,
         });
     }
 
@@ -168,6 +202,8 @@ export class Comment {
         authorId: string,
         parentId: string | null = null,
         mediaUrls: string[] = [],
+        isSensitive = false,
+        mediaStatus: MediaModerationStatus = MediaModerationStatus.APPROVED,
     ): Comment {
         return new Comment({
             content,
@@ -176,6 +212,8 @@ export class Comment {
             authorId,
             parentId,
             mediaUrls,
+            isSensitive,
+            mediaStatus,
         });
     }
 

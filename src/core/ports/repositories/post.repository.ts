@@ -1,3 +1,4 @@
+import type { MediaState } from "@core/ports/repositories/media-asset.repository";
 import type { PostType } from "@core/domain/enums/post-type.enum";
 import type { Post } from "@core/domain/entities/post.entity";
 import type { PostCategory } from "@core/domain/enums/post-category-enum";
@@ -153,6 +154,20 @@ export interface IPostRepository {
      * @param postId - The ID of the post that was quoted.
      */
     incrementQuoteCount(postId: string): Promise<void>;
+
+    /**
+     * Overwrites the media state written by moderation.
+     *
+     * Used by the background worker once a video has a verdict. The full media
+     * list is passed rather than a diff: the surviving assets already describe
+     * exactly what the content should carry, and computing a removal against a
+     * row that may have changed underneath is how a race turns into a media
+     * list that is missing something.
+     *
+     * @param id - The id of the content to update
+     * @param state - The media list and moderation flags to store
+     */
+    updateMediaState(id: string, state: MediaState): Promise<void>;
 
     /**
      * Decrements the quote count for a post.

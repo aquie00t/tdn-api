@@ -1,3 +1,4 @@
+import type { MediaState } from "@core/ports/repositories/media-asset.repository";
 /**
  * Repository interface for comment data operations
  * Handles CRUD operations for comments and nested comment relationships
@@ -121,6 +122,20 @@ export interface ICommentRepository {
      * @param commentId - The ID of the comment to update
      */
     incrementRepliesCount(commentId: string): Promise<void>;
+
+    /**
+     * Overwrites the media state written by moderation.
+     *
+     * Used by the background worker once a video has a verdict. The full media
+     * list is passed rather than a diff: the surviving assets already describe
+     * exactly what the content should carry, and computing a removal against a
+     * row that may have changed underneath is how a race turns into a media
+     * list that is missing something.
+     *
+     * @param id - The id of the content to update
+     * @param state - The media list and moderation flags to store
+     */
+    updateMediaState(id: string, state: MediaState): Promise<void>;
 
     /**
      * Decrements the cached reply count of a comment by one

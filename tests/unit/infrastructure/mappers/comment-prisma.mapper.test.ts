@@ -4,6 +4,7 @@ import {
     type CommentWithRelations,
 } from "@infrastructure/persistence/mappers/comment-prisma.mapper";
 import { Comment } from "@core/domain/entities/comment.entity";
+import { MediaModerationStatus } from "@core/domain/enums";
 
 const CDN = "https://cdn.example.com";
 const now = new Date("2025-01-01T00:00:00.000Z");
@@ -29,6 +30,8 @@ function makeDbComment(
         },
         likes: [],
         bookmarks: [],
+        isSensitive: false,
+        mediaStatus: MediaModerationStatus.APPROVED,
         ...overrides,
     } as unknown as CommentWithRelations;
 }
@@ -225,9 +228,8 @@ describe("CommentPrismaMapper", () => {
 
     describe("author handle guarantee", () => {
         it("should serialize the author handle", () => {
-            const comment = CommentPrismaMapper.toDomainComment(
-                makeDbComment(),
-            );
+            const comment =
+                CommentPrismaMapper.toDomainComment(makeDbComment());
 
             expect(
                 CommentPrismaMapper.toResponse(comment, CDN).author.username,
@@ -249,6 +251,46 @@ describe("CommentPrismaMapper", () => {
             expect(() => CommentPrismaMapper.toResponse(comment, CDN)).toThrow(
                 /loaded with its author/,
             );
+        });
+    });
+    describe("moderated media", () => {
+        const MEDIA = ["https://cdn.example.com/posts/user-1/clip.mp4"];
+
+        it("should serve media once it has been cleared", () => {
+            const comment = CommentPrismaMapper.toDomainComment(
+                makeDbComment({ mediaUrls: MEDIA } as never),
+            );
+            const result = CommentPrismaMapper.toResponse(comment, CDN);
+
+            expect(result.mediaUrls).toEqual(MEDIA);
+            expect(result.mediaPending).toBe(false);
+            expect(result.isSensitive).toBe(false);
+        });
+
+        it("should withhold unscanned media but keep the text", () => {
+            // Comment media comes off the same upload endpoint as post media,
+            // so it is withheld on the same terms.
+            const comment = CommentPrismaMapper.toDomainComment(
+                makeDbComment({
+                    mediaUrls: MEDIA,
+                    mediaStatus: MediaModerationStatus.PENDING,
+                } as never),
+            );
+            const result = CommentPrismaMapper.toResponse(comment, CDN);
+
+            expect(result.mediaUrls).toEqual([]);
+            expect(result.mediaPending).toBe(true);
+            expect(result.content).toBe("Test comment");
+        });
+
+        it("should serve borderline media with the sensitive flag set", () => {
+            const comment = CommentPrismaMapper.toDomainComment(
+                makeDbComment({ mediaUrls: MEDIA, isSensitive: true } as never),
+            );
+            const result = CommentPrismaMapper.toResponse(comment, CDN);
+
+            expect(result.mediaUrls).toEqual(MEDIA);
+            expect(result.isSensitive).toBe(true);
         });
     });
 });

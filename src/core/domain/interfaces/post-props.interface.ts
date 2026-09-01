@@ -1,4 +1,4 @@
-import type { PostType } from "@core/domain/enums";
+import type { MediaModerationStatus, PostType } from "@core/domain/enums";
 import type { PostCategory } from "../enums/post-category-enum";
 import type { QuotedPostSnapshot } from "./quoted-post.interface";
 
@@ -83,6 +83,21 @@ export interface PostProps {
      * than dropping it.
      */
     lang?: string | null;
+
+    /**
+     * True when moderation judged the attached media borderline rather than
+     * forbidden. The post is served as normal and the client blurs the media.
+     */
+    isSensitive?: boolean;
+
+    /**
+     * Moderation state of the post's own media.
+     *
+     * APPROVED for a text-only post. PENDING while an attached video is still
+     * being scanned and REJECTED once one failed - in both of those the read
+     * path withholds the media and serves the text.
+     */
+    mediaStatus?: MediaModerationStatus;
 
     /**
      * The post this one quotes, when it is a quote post.

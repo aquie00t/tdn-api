@@ -1,3 +1,4 @@
+import type { MediaState } from "@core/ports/repositories/media-asset.repository";
 /**
  * Prisma implementation of the comment repository
  * Handles database operations for comments and nested comment relationships
@@ -35,6 +36,8 @@ export class PrismaCommentRepository implements ICommentRepository {
                 articleId: comment.articleId,
                 authorId: comment.authorId,
                 parentId: comment.parentId,
+                isSensitive: comment.isSensitive,
+                mediaStatus: comment.mediaStatus,
             },
             include: {
                 author: {
@@ -211,6 +214,27 @@ export class PrismaCommentRepository implements ICommentRepository {
     async delete(id: string): Promise<void> {
         await this.prisma.comment.delete({ where: { id } });
     }
+    /**
+     * Overwrites the media state written by moderation.
+     *
+     * @param id - The id of the content to update
+     * @param state - The media list and moderation flags to store
+     */
+    async updateMediaState(id: string, state: MediaState): Promise<void> {
+        // updateMany, so content deleted while its video was in flight matches
+        // nothing instead of raising. An update that throws here would send the
+        // worker down the retry path and eventually reject - and delete - media
+        // whose owner is already gone, then tell the author about it.
+        await this.prisma.comment.updateMany({
+            where: { id },
+            data: {
+                mediaUrls: state.mediaUrls,
+                isSensitive: state.isSensitive,
+                mediaStatus: state.mediaStatus,
+            },
+        });
+    }
+
     /**
      * Counts the number of replies for a specific parent comment
      * @param parentId - The ID of the parent comment

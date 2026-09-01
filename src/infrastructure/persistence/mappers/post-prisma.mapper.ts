@@ -1,5 +1,6 @@
 import { Post } from "@core/domain/entities/post.entity";
 import type { PostCategory } from "@core/domain/enums/post-category-enum";
+import { MediaModerationStatus } from "@core/domain/enums/media-moderation-status.enum";
 import type { PostType } from "@core/domain/enums/post-type.enum";
 import type { Prisma } from "@generated/prisma/client";
 
@@ -42,6 +43,10 @@ export interface QuotedPostResponse {
     id: string;
     content: string;
     mediaUrls: string[];
+    /** True when the client should blur the media behind a tap. */
+    isSensitive: boolean;
+    /** True while the media is stored but not yet cleared by moderation. */
+    mediaPending: boolean;
     createdAt: Date;
     author: {
         id: string;
@@ -69,6 +74,10 @@ export interface PostResponse {
     };
     isLiked: boolean;
     isBookmarked: boolean;
+    /** True when the client should blur the media behind a tap. */
+    isSensitive: boolean;
+    /** True while the media is stored but not yet cleared by moderation. */
+    mediaPending: boolean;
     /** Detected content language, null when the detector could not tell. */
     lang: string | null;
     tags?: { name: string }[];
@@ -111,12 +120,17 @@ export class PostPrismaMapper {
             isBookmarked: dbPost.bookmarks && dbPost.bookmarks.length > 0,
             categories: (dbPost.category as PostCategory[]) || [],
             lang: dbPost.lang,
+            isSensitive: dbPost.isSensitive,
+            mediaStatus: dbPost.mediaStatus as MediaModerationStatus,
             quotedPostId: dbPost.quotedPostId ?? undefined,
             quotedPost: dbPost.quotedPost
                 ? {
                       id: dbPost.quotedPost.id,
                       content: dbPost.quotedPost.content,
                       mediaUrls: dbPost.quotedPost.mediaUrls,
+                      isSensitive: dbPost.quotedPost.isSensitive,
+                      mediaStatus: dbPost.quotedPost
+                          .mediaStatus as MediaModerationStatus,
                       createdAt: dbPost.quotedPost.createdAt,
                       author: {
                           id: dbPost.quotedPost.authorId,
@@ -147,6 +161,8 @@ export class PostPrismaMapper {
         category: PostCategory[];
         lang: string | null;
         quotedPostId: string | null;
+        isSensitive: boolean;
+        mediaStatus: MediaModerationStatus;
     } {
         return {
             content: post.content,
@@ -156,6 +172,8 @@ export class PostPrismaMapper {
             category: post.categories || [],
             lang: post.lang,
             quotedPostId: post.quotedPostId ?? null,
+            isSensitive: post.isSensitive,
+            mediaStatus: post.mediaStatus,
         };
     }
 
@@ -186,7 +204,12 @@ export class PostPrismaMapper {
             id: post.id,
             content: post.content,
             type: post.type,
-            mediaUrls: post.mediaUrls,
+            // Media that has not been cleared is withheld rather than the whole
+            // post: the text is the author's and was never in question, and a
+            // video usually clears within a minute of being uploaded.
+            mediaUrls: post.isMediaServable ? post.mediaUrls : [],
+            isSensitive: post.isSensitive,
+            mediaPending: post.mediaStatus === MediaModerationStatus.PENDING,
             createdAt: post.createdAt,
             likeCount: post.likeCount || 0,
             commentCount: post.commentCount || 0,
@@ -227,10 +250,18 @@ export class PostPrismaMapper {
         const quoted = post.quotedPost;
         if (!quoted) return null;
 
+        const quotedStatus =
+            quoted.mediaStatus ?? MediaModerationStatus.APPROVED;
+
         return {
             id: quoted.id,
             content: quoted.content,
-            mediaUrls: quoted.mediaUrls,
+            mediaUrls:
+                quotedStatus === MediaModerationStatus.APPROVED
+                    ? quoted.mediaUrls
+                    : [],
+            isSensitive: quoted.isSensitive ?? false,
+            mediaPending: quotedStatus === MediaModerationStatus.PENDING,
             createdAt: quoted.createdAt,
             author: {
                 id: quoted.author.id,

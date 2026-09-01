@@ -35,4 +35,10 @@ export enum NotificationType {
      * Notification when a user quotes another user's post
      */
     QUOTE = "QUOTE",
+
+    /**
+     * The user's own media was removed by moderation. Self-issued: it comes
+     * from the platform rather than another user.
+     */
+    MEDIA_REJECTED = "MEDIA_REJECTED",
 }

@@ -6,6 +6,7 @@ enum NotificationType {
   COMMENT_LIKE
   COMMENT_REPLY
   QUOTE
+  MEDIA_REJECTED
 }
 
 model Notification {

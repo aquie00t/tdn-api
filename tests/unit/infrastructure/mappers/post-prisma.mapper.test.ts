@@ -6,6 +6,7 @@ import {
 import { Post } from "@core/domain/entities/post.entity";
 import { PostType } from "@core/domain/enums/post-type.enum";
 import { PostCategory } from "@core/domain/enums/post-category-enum";
+import { MediaModerationStatus } from "@core/domain/enums";
 
 const CDN = "https://cdn.example.com";
 const now = new Date("2025-01-01T00:00:00.000Z");
@@ -35,6 +36,8 @@ function makeDbPost(
         ],
         likes: [],
         bookmarks: [],
+        isSensitive: false,
+        mediaStatus: MediaModerationStatus.APPROVED,
         ...overrides,
     } as unknown as PostWithRelations;
 }
@@ -357,7 +360,9 @@ describe("PostPrismaMapper", () => {
             expect(PostPrismaMapper.toPrismaPost(quote).quotedPostId).toBe(
                 "post-0",
             );
-            expect(PostPrismaMapper.toPrismaPost(plain).quotedPostId).toBeNull();
+            expect(
+                PostPrismaMapper.toPrismaPost(plain).quotedPostId,
+            ).toBeNull();
         });
 
         it("should render the quote card with a CDN-resolved avatar", () => {
@@ -373,6 +378,8 @@ describe("PostPrismaMapper", () => {
                 id: "post-0",
                 content: "The quoted post",
                 mediaUrls: ["uploads/quoted.png"],
+                isSensitive: false,
+                mediaPending: false,
                 createdAt: now,
                 author: {
                     id: "user-9",
@@ -386,7 +393,9 @@ describe("PostPrismaMapper", () => {
         it("should send quotedPost as null for a post that quotes nothing", () => {
             const post = PostPrismaMapper.toDomainPost(makeDbPost());
 
-            expect(PostPrismaMapper.toResponse(post, CDN).quotedPost).toBeNull();
+            expect(
+                PostPrismaMapper.toResponse(post, CDN).quotedPost,
+            ).toBeNull();
         });
 
         it("should map quoteCount onto the entity and the response", () => {
@@ -457,6 +466,109 @@ describe("PostPrismaMapper", () => {
             const response = PostPrismaMapper.toResponse(domain, CDN);
             expect(response).toHaveProperty("lang");
             expect(response.lang).toBeNull();
+        });
+    });
+    describe("moderated media", () => {
+        const MEDIA = ["https://cdn.example.com/posts/user-1/clip.mp4"];
+
+        it("should serve media once it has been cleared", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({ mediaUrls: MEDIA } as never),
+            );
+            const result = PostPrismaMapper.toResponse(post, CDN);
+
+            expect(result.mediaUrls).toEqual(MEDIA);
+            expect(result.mediaPending).toBe(false);
+            expect(result.isSensitive).toBe(false);
+        });
+
+        it("should withhold media that is still being scanned, but keep the text", () => {
+            // The text is the author's and was never in question; a video
+            // usually clears within a minute of being uploaded.
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({
+                    mediaUrls: MEDIA,
+                    mediaStatus: MediaModerationStatus.PENDING,
+                } as never),
+            );
+            const result = PostPrismaMapper.toResponse(post, CDN);
+
+            expect(result.mediaUrls).toEqual([]);
+            expect(result.mediaPending).toBe(true);
+            expect(result.content).toBe("Hello world");
+        });
+
+        it("should withhold media that was rejected, without calling it pending", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({
+                    mediaUrls: MEDIA,
+                    mediaStatus: MediaModerationStatus.REJECTED,
+                } as never),
+            );
+            const result = PostPrismaMapper.toResponse(post, CDN);
+
+            expect(result.mediaUrls).toEqual([]);
+            expect(result.mediaPending).toBe(false);
+        });
+
+        it("should serve borderline media with the sensitive flag set", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({ mediaUrls: MEDIA, isSensitive: true } as never),
+            );
+            const result = PostPrismaMapper.toResponse(post, CDN);
+
+            expect(result.mediaUrls).toEqual(MEDIA);
+            expect(result.isSensitive).toBe(true);
+        });
+
+        it("should withhold unscanned media on a quote card too", () => {
+            // Otherwise quoting a post would be a way to publish its video
+            // before that video was cleared.
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({
+                    quotedPostId: "post-0",
+                    quotedPost: {
+                        id: "post-0",
+                        content: "The quoted post",
+                        mediaUrls: ["uploads/quoted.png"],
+                        createdAt: now,
+                        authorId: "user-9",
+                        author: {
+                            id: "user-9",
+                            username: "quoted-author",
+                            profile: {
+                                avatarUrl: "uploads/quoted-avatar.jpg",
+                                fullName: "Quoted Author",
+                            },
+                        },
+                        isSensitive: false,
+                        mediaStatus: MediaModerationStatus.PENDING,
+                    },
+                } as never),
+            );
+
+            expect(
+                PostPrismaMapper.toResponse(post, CDN).quotedPost?.mediaUrls,
+            ).toEqual([]);
+        });
+
+        it("should carry the moderation state onto the Prisma create payload", () => {
+            const post = Post.create(
+                "hi",
+                PostType.COMMUNITY,
+                "user-1",
+                MEDIA,
+                [],
+                undefined,
+                null,
+                true,
+                MediaModerationStatus.PENDING,
+            );
+
+            expect(PostPrismaMapper.toPrismaPost(post)).toMatchObject({
+                isSensitive: true,
+                mediaStatus: MediaModerationStatus.PENDING,
+            });
         });
     });
 });

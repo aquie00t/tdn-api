@@ -1,3 +1,5 @@
+import type { MediaModerationStatus } from "@core/domain/enums";
+
 /**
  * Interface defining the properties of a comment entity
  * Supports nested comments through optional parent-child relationships
@@ -90,4 +92,19 @@ export interface CommentProps {
      * Array of media URLs attached to the comment
      */
     mediaUrls?: string[];
+
+    /**
+     * True when moderation judged the attached media borderline rather than
+     * forbidden. The comment is served as normal and the client blurs the media.
+     */
+    isSensitive?: boolean;
+
+    /**
+     * Moderation state of the comment's own media.
+     *
+     * APPROVED for a text-only comment. PENDING while an attached video is
+     * still being scanned and REJECTED once one failed - in both of those the
+     * read path withholds the media and serves the text.
+     */
+    mediaStatus?: MediaModerationStatus;
 }

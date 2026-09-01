@@ -8,6 +8,7 @@ import type { IBookmarkRepository } from "../repositories/bookmark.repository";
 import type { IVerificationTokenRepository } from "@core/ports/repositories/verification-token.repository";
 import type { IArticleRepository } from "@core/ports/repositories/article.repository";
 import type { IArticleLikeRepository } from "@core/ports/repositories/article-like.repository";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 
 /**
  * Provides transactional access to repositories within a single atomic operation.
@@ -40,6 +41,16 @@ export interface TransactionContext {
 
     /** Repository for article like operations within the transaction. */
     readonly articleLikeRepository: IArticleLikeRepository;
+
+    /**
+     * Repository for media assets within the transaction.
+     *
+     * Media is bound to its content inside the same transaction that creates
+     * the content: a rollback that left assets pointing at a post which was
+     * never written would make an abandoned upload look claimed, and the purge
+     * job would then leave it in storage forever.
+     */
+    readonly mediaAssetRepository: IMediaAssetRepository;
 }
 
 /**
