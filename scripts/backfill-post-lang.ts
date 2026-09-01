@@ -33,8 +33,11 @@ import { HeuristicLanguageDetectionService } from "../src/infrastructure/externa
 /** Rows read per round trip. Large enough to be quick, small enough to stream. */
 const BATCH_SIZE = 500;
 
-/** How many detected samples a dry run prints before it stops narrating. */
+/** How many samples a dry run prints per bucket before it stops narrating. */
 const DRY_RUN_SAMPLES = 20;
+
+/** Bucket label for posts the detector would not call. */
+const UNDETECTED = "(undetected)";
 
 const dryRun = process.argv.includes("--dry-run");
 const relabelAll = process.argv.includes("--all");
@@ -50,7 +53,9 @@ if (!connectionString) {
     );
 }
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+const prisma = new PrismaClient({
+    adapter: new PrismaPg({ connectionString }),
+});
 const detector = new HeuristicLanguageDetectionService();
 
 /**
@@ -65,6 +70,7 @@ async function backfill(): Promise<{
     scanned: number;
     labelled: number;
     undetected: number;
+    perLanguage: Map<string, number>;
 }> {
     const where = relabelAll ? {} : { lang: null };
 
@@ -73,6 +79,11 @@ async function backfill(): Promise<{
     let labelled = 0;
     let undetected = 0;
     let samplesPrinted = 0;
+    // A dry run that says how many posts it would label, without saying into
+    // what, cannot answer the question the dry run exists for: whether the
+    // detector is quietly filing one language under another.
+    const perLanguage = new Map<string, number>();
+    const samplesByLanguage = new Map<string, string[]>();
 
     for (;;) {
         const batch = await prisma.post.findMany({
@@ -91,18 +102,37 @@ async function backfill(): Promise<{
 
             if (!lang) {
                 undetected++;
+                // Sampled too. An undetected bucket you cannot look inside is
+                // a blind spot: it is where a language the detector cannot
+                // handle would silently pile up, and the count alone would
+                // never say so.
+                if (dryRun) {
+                    const samples = samplesByLanguage.get(UNDETECTED) ?? [];
+                    if (samples.length < DRY_RUN_SAMPLES) {
+                        samples.push(
+                            post.content.replace(/\s+/g, " ").slice(0, 70),
+                        );
+                        samplesByLanguage.set(UNDETECTED, samples);
+                    }
+                }
                 continue;
             }
 
             labelled++;
+            perLanguage.set(lang, (perLanguage.get(lang) ?? 0) + 1);
 
             if (dryRun) {
-                if (samplesPrinted < DRY_RUN_SAMPLES) {
+                // Sampled per language rather than in scan order. The first
+                // rows are whichever ids sort lowest - in practice a run of
+                // news bots all writing the same language - so a flat sample
+                // says nothing about the languages further down.
+                const samples = samplesByLanguage.get(lang) ?? [];
+                if (samples.length < DRY_RUN_SAMPLES) {
+                    samples.push(
+                        post.content.replace(/\s+/g, " ").slice(0, 70),
+                    );
+                    samplesByLanguage.set(lang, samples);
                     samplesPrinted++;
-                    const preview = post.content
-                        .replace(/\s+/g, " ")
-                        .slice(0, 70);
-                    console.log(`  [${lang}] ${preview}`);
                 }
                 continue;
             }
@@ -117,7 +147,16 @@ async function backfill(): Promise<{
         console.log(`scanned ${scanned}, labelled ${labelled}`);
     }
 
-    return { scanned, labelled, undetected };
+    if (dryRun) {
+        for (const [lang, samples] of samplesByLanguage) {
+            const count =
+                lang === UNDETECTED ? undetected : (perLanguage.get(lang) ?? 0);
+            console.log(`\n--- ${lang} (${count}) ---`);
+            for (const sample of samples) console.log(`  ${sample}`);
+        }
+    }
+
+    return { scanned, labelled, undetected, perLanguage };
 }
 
 async function main(): Promise<void> {
@@ -127,11 +166,15 @@ async function main(): Promise<void> {
         })`,
     );
 
-    const { scanned, labelled, undetected } = await backfill();
+    const { scanned, labelled, undetected, perLanguage } = await backfill();
 
-    console.log("---");
+    console.log("\n---");
     console.log(`scanned:    ${scanned}`);
     console.log(`labelled:   ${labelled}`);
+    for (const [lang, count] of [...perLanguage].sort((a, b) => b[1] - a[1])) {
+        const share = ((count / labelled) * 100).toFixed(1);
+        console.log(`  ${lang}: ${count} (${share}%)`);
+    }
     console.log(`undetected: ${undetected} (left null, reconsidered next run)`);
 }
 
