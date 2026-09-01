@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/the-developer-network/tdn-api/compare/v1.13.0...v1.14.0) (2026-09-01)
+
+
+### Features
+
+* **post:** rank the feed by language, interest and freshness ([#250](https://github.com/the-developer-network/tdn-api/issues/250)) ([8541ac8](https://github.com/the-developer-network/tdn-api/commit/8541ac8a4da3842bb64fa8a104c97bbe7f2fe6ad))
+
 # [1.13.0](https://github.com/the-developer-network/tdn-api/compare/v1.12.3...v1.13.0) (2026-08-31)
 
 
