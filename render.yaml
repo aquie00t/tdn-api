@@ -1,34 +1,75 @@
-# Originally exported from Render on 2026-05-04T18:29:38Z, edited since.
+# Exported from Render on 2026-09-01T15:53:57Z, with comments added.
 #
-# Region: the service, the Neon database and the Upstash Redis instance all
+# This file describes the service as it runs. It is not a place to ask for a
+# different one: Render rejects a blueprint whose region differs from the
+# running service - "changing region not supported" - and a rejected blueprint
+# applies nothing at all, so one hopeful line silently stops every other
+# setting here from syncing. That happened once already. To move a service,
+# create the new one first and export this file afterwards.
+#
+# Region: the service, the Neon database and the Upstash Redis instance now all
 # live in eu-central-1, and so do almost all of the readers. Measured from
 # Turkey, Frankfurt answers in 88 ms against 266 ms for Ohio and 287 ms for
-# Oregon, and the API pays that distance again on every database and cache
-# round trip - a ranked feed page makes about a dozen. Splitting these across
-# regions cost roughly a second per community feed request.
-#
-# Plan: `starter`, not `free`. A free instance sleeps after fifteen minutes and
-# then makes the next visitor wait out a cold start, which on a site this quiet
-# is most of them.
+# Oregon, and the API paid that distance again on every database and cache
+# round trip - a ranked feed page makes about a dozen of them, which cost it
+# roughly a second per request while the three were spread across two
+# continents.
 version: "1"
 projects:
-- name: My project
+- name: TDN
   environments:
   - name: Production
     services:
     - type: web
-      name: tdn-api
+      name: tdn-api-frankfurt
       runtime: docker
       repo: https://github.com/the-developer-network/tdn-api
-      plan: starter
+      # Render's current name for what its billing still calls Starter. Not
+      # `free`: a free instance sleeps after fifteen minutes, and on a site
+      # this quiet that means most visitors wait out a cold start.
+      plan: 0.5c-512mb
       envVars:
+      - key: MEDIA_MODERATION_LEASE_SECONDS
+        sync: false
+      - key: MEDIA_MODERATION_MAX_ATTEMPTS
+        sync: false
+      - key: MEDIA_MODERATION_BATCH_SIZE
+        sync: false
+      - key: MEDIA_MODERATION_CRON
+        sync: false
       - key: MODERATION_ENABLED
         sync: false
-      - key: SIGHTENGINE_API_USER
+      - key: FEED_EXPLORATION_RATE
         sync: false
-      - key: SIGHTENGINE_API_SECRET
+      - key: USER_INTEREST_SIGNAL_LIMIT
         sync: false
-      - key: OTP_EXPIRY_SECONDS
+      - key: USER_INTEREST_MIN_WEIGHT
+        sync: false
+      - key: USER_INTEREST_MAX
+        sync: false
+      - key: USER_INTEREST_HALF_LIFE_DAYS
+        sync: false
+      - key: USER_INTEREST_WINDOW_DAYS
+        sync: false
+      - key: USER_INTEREST_REBUILD_CRON
+        sync: false
+      - key: FEED_WEIGHT_AFFINITY
+        sync: false
+      - key: FEED_CANDIDATE_WINDOW_DAYS
+        sync: false
+      - key: FEED_CANDIDATE_POOL_SIZE
+        sync: false
+      - key: FEED_FOREIGN_LANGUAGE_QUOTA
+        sync: false
+      - key: FEED_MAX_POSTS_PER_AUTHOR
+        sync: false
+      - key: FEED_HALF_LIFE_HOURS
+        sync: false
+      - key: FEED_WEIGHT_ENGAGEMENT
+        sync: false
+      - key: FEED_WEIGHT_SOCIAL
+        sync: false
+      - key: FEED_WEIGHT_LANGUAGE
         sync: false
       - key: USER_PURGE_GRACE_PERIOD_DAYS
         sync: false
@@ -55,6 +96,8 @@ projects:
       - key: R2_ACCESS_KEY_ID
         sync: false
       - key: PORT
+        sync: false
+      - key: OTP_EXPIRY_SECONDS
         sync: false
       - key: NOTIFICATION_PURGE_GRACE_PERIOD_DAYS
         sync: false
@@ -96,3 +139,4 @@ projects:
       domains:
       - api.developernetwork.net
       autoDeployTrigger: commit
+      renderSubdomainPolicy: disabled
