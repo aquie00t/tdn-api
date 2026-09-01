@@ -1,5 +1,6 @@
 import type { Prisma } from "@generated/prisma/client";
 import { Comment } from "@core/domain/entities/comment.entity";
+import { MediaModerationStatus } from "@core/domain/enums";
 
 export type CommentWithRelations = Prisma.CommentGetPayload<{
     include: {
@@ -32,6 +33,10 @@ export interface CommentResponse {
     articleId: string | null;
 
     mediaUrls: string[];
+    /** True when the client should blur the media behind a tap. */
+    isSensitive: boolean;
+    /** True while the media is stored but not yet cleared by moderation. */
+    mediaPending: boolean;
     parentId: string | null;
     createdAt: Date;
     author: {
@@ -63,6 +68,8 @@ export class CommentPrismaMapper {
             authorId: dbComment.authorId,
             parentId: dbComment.parentId,
             mediaUrls: dbComment.mediaUrls,
+            isSensitive: dbComment.isSensitive,
+            mediaStatus: dbComment.mediaStatus as MediaModerationStatus,
             createdAt: dbComment.createdAt,
             updatedAt: dbComment.updatedAt,
 
@@ -100,7 +107,11 @@ export class CommentPrismaMapper {
             postId: comment.postId,
             articleId: comment.articleId,
             parentId: comment.parentId,
-            mediaUrls: comment.mediaUrls,
+            // Media that has not been cleared is withheld rather than the whole
+            // comment: the text is the author's and was never in question.
+            mediaUrls: comment.isMediaServable ? comment.mediaUrls : [],
+            isSensitive: comment.isSensitive,
+            mediaPending: comment.mediaStatus === MediaModerationStatus.PENDING,
             createdAt: comment.createdAt,
             likeCount: comment.likeCount,
             replyCount: comment.replyCount,

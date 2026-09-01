@@ -8,6 +8,7 @@ import type {
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
 import type { LanguageDetectionPort } from "@core/ports/services/language-detection.port";
@@ -15,7 +16,17 @@ import { NotFoundError } from "@core/errors/common/not-found.error";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
 import { BadRequestError } from "@core/errors/common/bad-request.error";
 import { PostType } from "@core/domain/enums/post-type.enum";
+import { MediaAsset } from "@core/domain/entities/media-asset.entity";
+import {
+    MediaChannel,
+    MediaKind,
+    MediaModerationStatus,
+    MediaOwnerKind,
+} from "@core/domain/enums";
+import { MediaNotOwnedError } from "@core/errors";
 import { buildUser, buildPost } from "../../../helpers/mock-factories";
+
+const CDN_URL = "https://cdn.example.com";
 
 describe("CreatePostUseCase", () => {
     let useCase: CreatePostUseCase;
@@ -31,6 +42,10 @@ describe("CreatePostUseCase", () => {
     let notifyQuotedAuthorUseCase: Pick<NotifyQuotedAuthorUseCase, "execute">;
     let languageDetectionService: LanguageDetectionPort;
     let logger: Pick<LoggerPort, "error">;
+    let mediaAssetRepository: Pick<
+        IMediaAssetRepository,
+        "findByStorageKeys" | "attachToOwner"
+    >;
 
     beforeEach(() => {
         postRepository = {
@@ -38,12 +53,17 @@ describe("CreatePostUseCase", () => {
             findById: vi.fn().mockResolvedValue(buildPost()),
             incrementQuoteCount: vi.fn().mockResolvedValue(undefined),
         };
+        mediaAssetRepository = {
+            findByStorageKeys: vi.fn().mockResolvedValue([]),
+            attachToOwner: vi.fn().mockResolvedValue(1),
+        };
         transactionService = {
-            runInTransaction: vi
-                .fn()
-                .mockImplementation(async (work) =>
-                    work({ postRepository } as unknown as TransactionContext),
-                ),
+            runInTransaction: vi.fn().mockImplementation(async (work) =>
+                work({
+                    postRepository,
+                    mediaAssetRepository,
+                } as unknown as TransactionContext),
+            ),
         };
         userRepository = {
             findById: vi.fn(),
@@ -68,6 +88,8 @@ describe("CreatePostUseCase", () => {
             notifyNewPostUseCase as NotifyNewPostUseCase,
             notifyQuotedAuthorUseCase as NotifyQuotedAuthorUseCase,
             languageDetectionService,
+            mediaAssetRepository as IMediaAssetRepository,
+            CDN_URL,
             logger as LoggerPort,
         );
     });
@@ -377,6 +399,112 @@ describe("CreatePostUseCase", () => {
             ).toBe("post-1");
         });
     });
+    describe("media ownership", () => {
+        const KEY = "posts/user-1/abc.jpg";
+        const URL = `${CDN_URL}/${KEY}`;
+
+        const uploaded = (
+            overrides: Record<string, unknown> = {},
+        ): MediaAsset =>
+            MediaAsset.with({
+                id: "asset-1",
+                storageKey: KEY,
+                kind: MediaKind.IMAGE,
+                mimeType: "image/jpeg",
+                byteSize: 100,
+                uploaderId: "user-1",
+                channel: MediaChannel.POST_MEDIA,
+                status: MediaModerationStatus.APPROVED,
+                categories: [],
+                attempts: 0,
+                ...overrides,
+            });
+
+        it("should refuse a media URL that no upload produced", async () => {
+            // Without this the whole pipeline is decorative: a client can skip
+            // the upload endpoint and put any URL it likes in the body.
+            await expect(
+                useCase.execute({
+                    content: "look at this",
+                    type: PostType.COMMUNITY,
+                    authorId: "user-1",
+                    mediaUrls: ["https://evil.example.com/whatever.jpg"],
+                }),
+            ).rejects.toThrow(MediaNotOwnedError);
+
+            expect(postRepository.create).not.toHaveBeenCalled();
+        });
+
+        it("should refuse a key uploaded by someone else", async () => {
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [uploaded({ uploaderId: "user-2" })],
+            );
+
+            await expect(
+                useCase.execute({
+                    content: "look at this",
+                    type: PostType.COMMUNITY,
+                    authorId: "user-1",
+                    mediaUrls: [URL],
+                }),
+            ).rejects.toThrow(MediaNotOwnedError);
+        });
+
+        it("should bind the assets to the post inside the transaction", async () => {
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [uploaded()],
+            );
+            vi.mocked(postRepository.create).mockResolvedValue(
+                buildPost({ id: "post-7" }),
+            );
+
+            await useCase.execute({
+                content: "look at this",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                mediaUrls: [URL],
+            });
+
+            expect(mediaAssetRepository.attachToOwner).toHaveBeenCalledWith(
+                [KEY],
+                MediaOwnerKind.POST,
+                "post-7",
+            );
+        });
+
+        it("should carry a pending video's state onto the post", async () => {
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [uploaded({ status: MediaModerationStatus.PENDING })],
+            );
+
+            await useCase.execute({
+                content: "clip",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                mediaUrls: [URL],
+            });
+
+            const [stored] = vi.mocked(postRepository.create).mock.calls[0];
+            expect(stored.mediaStatus).toBe(MediaModerationStatus.PENDING);
+        });
+
+        it("should mark the post sensitive when an asset is borderline", async () => {
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [uploaded({ status: MediaModerationStatus.SENSITIVE })],
+            );
+
+            await useCase.execute({
+                content: "borderline",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                mediaUrls: [URL],
+            });
+
+            const [stored] = vi.mocked(postRepository.create).mock.calls[0];
+            expect(stored.isSensitive).toBe(true);
+        });
+    });
+
     describe("language detection", () => {
         it("should label the post with the detected language", async () => {
             vi.mocked(languageDetectionService.detect).mockResolvedValue("tr");
@@ -424,6 +552,7 @@ describe("CreatePostUseCase", () => {
                     order.push("transaction");
                     return work({
                         postRepository,
+                        mediaAssetRepository,
                     } as unknown as TransactionContext);
                 },
             );

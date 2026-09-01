@@ -30,6 +30,16 @@ export interface ArticleProps {
     /** Accessibility text for the cover image */
     coverImageAlt: string | null;
 
+    /**
+     * True when moderation judged the cover borderline rather than forbidden.
+     * The article is served as normal; the client blurs the cover.
+     *
+     * A cover is always an image and is therefore scanned inside the upload
+     * request, so there is no pending state to represent here - a forbidden
+     * cover never reached storage to be referenced in the first place.
+     */
+    isSensitive?: boolean;
+
     /** Lifecycle state controlling who may read the article */
     status: ArticleStatus;
 

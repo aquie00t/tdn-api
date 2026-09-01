@@ -1,9 +1,13 @@
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { UpdateBannerUseCaseInput } from "./update-banner-usecase.input";
-import { InvalidFileTypeError } from "@core/errors";
 import type { StoragePort } from "@core/ports/services/storage.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
+import { MediaChannel } from "@core/domain/enums";
+import type { UploadModeratedMediaUseCase } from "@core/use-cases/media/upload-moderated-media";
 import { isDefaultMediaKey } from "@core/domain/constants/default-media.constants";
+
+/** Largest banner accepted, in bytes. */
+const MAX_BANNER_BYTES = 5 * 1024 * 1024;
 
 /**
  * Use case for updating a user's profile banner.
@@ -16,11 +20,14 @@ export class UpdateBannerUseCase {
      * Creates a new instance of UpdateBannerUseCase.
      *
      * @param profileRepository - Repository for managing profile data
+     * @param uploadModeratedMediaUseCase - Shared upload path that validates,
+     * moderates and records the file
      * @param storageService - Service for file storage operations
      * @param logger - Service for logging operations
      */
     constructor(
         private readonly profileRepository: IProfileRepository,
+        private readonly uploadModeratedMediaUseCase: UploadModeratedMediaUseCase,
         private readonly storageService: StoragePort,
         private readonly logger: LoggerPort,
     ) {}
@@ -28,41 +35,37 @@ export class UpdateBannerUseCase {
     /**
      * Executes the banner update process.
      *
-     * @param input - Input containing user ID, file data, MIME type, and original filename
-     * @returns Promise<string> The uploaded file path/URL
+     * @param input - Input containing user ID and file data
+     * @returns Promise<string> The uploaded file path
      *
-     * @throws InvalidFileTypeError - When the file type is not an image
+     * @throws InvalidMediaTypeError - When the bytes are not a supported format
+     * @throws InvalidFileTypeError - When the bytes are a video
+     * @throws MediaRejectedError - When moderation refuses the image
      *
      * @remarks
-     * This method validates the file type, uploads the new banner image,
-     * updates the profile with the new image URL, and attempts to delete
-     * the old banner image from storage. Deletion errors are logged but
-     * don't prevent the operation from completing successfully.
+     * A banner is shown to every visitor of the profile, so it is moderated on
+     * the same terms as post media.
+     *
+     * The old banner is deleted only after the profile points at the new one.
+     * Deletion errors are logged but don't prevent the operation from
+     * completing successfully.
      */
     async execute(input: UpdateBannerUseCaseInput): Promise<string> {
-        if (!input.mimeType.startsWith("image/")) {
-            throw new InvalidFileTypeError(
-                "Invalid file type. Only images are allowed.",
-            );
-        }
-
         const oldBannerUrl = await this.profileRepository.findBannerByUserId(
             input.userId,
         );
 
-        const extension = input.originalFileName.split(".").pop() || "jpeg";
-        const newFileName = `banners/${input.userId}-${Date.now()}.${extension}`;
+        const { storageKey } = await this.uploadModeratedMediaUseCase.execute({
+            userId: input.userId,
+            fileBuffer: input.fileBuffer,
+            channel: MediaChannel.BANNER,
+            keyPrefix: "banners/" + input.userId,
+            truncated: input.truncated,
+            maxBytes: MAX_BANNER_BYTES,
+            allowVideo: false,
+        });
 
-        const uploadedFilePath = await this.storageService.upload(
-            newFileName,
-            input.fileBuffer,
-            input.mimeType,
-        );
-
-        await this.profileRepository.updateBanner(
-            input.userId,
-            uploadedFilePath,
-        );
+        await this.profileRepository.updateBanner(input.userId, storageKey);
 
         if (oldBannerUrl && !isDefaultMediaKey(oldBannerUrl)) {
             try {
@@ -80,6 +83,6 @@ export class UpdateBannerUseCase {
             }
         }
 
-        return uploadedFilePath;
+        return storageKey;
     }
 }

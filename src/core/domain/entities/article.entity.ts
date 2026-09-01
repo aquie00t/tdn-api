@@ -65,6 +65,9 @@ export interface CreateArticleData {
     /** Accessibility text for the cover image */
     coverImageAlt?: string | null;
 
+    /** Whether moderation judged the cover borderline */
+    isSensitive?: boolean;
+
     /** Explicit tag names, already normalized by the caller */
     tags?: string[];
 
@@ -102,6 +105,7 @@ export class Article {
             excerpt: Article.resolveExcerpt(body, data.excerpt),
             coverImageKey: data.coverImageKey ?? null,
             coverImageAlt: data.coverImageAlt ?? null,
+            isSensitive: data.isSensitive ?? false,
             status: ArticleStatus.DRAFT,
             publishedAt: null,
             readingTimeMinutes: Article.calculateReadingTime(body),
@@ -306,6 +310,14 @@ export class Article {
         return this.props.coverImageAlt;
     }
 
+    /**
+     * Whether moderation judged the cover borderline.
+     * @returns True when the client should blur the cover behind a tap
+     */
+    get isSensitive(): boolean {
+        return this.props.isSensitive ?? false;
+    }
+
     /** The current lifecycle state */
     get status(): ArticleStatus {
         return this.props.status;
@@ -453,6 +465,7 @@ export class Article {
         excerpt?: string | null;
         coverImageKey?: string | null;
         coverImageAlt?: string | null;
+        isSensitive?: boolean;
         tags?: string[];
         categories?: PostCategory[];
     }): void {
@@ -482,6 +495,11 @@ export class Article {
         }
         if (changes.coverImageAlt !== undefined) {
             this.props.coverImageAlt = changes.coverImageAlt;
+        }
+        // Follows the cover: swapping in a clean image has to clear the flag
+        // the previous one set, or the article stays blurred forever.
+        if (changes.isSensitive !== undefined) {
+            this.props.isSensitive = changes.isSensitive;
         }
         if (changes.tags !== undefined) this.props.tags = changes.tags;
         if (changes.categories !== undefined) {

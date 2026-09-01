@@ -1,3 +1,4 @@
+import { MediaModerationStatus } from "@core/domain/enums/media-moderation-status.enum";
 import type { PostType } from "@core/domain/enums/post-type.enum";
 import type { PostProps } from "@core/domain/interfaces/post-props.interface";
 import type { PostCategory } from "../enums/post-category-enum";
@@ -27,6 +28,10 @@ export class Post {
      * @param quotedPostId - Optional. The id of the post this one quotes.
      * @param lang - Optional. The detected language of the content, or null
      * when the detector could not tell.
+     * @param isSensitive - Optional. Whether the attached media was judged
+     * borderline by moderation.
+     * @param mediaStatus - Optional. Moderation state of the attached media;
+     * PENDING when an attached video has not been scanned yet.
      * @returns A new Post instance with the specified properties.
      */
     public static create(
@@ -37,6 +42,8 @@ export class Post {
         categories: PostCategory[] = [],
         quotedPostId?: string,
         lang: string | null = null,
+        isSensitive = false,
+        mediaStatus: MediaModerationStatus = MediaModerationStatus.APPROVED,
     ): Post {
         return new Post({
             content,
@@ -47,6 +54,8 @@ export class Post {
             categories,
             quotedPostId,
             lang,
+            isSensitive,
+            mediaStatus,
         });
     }
 
@@ -84,6 +93,35 @@ export class Post {
      */
     get mediaUrls(): string[] {
         return this.props.mediaUrls;
+    }
+
+    /**
+     * Whether moderation judged the attached media borderline.
+     * @returns True when the client should blur the media behind a tap
+     */
+    get isSensitive(): boolean {
+        return this.props.isSensitive ?? false;
+    }
+
+    /**
+     * Moderation state of the post's own media.
+     * @returns The stored status, defaulting to APPROVED for a text-only post
+     */
+    get mediaStatus(): MediaModerationStatus {
+        return this.props.mediaStatus ?? MediaModerationStatus.APPROVED;
+    }
+
+    /**
+     * Whether the read path may serve this post's media URLs.
+     *
+     * A post whose video has not been cleared is still served - withholding
+     * the text as well would punish the author for a scan that has not
+     * finished - but its media is held back until a verdict exists.
+     *
+     * @returns True once the attached media has been cleared
+     */
+    get isMediaServable(): boolean {
+        return this.mediaStatus === MediaModerationStatus.APPROVED;
     }
 
     /**

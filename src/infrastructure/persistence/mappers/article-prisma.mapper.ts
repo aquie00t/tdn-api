@@ -27,6 +27,8 @@ export interface ArticleResponse {
     excerpt: string | null;
     coverImageUrl: string | null;
     coverImageAlt: string | null;
+    /** True when the client should blur the cover behind a tap. */
+    isSensitive: boolean;
     status: string;
     publishedAt: Date | null;
     readingTimeMinutes: number;
@@ -83,6 +85,7 @@ export class ArticlePrismaMapper {
             excerpt: dbArticle.excerpt,
             coverImageKey: dbArticle.coverImageKey,
             coverImageAlt: dbArticle.coverImageAlt,
+            isSensitive: dbArticle.isSensitive,
             status: dbArticle.status as ArticleStatus,
             publishedAt: dbArticle.publishedAt,
             readingTimeMinutes: dbArticle.readingTimeMinutes,
@@ -126,6 +129,7 @@ export class ArticlePrismaMapper {
             excerpt: article.excerpt,
             coverImageKey: article.coverImageKey,
             coverImageAlt: article.coverImageAlt,
+            isSensitive: article.isSensitive,
             status: article.status,
             publishedAt: article.publishedAt,
             readingTimeMinutes: article.readingTimeMinutes,
@@ -174,6 +178,9 @@ export class ArticlePrismaMapper {
                 ? `${cdnUrl}/${article.coverImageKey}`
                 : null,
             coverImageAlt: article.coverImageAlt,
+            // True when moderation judged the cover borderline; the client
+            // blurs it behind a tap.
+            isSensitive: article.isSensitive,
             status: article.status,
             publishedAt: article.publishedAt,
             readingTimeMinutes: article.readingTimeMinutes,

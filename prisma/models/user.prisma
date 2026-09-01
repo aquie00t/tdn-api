@@ -29,6 +29,7 @@ model User {
   comments         Comment[]
   commentBookmarks CommentBookmark[]
 
+  mediaAssets      MediaAsset[]
   articles         Article[]
   articleLikes     ArticleLike[]
   articleBookmarks ArticleBookmark[]

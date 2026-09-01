@@ -1,3 +1,4 @@
+import type { MediaState } from "@core/ports/repositories/media-asset.repository";
 import type {
     IPostRepository,
     GetPostsParams,
@@ -347,6 +348,27 @@ export class PrismaPostRepository implements IPostRepository {
         await this.prisma.post.update({
             where: { id: postId },
             data: { commentCount: { decrement: 1 } },
+        });
+    }
+
+    /**
+     * Overwrites the media state written by moderation.
+     *
+     * @param id - The id of the content to update
+     * @param state - The media list and moderation flags to store
+     */
+    async updateMediaState(id: string, state: MediaState): Promise<void> {
+        // updateMany, so content deleted while its video was in flight matches
+        // nothing instead of raising. An update that throws here would send the
+        // worker down the retry path and eventually reject - and delete - media
+        // whose owner is already gone, then tell the author about it.
+        await this.prisma.post.updateMany({
+            where: { id },
+            data: {
+                mediaUrls: state.mediaUrls,
+                isSensitive: state.isSensitive,
+                mediaStatus: state.mediaStatus,
+            },
         });
     }
 

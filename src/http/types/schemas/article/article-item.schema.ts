@@ -24,6 +24,9 @@ export const ArticleItemSchema = FBType.Object({
     excerpt: FBType.Union([FBType.String(), FBType.Null()]),
     coverImageUrl: FBType.Union([FBType.String(), FBType.Null()]),
     coverImageAlt: FBType.Union([FBType.String(), FBType.Null()]),
+    // True when moderation judged the cover borderline: the client shows it
+    // behind a blur rather than inline.
+    isSensitive: FBType.Boolean(),
     status: FBType.Enum(ArticleStatus),
     publishedAt: FBType.Union([FBType.String(), FBType.Null()]),
     readingTimeMinutes: FBType.Number(),

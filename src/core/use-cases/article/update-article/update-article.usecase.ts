@@ -1,3 +1,6 @@
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import { MediaOwnerKind } from "@core/domain/enums";
+import { resolveCoverSensitivity } from "@core/use-cases/shared/media/resolve-cover-sensitivity";
 import type { Article } from "@core/domain/entities/article.entity";
 import type { IArticleRepository } from "@core/ports/repositories/article.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
@@ -25,10 +28,12 @@ export class UpdateArticleUseCase {
      *
      * @param articleRepository - Repository for managing article data
      * @param cacheService - Cache used by the public article list
+     * @param mediaAssetRepository - Repository holding the cover's moderation verdict
      */
     constructor(
         private readonly articleRepository: IArticleRepository,
         private readonly cacheService: CachePort,
+        private readonly mediaAssetRepository: IMediaAssetRepository,
     ) {}
 
     /**
@@ -48,6 +53,11 @@ export class UpdateArticleUseCase {
             input.userId,
         );
 
+        const coverImageKey =
+            input.coverImageKey === undefined
+                ? undefined
+                : validateCoverImageKey(input.coverImageKey, input.userId);
+
         article.applyEdit({
             title:
                 input.title === undefined
@@ -58,10 +68,17 @@ export class UpdateArticleUseCase {
                     ? undefined
                     : normalizeBody(input.body),
             excerpt: input.excerpt,
-            coverImageKey:
-                input.coverImageKey === undefined
+            coverImageKey,
+            // Recomputed only when the cover itself changed, and always then:
+            // swapping a borderline cover for a clean one has to clear the
+            // flag, or the article stays blurred forever.
+            isSensitive:
+                coverImageKey === undefined
                     ? undefined
-                    : validateCoverImageKey(input.coverImageKey, input.userId),
+                    : await resolveCoverSensitivity(
+                          coverImageKey,
+                          this.mediaAssetRepository,
+                      ),
             coverImageAlt: input.coverImageAlt,
             tags:
                 input.tags === undefined
@@ -71,6 +88,24 @@ export class UpdateArticleUseCase {
         });
 
         const updated = await this.articleRepository.update(article);
+
+        if (coverImageKey !== undefined) {
+            // The cover changed, so whatever was attached before is superseded.
+            // Releasing it first keeps "attached" meaning "in use", which is
+            // what a storage purge would have to rely on.
+            await this.mediaAssetRepository.detachFromOwner(
+                MediaOwnerKind.ARTICLE,
+                updated.id,
+            );
+
+            if (coverImageKey) {
+                await this.mediaAssetRepository.attachToOwner(
+                    [coverImageKey],
+                    MediaOwnerKind.ARTICLE,
+                    updated.id,
+                );
+            }
+        }
 
         if (updated.isPublished()) {
             await this.cacheService.deleteByPattern(ARTICLE_LIST_CACHE_PATTERN);

@@ -7,10 +7,13 @@ import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
 import type { LanguageDetectionPort } from "@core/ports/services/language-detection.port";
-import { PostType } from "@core/domain/enums";
+import { MediaChannel, MediaOwnerKind, PostType } from "@core/domain/enums";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import { resolveAttachableMedia } from "@core/use-cases/shared/media/resolve-attachable-media";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
 import { NotFoundError } from "@core/errors/common/not-found.error";
 import { BadRequestError } from "@core/errors/common/bad-request.error";
+import { MediaNotOwnedError } from "@core/errors";
 
 /**
  * Use case for creating a new post.
@@ -28,6 +31,9 @@ export class CreatePostUseCase {
      * @param notifyNewPostUseCase - Use case that fans the post out to followers
      * @param notifyQuotedAuthorUseCase - Use case that tells an author their post was quoted
      * @param languageDetectionService - Service that labels the content with the language it was written in
+     * @param mediaAssetRepository - Repository the submitted media keys are checked against
+     * @param r2PublicUrl - CDN origin media URLs are served from, used to
+     * recover the storage key behind a submitted URL
      * @param logger - Service for logging operations
      */
     constructor(
@@ -37,6 +43,8 @@ export class CreatePostUseCase {
         private readonly notifyNewPostUseCase: NotifyNewPostUseCase,
         private readonly notifyQuotedAuthorUseCase: NotifyQuotedAuthorUseCase,
         private readonly languageDetectionService: LanguageDetectionPort,
+        private readonly mediaAssetRepository: IMediaAssetRepository,
+        private readonly r2PublicUrl: string,
         private readonly logger: LoggerPort,
     ) {}
 
@@ -48,6 +56,8 @@ export class CreatePostUseCase {
      * @returns Promise<void> - Resolves when post creation is complete
      *
      * @throws BadRequestError - When an empty post quotes nothing
+     * @throws MediaNotOwnedError - When a submitted media URL is not one this
+     * author uploaded, or was rejected by moderation
      * @throws NotFoundError - When quotedPostId names a post that does not exist
      *
      * @remarks
@@ -76,6 +86,16 @@ export class CreatePostUseCase {
      * from holding the write open across it, and a post whose language cannot
      * be told is stored with a null rather than a guess.
      *
+     * Media is resolved before the transaction as well, and this is the check
+     * that makes moderation mean anything at all. Scanning at upload time only
+     * governs what the upload endpoint writes to storage; nothing stops a
+     * client from skipping that endpoint and putting its own URLs straight in
+     * this body. Requiring every URL to resolve to an asset this author
+     * uploaded, through the media channel, and that moderation did not reject,
+     * closes that path. The assets are then bound to the post inside the
+     * transaction, so a rolled-back write leaves no asset claiming a post that
+     * does not exist.
+     *
      * Followers and, for a quote, the quoted author are notified after the
      * post is committed, deliberately outside the caller's critical path: the
      * post is the thing worth keeping, so a notification failure is logged
@@ -98,6 +118,14 @@ export class CreatePostUseCase {
 
         const lang = await this.languageDetectionService.detect(input.content);
 
+        const media = await resolveAttachableMedia({
+            mediaUrls: input.mediaUrls || [],
+            uploaderId: input.authorId,
+            channel: MediaChannel.POST_MEDIA,
+            cdnBaseUrl: this.r2PublicUrl,
+            mediaAssetRepository: this.mediaAssetRepository,
+        });
+
         const rawPost = await this.transactionService.runInTransaction(
             async (ctx) => {
                 if (input.quotedPostId) {
@@ -117,9 +145,27 @@ export class CreatePostUseCase {
                     input.categories || [],
                     input.quotedPostId,
                     lang,
+                    media.isSensitive,
+                    media.mediaStatus,
                 );
 
                 const created = await ctx.postRepository.create(post);
+
+                if (media.storageKeys.length > 0) {
+                    // The attach is the atomic claim, not the check above it:
+                    // two requests carrying the same key both pass that check,
+                    // and only one can come back with every row written.
+                    const attached =
+                        await ctx.mediaAssetRepository.attachToOwner(
+                            media.storageKeys,
+                            MediaOwnerKind.POST,
+                            created.id,
+                        );
+
+                    if (attached !== media.storageKeys.length) {
+                        throw new MediaNotOwnedError();
+                    }
+                }
 
                 if (input.quotedPostId) {
                     await ctx.postRepository.incrementQuoteCount(

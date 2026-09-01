@@ -3,8 +3,16 @@ import { UpdateBannerUseCase } from "@core/use-cases/profile/update-banner";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { StoragePort } from "@core/ports/services/storage.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
-import { InvalidFileTypeError } from "@core/errors";
+import type { UploadModeratedMediaUseCase } from "@core/use-cases/media/upload-moderated-media";
+import {
+    MediaChannel,
+    MediaKind,
+    MediaModerationStatus,
+} from "@core/domain/enums";
+import { MediaRejectedError } from "@core/errors";
 import { DEFAULT_BANNER_KEY } from "@core/domain/constants/default-media.constants";
+
+const NEW_KEY = "banners/user-1/new.jpg";
 
 describe("UpdateBannerUseCase", () => {
     let useCase: UpdateBannerUseCase;
@@ -12,14 +20,16 @@ describe("UpdateBannerUseCase", () => {
         IProfileRepository,
         "findBannerByUserId" | "updateBanner"
     >;
-    let storageService: Pick<StoragePort, "upload" | "delete">;
+    let storageService: Pick<StoragePort, "delete">;
     let logger: Pick<LoggerPort, "error">;
+    let uploadModeratedMediaUseCase: Pick<
+        UploadModeratedMediaUseCase,
+        "execute"
+    >;
 
     const baseInput = {
         userId: "user-1",
-        fileBuffer: Buffer.from("banner-data"),
-        mimeType: "image/jpeg",
-        originalFileName: "banner.jpg",
+        fileBuffer: Buffer.from("image-data"),
     };
 
     beforeEach(() => {
@@ -28,50 +38,59 @@ describe("UpdateBannerUseCase", () => {
             updateBanner: vi.fn().mockResolvedValue(undefined),
         };
         storageService = {
-            upload: vi.fn().mockResolvedValue("banners/user-1-123.jpg"),
             delete: vi.fn().mockResolvedValue(undefined),
         };
-        logger = {
-            error: vi.fn(),
+        logger = { error: vi.fn() };
+        uploadModeratedMediaUseCase = {
+            execute: vi.fn().mockResolvedValue({
+                storageKey: NEW_KEY,
+                kind: MediaKind.IMAGE,
+                status: MediaModerationStatus.APPROVED,
+            }),
         };
+
         useCase = new UpdateBannerUseCase(
             profileRepository as IProfileRepository,
+            uploadModeratedMediaUseCase as UploadModeratedMediaUseCase,
             storageService as StoragePort,
             logger as LoggerPort,
         );
     });
 
-    it("should throw InvalidFileTypeError when mimeType does not start with 'image/'", async () => {
-        await expect(
-            useCase.execute({ ...baseInput, mimeType: "application/pdf" }),
-        ).rejects.toThrow(InvalidFileTypeError);
-
-        expect(storageService.upload).not.toHaveBeenCalled();
-        expect(profileRepository.updateBanner).not.toHaveBeenCalled();
-    });
-
-    it("should upload the file and update the profile with the new URL", async () => {
-        vi.mocked(storageService.upload).mockResolvedValue(
-            "banners/user-1-new.jpg",
-        );
-
-        const result = await useCase.execute(baseInput);
-
-        expect(storageService.upload).toHaveBeenCalledOnce();
-        expect(profileRepository.updateBanner).toHaveBeenCalledWith(
-            "user-1",
-            "banners/user-1-new.jpg",
-        );
-        expect(result).toBe("banners/user-1-new.jpg");
-    });
-
-    it("should generate the filename with userId and extension from originalFileName", async () => {
+    it("should upload through the banner channel and refuse video", async () => {
         await useCase.execute(baseInput);
 
-        const uploadCall = vi.mocked(storageService.upload).mock.calls[0];
-        expect(uploadCall[0]).toMatch(/^banners\/user-1-\d+\.jpg$/);
-        expect(uploadCall[1]).toBe(baseInput.fileBuffer);
-        expect(uploadCall[2]).toBe("image/jpeg");
+        expect(uploadModeratedMediaUseCase.execute).toHaveBeenCalledWith({
+            userId: "user-1",
+            fileBuffer: baseInput.fileBuffer,
+            channel: MediaChannel.BANNER,
+            keyPrefix: "banners/user-1",
+            truncated: undefined,
+            maxBytes: 5 * 1024 * 1024,
+            allowVideo: false,
+        });
+    });
+
+    it("should update the profile with the stored key and return it", async () => {
+        const result = await useCase.execute(baseInput);
+
+        expect(profileRepository.updateBanner).toHaveBeenCalledWith(
+            "user-1",
+            NEW_KEY,
+        );
+        expect(result).toBe(NEW_KEY);
+    });
+
+    it("should not touch the profile when moderation refuses the image", async () => {
+        vi.mocked(uploadModeratedMediaUseCase.execute).mockRejectedValue(
+            new MediaRejectedError(),
+        );
+
+        await expect(useCase.execute(baseInput)).rejects.toThrow(
+            MediaRejectedError,
+        );
+
+        expect(profileRepository.updateBanner).not.toHaveBeenCalled();
     });
 
     it("should not call storageService.delete when there is no old banner", async () => {
@@ -82,34 +101,22 @@ describe("UpdateBannerUseCase", () => {
         expect(storageService.delete).not.toHaveBeenCalled();
     });
 
-    it("should not call storageService.delete when old banner is the default", async () => {
-        vi.mocked(profileRepository.findBannerByUserId).mockResolvedValue(
-            `https://cdn.example.com/${DEFAULT_BANNER_KEY}`,
-        );
-
-        await useCase.execute(baseInput);
-
-        expect(storageService.delete).not.toHaveBeenCalled();
-    });
-
-    it("should not call storageService.delete for the schema default banner key", async () => {
-        vi.mocked(profileRepository.findBannerByUserId).mockResolvedValue(
+    it("should not call storageService.delete for the default banner, however it is stored", async () => {
+        // The default has been written as a bare key, as a CDN URL, and with a
+        // cache-busting query. None of the three may be deleted.
+        for (const stored of [
             DEFAULT_BANNER_KEY,
-        );
-
-        await useCase.execute(baseInput);
-
-        expect(storageService.delete).not.toHaveBeenCalled();
-    });
-
-    it("should not call storageService.delete when the default banner carries a cache-busting query", async () => {
-        vi.mocked(profileRepository.findBannerByUserId).mockResolvedValue(
+            `https://cdn.example.com/${DEFAULT_BANNER_KEY}`,
             `https://cdn.example.com/${DEFAULT_BANNER_KEY}?v=1`,
-        );
+        ]) {
+            vi.mocked(profileRepository.findBannerByUserId).mockResolvedValue(
+                stored,
+            );
 
-        await useCase.execute(baseInput);
+            await useCase.execute(baseInput);
 
-        expect(storageService.delete).not.toHaveBeenCalled();
+            expect(storageService.delete).not.toHaveBeenCalled();
+        }
     });
 
     it("should delete the old banner when it exists and is not the default", async () => {
@@ -132,21 +139,7 @@ describe("UpdateBannerUseCase", () => {
             new Error("Storage unavailable"),
         );
 
-        await expect(useCase.execute(baseInput)).resolves.toBeDefined();
+        await expect(useCase.execute(baseInput)).resolves.toBe(NEW_KEY);
         expect(logger.error).toHaveBeenCalledOnce();
-    });
-
-    it("should still return the uploaded path even when old banner deletion fails", async () => {
-        vi.mocked(profileRepository.findBannerByUserId).mockResolvedValue(
-            "banners/user-1-old.jpg",
-        );
-        vi.mocked(storageService.upload).mockResolvedValue(
-            "banners/user-1-new.jpg",
-        );
-        vi.mocked(storageService.delete).mockRejectedValue(new Error("fail"));
-
-        const result = await useCase.execute(baseInput);
-
-        expect(result).toBe("banners/user-1-new.jpg");
     });
 });

@@ -10,4 +10,16 @@ export interface LoggerPort {
      * @param message - The error message.
      */
     error(object: object, message: string): void;
+
+    /**
+     * Logs a warning with an object context and message.
+     *
+     * Separate from {@link LoggerPort.error} because a moderation rejection is
+     * the system working, not failing: it belongs in the record without
+     * raising an alert.
+     *
+     * @param object - The object context for the warning.
+     * @param message - The warning message.
+     */
+    warn(object: object, message: string): void;
 }

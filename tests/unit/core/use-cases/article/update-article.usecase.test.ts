@@ -1,3 +1,4 @@
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UpdateArticleUseCase } from "@core/use-cases/article/update-article";
 import type { IArticleRepository } from "@core/ports/repositories/article.repository";
@@ -9,6 +10,7 @@ import {
     NotFoundError,
     UnauthorizedActionError,
 } from "@core/errors";
+import { MediaOwnerKind } from "@core/domain/enums";
 import { buildArticle } from "../../../helpers/mock-factories";
 
 const AUTHOR = "11111111-1111-4111-8111-111111111111";
@@ -18,6 +20,10 @@ describe("UpdateArticleUseCase", () => {
     let useCase: UpdateArticleUseCase;
     let articleRepository: Pick<IArticleRepository, "findById" | "update">;
     let cacheService: Pick<CachePort, "deleteByPattern">;
+    let mediaAssetRepository: Pick<
+        IMediaAssetRepository,
+        "findByStorageKeys" | "attachToOwner" | "detachFromOwner"
+    >;
 
     beforeEach(() => {
         articleRepository = {
@@ -27,10 +33,36 @@ describe("UpdateArticleUseCase", () => {
         cacheService = {
             deleteByPattern: vi.fn().mockResolvedValue(undefined),
         };
+        mediaAssetRepository = {
+            findByStorageKeys: vi.fn().mockResolvedValue([]),
+            attachToOwner: vi.fn().mockResolvedValue(1),
+            detachFromOwner: vi.fn().mockResolvedValue(undefined),
+        };
         useCase = new UpdateArticleUseCase(
             articleRepository as IArticleRepository,
             cacheService as CachePort,
+            mediaAssetRepository as IMediaAssetRepository,
         );
+    });
+
+    it("should release the cover it supersedes before attaching the new one", async () => {
+        // "Attached" has to keep meaning "in use": a purge job reading it any
+        // other way would leave every replaced cover in storage forever.
+        vi.mocked(articleRepository.findById).mockResolvedValue(
+            buildArticle({ id: "article-1", author: { id: AUTHOR } }),
+        );
+
+        await useCase.execute({
+            articleId: "article-1",
+            userId: AUTHOR,
+            coverImageKey: `articles/covers/${AUTHOR}/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.png`,
+        });
+
+        expect(mediaAssetRepository.detachFromOwner).toHaveBeenCalledWith(
+            MediaOwnerKind.ARTICLE,
+            "article-1",
+        );
+        expect(mediaAssetRepository.attachToOwner).toHaveBeenCalled();
     });
 
     it("should throw NotFoundError when the article does not exist", async () => {

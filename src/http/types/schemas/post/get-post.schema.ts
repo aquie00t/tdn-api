@@ -20,6 +20,13 @@ export const QuotedPostSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
     content: FBType.String(),
     mediaUrls: FBType.Array(FBType.String()),
+    // True when moderation judged the media borderline: the client shows it
+    // behind a blur rather than inline.
+    isSensitive: FBType.Boolean(),
+    // True while an attached video is stored but not yet cleared. mediaUrls is
+    // empty in the meantime; the client can say so rather than showing a post
+    // that looks like it lost its attachment.
+    mediaPending: FBType.Boolean(),
     createdAt: FBType.String(),
     author: PostAuthorSchema,
 });
@@ -31,6 +38,13 @@ export const PostItemSchema = FBType.Object({
     content: FBType.String(),
     type: FBType.Enum(PostType),
     mediaUrls: FBType.Array(FBType.String()),
+    // True when moderation judged the media borderline: the client shows it
+    // behind a blur rather than inline.
+    isSensitive: FBType.Boolean(),
+    // True while an attached video is stored but not yet cleared. mediaUrls is
+    // empty in the meantime; the client can say so rather than showing a post
+    // that looks like it lost its attachment.
+    mediaPending: FBType.Boolean(),
     createdAt: FBType.String(),
     likeCount: FBType.Number(),
     commentCount: FBType.Number(),

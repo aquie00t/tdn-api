@@ -68,6 +68,43 @@ export const EnvSchema = Type.Object({
     FRONTEND_URL: Type.String({ default: "http://localhost:5173" }),
     API_URL: Type.String({ default: "http://localhost:8080" }),
 
+    // --- Media moderation ---
+    // Turned off in the test environment and in local setups without provider
+    // credentials, where a stand-in approves everything. It is never a
+    // fallback: a failed provider call refuses the upload rather than
+    // switching this off.
+    MODERATION_ENABLED: Type.Boolean({ default: false }),
+    SIGHTENGINE_API_USER: Type.String({ default: "" }),
+    SIGHTENGINE_API_SECRET: Type.String({ default: "" }),
+    // Both thresholds are a starting guess. Raw provider scores are stored on
+    // every asset precisely so these can be retuned against real traffic.
+    MODERATION_REJECT_THRESHOLD: Type.Number({
+        default: 0.75,
+        minimum: 0,
+        maximum: 1,
+    }),
+    MODERATION_SENSITIVE_THRESHOLD: Type.Number({
+        default: 0.4,
+        minimum: 0,
+        maximum: 1,
+    }),
+    // Bounds how long an image upload can be held open waiting on the
+    // provider. Past this the upload fails closed.
+    MODERATION_REQUEST_TIMEOUT_MS: Type.Number({ default: 15000, minimum: 1 }),
+
+    // Runs every minute: what it clears is a user waiting to see their own
+    // post, and a video that takes an hour to appear reads as a broken upload.
+    MEDIA_MODERATION_CRON: Type.String({ default: "* * * * *" }),
+    MEDIA_MODERATION_BATCH_SIZE: Type.Number({ default: 10, minimum: 1 }),
+    // A file that cannot be checked after this many tries is refused rather
+    // than left pending forever, so the author learns to upload it again.
+    MEDIA_MODERATION_MAX_ATTEMPTS: Type.Number({ default: 3, minimum: 1 }),
+    // How long a worker's claim on an asset is honoured. A process killed
+    // mid-scan - a redeploy, an OOM - leaves the asset claimed, and without a
+    // lease the post carrying it would withhold its media forever. Comfortably
+    // longer than a scan so a slow one is not stolen from the worker doing it.
+    MEDIA_MODERATION_LEASE_SECONDS: Type.Number({ default: 600, minimum: 1 }),
+
     // --- Feed ranking ---
     // The right values here are an empirical question, so they are configured
     // rather than compiled in: the mix can be retuned without a deploy.

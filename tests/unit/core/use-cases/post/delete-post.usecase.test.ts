@@ -41,6 +41,7 @@ describe("DeletePostUseCase", () => {
         };
         logger = {
             error: vi.fn(),
+            warn: vi.fn(),
         };
         cacheService = {
             deleteByPattern: vi.fn().mockResolvedValue(undefined),

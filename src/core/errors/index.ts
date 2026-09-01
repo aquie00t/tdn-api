@@ -25,6 +25,11 @@ export * from "./post/invalid-media-type.error";
 export * from "./post/media-limit-exceeded.error";
 export * from "./post/no-media-provided.error";
 
+// Media moderation errors
+export * from "./media/media-not-owned.error";
+export * from "./media/media-rejected.error";
+export * from "./media/moderation-unavailable.error";
+
 // Article errors
 export * from "./article/article-not-published.error";
 export * from "./article/invalid-article-state.error";

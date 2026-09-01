@@ -21,6 +21,13 @@ export const CommentItemSchema = FBType.Object({
     articleId: FBType.Union([FBType.String({ format: "uuid" }), FBType.Null()]),
     parentId: FBType.Union([FBType.String({ format: "uuid" }), FBType.Null()]),
     mediaUrls: FBType.Array(FBType.String()),
+    // True when moderation judged the media borderline: the client shows it
+    // behind a blur rather than inline.
+    isSensitive: FBType.Boolean(),
+    // True while an attached video is stored but not yet cleared. mediaUrls is
+    // empty in the meantime; the client can say so rather than showing a post
+    // that looks like it lost its attachment.
+    mediaPending: FBType.Boolean(),
     createdAt: FBType.String(),
     likeCount: FBType.Number(),
     replyCount: FBType.Number(),

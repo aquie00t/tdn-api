@@ -16,6 +16,13 @@ model Article {
   coverImageKey String? @map("cover_image_key")
   coverImageAlt String? @map("cover_image_alt") @db.VarChar(160)
 
+  /// The cover is the only media an article carries, and it is always an
+  /// image, so it is scanned inside the upload request and never sits
+  /// PENDING. The fields exist so the read path can treat every content type
+  /// the same way.
+  isSensitive Boolean               @default(false) @map("is_sensitive")
+  mediaStatus MediaModerationStatus @default(APPROVED) @map("media_status")
+
   status             ArticleStatus @default(DRAFT)
   publishedAt        DateTime?     @map("published_at")
   readingTimeMinutes Int           @default(1) @map("reading_time_minutes")

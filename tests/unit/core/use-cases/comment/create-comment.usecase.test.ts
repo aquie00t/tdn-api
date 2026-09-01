@@ -12,6 +12,9 @@ import type { INotificationRepository } from "@core/ports/repositories/notificat
 import type { Comment } from "@core/domain/entities/comment.entity";
 import type { Post } from "@core/domain/entities/post.entity";
 import { buildComment } from "../../../helpers/mock-factories";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+
+const CDN_URL = "https://cdn.example.com";
 
 const buildPost = (authorId = "author-1"): Post =>
     ({
@@ -23,6 +26,10 @@ describe("CreateCommentUseCase", () => {
     let useCase: CreateCommentUseCase;
     let transactionSvc: Pick<TransactionPort, "runInTransaction">;
     let realtimeSvc: Pick<RealtimePort, "emitToUser">;
+    let mediaAssetRepo: Pick<
+        IMediaAssetRepository,
+        "findByStorageKeys" | "attachToOwner"
+    >;
     let txPostRepo: Pick<
         IPostRepository,
         "findById" | "incrementCommentsCount"
@@ -39,6 +46,7 @@ describe("CreateCommentUseCase", () => {
             commentRepository: txCommentRepo as ICommentRepository,
             notificationRepository:
                 txNotificationRepo as INotificationRepository,
+            mediaAssetRepository: mediaAssetRepo as IMediaAssetRepository,
         }) as TransactionContext;
 
     beforeEach(() => {
@@ -53,6 +61,10 @@ describe("CreateCommentUseCase", () => {
         };
         txNotificationRepo = { create: vi.fn() };
         realtimeSvc = { emitToUser: vi.fn() };
+        mediaAssetRepo = {
+            findByStorageKeys: vi.fn().mockResolvedValue([]),
+            attachToOwner: vi.fn().mockResolvedValue(1),
+        };
         transactionSvc = { runInTransaction: vi.fn() };
 
         vi.mocked(transactionSvc.runInTransaction).mockImplementation(
@@ -62,6 +74,8 @@ describe("CreateCommentUseCase", () => {
         useCase = new CreateCommentUseCase(
             transactionSvc as TransactionPort,
             realtimeSvc as RealtimePort,
+            mediaAssetRepo as IMediaAssetRepository,
+            CDN_URL,
         );
     });
 

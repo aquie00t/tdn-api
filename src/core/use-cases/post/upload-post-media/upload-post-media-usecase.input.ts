@@ -2,7 +2,7 @@
  * Input interface for uploading post media files.
  *
  * This interface defines the required parameters for uploading media files
- * (images or videos) associated with posts.
+ * (images or videos) associated with posts and comments.
  */
 export interface UploadPostMediaInput {
     /**
@@ -16,14 +16,10 @@ export interface UploadPostMediaInput {
     fileBuffer: Buffer;
 
     /**
-     * The MIME type of the file (e.g., "image/jpeg", "video/mp4").
-     * Used for validation and proper handling of the file.
+     * Whether the multipart layer cut the file short at its size limit.
+     *
+     * A truncated file is refused rather than stored: the bytes that were cut
+     * off are exactly the ones moderation never got to look at.
      */
-    mimeType: string;
-
-    /**
-     * The original filename of the uploaded file.
-     * Used for generating the storage filename and extension detection.
-     */
-    originalFileName: string;
+    truncated?: boolean;
 }

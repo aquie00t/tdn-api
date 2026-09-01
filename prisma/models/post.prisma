@@ -26,6 +26,14 @@ model Post {
   /// rather than being pushed out of every feed.
   lang String? @db.VarChar(5)
 
+  /// True when moderation judged the media borderline rather than forbidden.
+  /// The post is served as normal; the client blurs the media behind a tap.
+  isSensitive Boolean               @default(false) @map("is_sensitive")
+  /// APPROVED for a text-only post. PENDING while an attached video is still
+  /// being scanned and REJECTED once one failed, both of which make the read
+  /// path withhold the media while leaving the text visible.
+  mediaStatus MediaModerationStatus @default(APPROVED) @map("media_status")
+
   authorId String @map("author_id")
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
@@ -41,9 +49,9 @@ model Post {
   bookmarks     PostBookmark[]
   comments      Comment[]
   notifications Notification[]
-  commentCount Int            @default(0)
-  likeCount    Int            @default(0)
-  quoteCount   Int            @default(0)
+  commentCount  Int            @default(0)
+  likeCount     Int            @default(0)
+  quoteCount    Int            @default(0)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -115,6 +123,11 @@ model Comment {
   content   String   @db.Text
   mediaUrls String[] @default([]) @map("media_urls")
 
+  /// Mirrors the same two fields on Post: a comment carries media from the
+  /// same upload endpoint, so it needs the same withholding rules.
+  isSensitive Boolean               @default(false) @map("is_sensitive")
+  mediaStatus MediaModerationStatus @default(APPROVED) @map("media_status")
+
   // Exactly one of postId / articleId is set, enforced by a CHECK constraint
   // added in the migration: Prisma cannot express one.
   postId    String? @map("post_id")
@@ -132,8 +145,8 @@ model Comment {
   likes         CommentLike[]
   bookmarks     CommentBookmark[]
   notifications Notification[]
-  likeCount  Int               @default(0) @map("like_count")
-  replyCount Int               @default(0) @map("reply_count")
+  likeCount     Int               @default(0) @map("like_count")
+  replyCount    Int               @default(0) @map("reply_count")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

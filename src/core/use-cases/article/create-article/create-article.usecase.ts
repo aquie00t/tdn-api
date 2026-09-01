@@ -1,3 +1,6 @@
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import { MediaOwnerKind } from "@core/domain/enums";
+import { resolveCoverSensitivity } from "@core/use-cases/shared/media/resolve-cover-sensitivity";
 import { Article } from "@core/domain/entities/article.entity";
 import type { IArticleRepository } from "@core/ports/repositories/article.repository";
 import type { CryptoPort } from "@core/ports/services/crypto.port";
@@ -24,10 +27,12 @@ export class CreateArticleUseCase {
      *
      * @param articleRepository - Repository for managing article data
      * @param cryptoService - Source of the random slug suffix
+     * @param mediaAssetRepository - Repository holding the cover's moderation verdict
      */
     constructor(
         private readonly articleRepository: IArticleRepository,
         private readonly cryptoService: CryptoPort,
+        private readonly mediaAssetRepository: IMediaAssetRepository,
     ) {}
 
     /**
@@ -39,21 +44,37 @@ export class CreateArticleUseCase {
      * @throws BadRequestError - When the title, body, tags or cover key are invalid
      */
     async execute(input: CreateArticleUseCaseInput): Promise<Article> {
+        const coverImageKey = validateCoverImageKey(
+            input.coverImageKey,
+            input.authorId,
+        );
+
         const article = Article.create({
             title: normalizeTitle(input.title),
             body: normalizeBody(input.body),
             authorId: input.authorId,
             slugSuffix: this.cryptoService.generateRandomHex(SLUG_SUFFIX_BYTES),
             excerpt: input.excerpt,
-            coverImageKey: validateCoverImageKey(
-                input.coverImageKey,
-                input.authorId,
-            ),
+            coverImageKey,
             coverImageAlt: input.coverImageAlt ?? null,
+            isSensitive: await resolveCoverSensitivity(
+                coverImageKey,
+                this.mediaAssetRepository,
+            ),
             tags: normalizeTags(input.tags),
             categories: input.categories ?? [],
         });
 
-        return await this.articleRepository.create(article);
+        const created = await this.articleRepository.create(article);
+
+        if (coverImageKey) {
+            await this.mediaAssetRepository.attachToOwner(
+                [coverImageKey],
+                MediaOwnerKind.ARTICLE,
+                created.id,
+            );
+        }
+
+        return created;
     }
 }
