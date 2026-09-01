@@ -93,9 +93,10 @@ export interface PostProps {
     /**
      * Moderation state of the post's own media.
      *
-     * APPROVED for a text-only post. PENDING while an attached video is still
-     * being scanned and REJECTED once one failed - in both of those the read
-     * path withholds the media and serves the text.
+     * APPROVED for a text-only post, and for one whose media has all been
+     * judged. PENDING while an attached video is still being scanned, and in
+     * that state the read path withholds the media and serves the text. A
+     * rejected file is dropped from `mediaUrls` rather than recorded here.
      */
     mediaStatus?: MediaModerationStatus;
 

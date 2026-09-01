@@ -56,7 +56,10 @@ describe("ModeratePendingMediaUseCase", () => {
     let moderation: MediaModerationPort;
     let storageService: Pick<StoragePort, "delete">;
     let postRepository: Pick<IPostRepository, "updateMediaState">;
-    let commentRepository: Pick<ICommentRepository, "updateMediaState">;
+    let commentRepository: Pick<
+        ICommentRepository,
+        "updateMediaState" | "findById"
+    >;
     let notificationRepository: Pick<INotificationRepository, "create">;
     let logger: Pick<LoggerPort, "error" | "warn">;
 
@@ -89,6 +92,7 @@ describe("ModeratePendingMediaUseCase", () => {
         };
         commentRepository = {
             updateMediaState: vi.fn().mockResolvedValue(undefined),
+            findById: vi.fn().mockResolvedValue(null),
         };
         notificationRepository = {
             create: vi.fn().mockResolvedValue(undefined),
@@ -180,6 +184,57 @@ describe("ModeratePendingMediaUseCase", () => {
 
             expect(notification.recipientId).toBe(UPLOADER);
             expect(notification.type).toBe(NotificationType.MEDIA_REJECTED);
+        });
+
+        it("should point a comment notification at the article it lives under", async () => {
+            // An article is read by slug, and the slug only travels with the
+            // notification when articleId is set. Without it the reader gets a
+            // notice they cannot tap.
+            const onComment = videoAsset({
+                ownerKind: MediaOwnerKind.COMMENT,
+                ownerId: "comment-1",
+            });
+
+            vi.mocked(mediaAssetRepository.claimPending).mockResolvedValue([
+                onComment,
+            ]);
+            vi.mocked(
+                mediaAssetRepository.findByStorageKeys,
+            ).mockResolvedValue([onComment]);
+            vi.mocked(commentRepository.findById).mockResolvedValue({
+                articleId: "article-9",
+                postId: null,
+            } as never);
+
+            await useCase.execute();
+
+            const [notification] = vi.mocked(notificationRepository.create).mock
+                .calls[0];
+
+            expect(notification.commentId).toBe("comment-1");
+            expect(notification.articleId).toBe("article-9");
+        });
+
+        it("should leave a targetless notification when nothing claimed the asset", async () => {
+            // A user can upload a video and never submit the post. The notice
+            // still goes out, but it has nowhere to point.
+            const orphan = videoAsset({ ownerId: null, ownerKind: null });
+
+            vi.mocked(mediaAssetRepository.claimPending).mockResolvedValue([
+                orphan,
+            ]);
+            vi.mocked(
+                mediaAssetRepository.findByStorageKeys,
+            ).mockResolvedValue([orphan]);
+
+            await useCase.execute();
+
+            const [notification] = vi.mocked(notificationRepository.create).mock
+                .calls[0];
+
+            expect(notification.postId).toBeUndefined();
+            expect(notification.commentId).toBeUndefined();
+            expect(notification.articleId).toBeUndefined();
         });
 
         it("should keep going when the object cannot be deleted", async () => {
