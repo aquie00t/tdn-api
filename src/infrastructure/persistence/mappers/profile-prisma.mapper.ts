@@ -40,6 +40,7 @@ export class ProfilePrismaMapper {
             bannerUrl: dbProfile.bannerUrl,
             socials: dbProfile.socials as Record<string, string>,
             categories: dbProfile.categories as PostCategory[],
+            languages: dbProfile.languages,
             createdAt: dbProfile.createdAt,
             updatedAt: dbProfile.updatedAt,
             followersCount: dbProfile.user?._count?.followers || 0,
@@ -61,6 +62,7 @@ export class ProfilePrismaMapper {
             location: data.location,
             socials: data.socials as Prisma.InputJsonValue,
             categories: data.categories,
+            languages: data.languages,
             updatedAt: new Date(),
         };
     }
@@ -81,6 +83,7 @@ export class ProfilePrismaMapper {
         bannerUrl: string;
         socials: Record<string, string>;
         categories: PostCategory[];
+        languages: string[];
         createdAt: Date;
         updatedAt: Date;
         followersCount: number;
@@ -96,6 +99,7 @@ export class ProfilePrismaMapper {
             bannerUrl: profile.bannerUrl,
             socials: profile.socials,
             categories: profile.categories,
+            languages: profile.languages,
             createdAt: profile.createdAt,
             updatedAt: profile.updatedAt,
             followersCount: profile.followersCount,

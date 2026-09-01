@@ -14,6 +14,7 @@ function buildProps(overrides: Partial<ProfileProps> = {}): ProfileProps {
         bannerUrl: "https://cdn.example.com/default-banner.jpg",
         socials: null,
         categories: [],
+        languages: [],
         followersCount: 0,
         followingCount: 0,
         createdAt: new Date("2024-01-01T00:00:00Z"),

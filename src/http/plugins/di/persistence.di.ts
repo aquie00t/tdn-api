@@ -6,6 +6,7 @@ import { PrismaOAuthAccountRepository } from "@infrastructure/persistence/reposi
 import { PrismaProfileRepository } from "@infrastructure/persistence/repositories/prisma-profile.repository";
 import { PrismaFollowUserRepository } from "@infrastructure/persistence/repositories/prisma-follow.repository";
 import { PrismaNotificationRepository } from "@infrastructure/persistence/repositories/prisma-notification.repository";
+import { PrismaUserInterestRepository } from "@infrastructure/persistence/repositories/prisma-user-interest.repository";
 import { PrismaPostRepository } from "@infrastructure/persistence/repositories/prisma-post.repository";
 import { PrismaPostLikeRepository } from "@infrastructure/persistence/repositories/prisma-post-like.repository";
 import { PrismaLikeRepository } from "@infrastructure/persistence/repositories/prisma-like.repository";
@@ -78,6 +79,11 @@ export const persistenceModule = {
      * Post repository for managing post data persistence
      */
     postRepository: asClass(PrismaPostRepository).singleton(),
+
+    /**
+     * User interest repository backing the feed's affinity term
+     */
+    userInterestRepository: asClass(PrismaUserInterestRepository).singleton(),
 
     /**
      * Post like repository for managing post like relationships

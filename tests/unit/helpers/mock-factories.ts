@@ -91,6 +91,7 @@ export function buildProfile(overrides: Partial<ProfileProps> = {}): Profile {
         bannerUrl: "https://example.com/banner.png",
         socials: null,
         categories: [],
+        languages: [],
         followersCount: 0,
         followingCount: 0,
         createdAt: new Date("2024-01-01T00:00:00Z"),

@@ -23,6 +23,7 @@ model User {
   issuedNotifications   Notification[] @relation("IssuedNotifications")
 
   posts            Post[]
+  interests        UserInterest[]
   postLikes        PostLike[]
   postBookmarks    PostBookmark[]
   comments         Comment[]

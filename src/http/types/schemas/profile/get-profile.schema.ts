@@ -12,6 +12,7 @@ export const ProfileItemSchema = FBType.Object({
     bannerUrl: FBType.String(),
     socials: FBType.Record(FBType.String(), FBType.String()),
     categories: FBType.Array(FBType.Enum(PostCategory)),
+    languages: FBType.Array(FBType.String()),
     createdAt: FBType.String(),
     updatedAt: FBType.String(),
     followersCount: FBType.Number(),

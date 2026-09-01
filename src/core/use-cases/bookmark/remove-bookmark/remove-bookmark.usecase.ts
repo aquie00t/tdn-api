@@ -4,17 +4,13 @@
 import type { TransactionPort } from "@core/ports/services/transaction.port";
 import { NotFoundError } from "@core/errors";
 import type { RemoveBookmarkInput } from "./remove-bookmark-usecase.input";
-import type { CachePort } from "@core/ports/services/cache.port";
 
 export class RemoveBookmarkUseCase {
     /**
      * Creates a new RemoveBookmarkUseCase instance
      * @param transactionService - Transaction service for database operations
      */
-    constructor(
-        private readonly transactionService: TransactionPort,
-        private readonly cacheService: CachePort,
-    ) {}
+    constructor(private readonly transactionService: TransactionPort) {}
 
     /**
      * Executes the bookmark removal use case
@@ -44,12 +40,9 @@ export class RemoveBookmarkUseCase {
 
         if (!bookmarkRemoved) return;
 
-        try {
-            await this.cacheService.deleteByPattern(
-                `posts:feed:*user:${input.userId}*`,
-            );
-        } catch {
-            // Cache invalidation failure is non-critical; bookmark is already removed.
-        }
+        // The feed cache holds only the ranked order of post ids; isLiked and
+        // isBookmarked are read fresh on every page. Purging the viewer's
+        // ranked order here would rebuild it mid-scroll and shift every page
+        // under them, to refresh a flag that was never stale.
     }
 }

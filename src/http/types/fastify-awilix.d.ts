@@ -9,12 +9,14 @@ import type { FollowUserController } from "@services/follow-user.controller";
 import type { WebSocketManager } from "@infrastructure/realtime/websocket/websocket-manager";
 import type { NotificationController } from "@controllers/notification.controller";
 import type { NotificationPurgeScheduler } from "@infrastructure/jobs/notification/notification-purge.scheduler";
+import type { UserInterestRebuildScheduler } from "@infrastructure/jobs/user-interest/user-interest-rebuild.scheduler";
 import type PostController from "@services/post.controller";
 import type { CommentController } from "@controllers/comment.controller";
 import type { LikeController } from "@controllers/like.controller";
 import type { BookmarkController } from "@controllers/bookmark.controller";
 import type { TrendController } from "@controllers/trend.controller";
 import type { CachePort } from "@core/ports/services/cache.port";
+import type { SeenPostsPort } from "@core/ports/services/seen-posts.port";
 import type { TranslationController } from "@controllers/translation.controller";
 import type { ArticleController } from "@controllers/article.controller";
 /**
@@ -56,6 +58,9 @@ declare module "@fastify/awilix" {
         /** Scheduler for notification purge jobs */
         notificationPurgeScheduler: NotificationPurgeScheduler;
 
+        /** Scheduler for the nightly interest profile rebuild */
+        userInterestRebuildScheduler: UserInterestRebuildScheduler;
+
         /** Controller for post operations */
         postController: PostController;
 
@@ -73,6 +78,9 @@ declare module "@fastify/awilix" {
 
         /** Redis-backed cache service */
         cacheService: CachePort;
+
+        /** Redis-backed record of what each reader has already been shown */
+        seenPostsService: SeenPostsPort;
 
         /** Controller for translation operations */
         translationController: TranslationController;

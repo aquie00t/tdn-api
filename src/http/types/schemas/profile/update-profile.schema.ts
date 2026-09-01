@@ -1,5 +1,6 @@
 import { type Static, Type } from "@fastify/type-provider-typebox";
 import { PostCategory } from "@core/domain/enums/post-category-enum";
+import { SUPPORTED_LANGUAGES } from "@core/domain/constants/language.constants";
 
 export const UpdateProfileBodySchema = Type.Object(
     {
@@ -29,6 +30,19 @@ export const UpdateProfileBodySchema = Type.Object(
                 description:
                     "Discovery categories. Bot accounts only — non-bot accounts get a 403.",
             }),
+        ),
+        languages: Type.Optional(
+            Type.Array(
+                Type.Union(
+                    SUPPORTED_LANGUAGES.map((code) => Type.Literal(code)),
+                ),
+                {
+                    maxItems: SUPPORTED_LANGUAGES.length,
+                    uniqueItems: true,
+                    description:
+                        "Feed languages, most preferred first. An empty array hands the choice back to Accept-Language.",
+                },
+            ),
         ),
     },
     { additionalProperties: false },

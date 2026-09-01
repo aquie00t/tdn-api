@@ -10,6 +10,7 @@ import type { CachePort } from "@core/ports/services/cache.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
+import type { LanguageDetectionPort } from "@core/ports/services/language-detection.port";
 import { NotFoundError } from "@core/errors/common/not-found.error";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
 import { BadRequestError } from "@core/errors/common/bad-request.error";
@@ -28,6 +29,7 @@ describe("CreatePostUseCase", () => {
     let cacheService: Pick<CachePort, "deleteByPattern">;
     let notifyNewPostUseCase: Pick<NotifyNewPostUseCase, "execute">;
     let notifyQuotedAuthorUseCase: Pick<NotifyQuotedAuthorUseCase, "execute">;
+    let languageDetectionService: LanguageDetectionPort;
     let logger: Pick<LoggerPort, "error">;
 
     beforeEach(() => {
@@ -55,6 +57,9 @@ describe("CreatePostUseCase", () => {
         notifyQuotedAuthorUseCase = {
             execute: vi.fn().mockResolvedValue(0),
         };
+        languageDetectionService = {
+            detect: vi.fn().mockResolvedValue("tr"),
+        };
         logger = { error: vi.fn() };
         useCase = new CreatePostUseCase(
             transactionService as TransactionPort,
@@ -62,6 +67,7 @@ describe("CreatePostUseCase", () => {
             userRepository as IUserRepository,
             notifyNewPostUseCase as NotifyNewPostUseCase,
             notifyQuotedAuthorUseCase as NotifyQuotedAuthorUseCase,
+            languageDetectionService,
             logger as LoggerPort,
         );
     });
@@ -369,6 +375,66 @@ describe("CreatePostUseCase", () => {
             expect(
                 vi.mocked(postRepository.create).mock.calls[0][0].quotedPostId,
             ).toBe("post-1");
+        });
+    });
+    describe("language detection", () => {
+        it("should label the post with the detected language", async () => {
+            vi.mocked(languageDetectionService.detect).mockResolvedValue("tr");
+
+            await useCase.execute({
+                content: "Bugün yeni bir şey öğrendim",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(languageDetectionService.detect).toHaveBeenCalledWith(
+                "Bugün yeni bir şey öğrendim",
+            );
+            expect(vi.mocked(postRepository.create).mock.calls[0][0].lang).toBe(
+                "tr",
+            );
+        });
+
+        it("should store a null language rather than guessing one", async () => {
+            // An undetectable post is ranked language-neutral by the feed. A
+            // guess here would push it out of every feed but one.
+            vi.mocked(languageDetectionService.detect).mockResolvedValue(null);
+
+            await useCase.execute({
+                content: "https://example.com",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(
+                vi.mocked(postRepository.create).mock.calls[0][0].lang,
+            ).toBeNull();
+        });
+
+        it("should detect the language before opening the transaction", async () => {
+            const order: string[] = [];
+            vi.mocked(languageDetectionService.detect).mockImplementation(
+                () => {
+                    order.push("detect");
+                    return Promise.resolve("en");
+                },
+            );
+            vi.mocked(transactionService.runInTransaction).mockImplementation(
+                async (work) => {
+                    order.push("transaction");
+                    return work({
+                        postRepository,
+                    } as unknown as TransactionContext);
+                },
+            );
+
+            await useCase.execute({
+                content: "this is an english post about the feed",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(order).toEqual(["detect", "transaction"]);
         });
     });
 });

@@ -4,7 +4,6 @@ import { Notification } from "@core/domain/entities/notification.entity";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import { NotFoundError } from "@core/errors";
 import type { LikePostUseCaseInput } from "./like-post-usecase.input";
-import type { CachePort } from "@core/ports/services/cache.port";
 
 /**
  * Use case for liking a post
@@ -22,7 +21,6 @@ export class LikePostUseCase {
     constructor(
         private readonly transactionService: TransactionPort,
         private readonly realtimeService: RealtimePort,
-        private readonly cacheService: CachePort,
     ) {}
 
     /**
@@ -68,8 +66,9 @@ export class LikePostUseCase {
                 );
             }
         });
-        await this.cacheService.deleteByPattern(
-            `posts:feed:*user:${input.userId}*`,
-        );
+        // The feed cache holds only the ranked order of post ids; isLiked and
+        // isBookmarked are read fresh on every page. Purging the viewer's
+        // ranked order here would rebuild it mid-scroll and shift every page
+        // under them, to refresh a flag that was never stale.
     }
 }

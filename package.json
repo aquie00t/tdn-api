@@ -22,6 +22,7 @@
         "test:coverage": "vitest run --config vitest.unit.config.ts --coverage",
         "migrate-bots": "cross-env DOTENV_CONFIG_PATH=.env.production tsx scripts/migrate-bots.ts",
         "assign-bot-categories": "tsx scripts/assign-bot-categories.ts",
+        "backfill-post-lang": "tsx scripts/backfill-post-lang.ts",
         "db:deploy": "prisma migrate deploy",
         "db:generate": "prisma generate",
         "db:studio": "prisma studio"

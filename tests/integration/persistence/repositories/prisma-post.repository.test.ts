@@ -338,4 +338,185 @@ describe("PrismaPostRepository (integration)", () => {
             expect(await postRepo.findById(quote.id)).toBeNull();
         });
     });
+    describe("feed ranking reads", () => {
+        it("should persist and read back the detected language", async () => {
+            const created = await postRepo.create(
+                Post.create(
+                    "Dil etiketi kalici olmali",
+                    PostType.COMMUNITY,
+                    testUserId,
+                    [],
+                    [],
+                    undefined,
+                    "tr",
+                ),
+            );
+
+            const read = await postRepo.findById(created.id);
+
+            expect(read?.lang).toBe("tr");
+        });
+
+        it("should leave an undetected language null rather than defaulting it", async () => {
+            const created = await postRepo.create(
+                Post.create(
+                    "https://example.com",
+                    PostType.COMMUNITY,
+                    testUserId,
+                ),
+            );
+
+            expect((await postRepo.findById(created.id))?.lang).toBeNull();
+        });
+
+        describe("findFeedCandidates()", () => {
+            it("should return the ranking inputs for posts inside the window", async () => {
+                const created = await postRepo.create(
+                    Post.create(
+                        "A candidate for the feed",
+                        PostType.COMMUNITY,
+                        testUserId,
+                        [],
+                        [],
+                        undefined,
+                        "en",
+                    ),
+                );
+
+                const candidates = await postRepo.findFeedCandidates({
+                    since: new Date(Date.now() - 60 * 60 * 1000),
+                    limit: 100,
+                });
+
+                const found = candidates.find((c) => c.id === created.id);
+                expect(found).toBeDefined();
+                expect(found).toMatchObject({
+                    authorId: testUserId,
+                    lang: "en",
+                    likeCount: 0,
+                    commentCount: 0,
+                    quoteCount: 0,
+                });
+                expect(found?.createdAt).toBeInstanceOf(Date);
+            });
+
+            it("should exclude posts older than the window", async () => {
+                const created = await postRepo.create(
+                    Post.create(
+                        "Too old for the pool",
+                        PostType.COMMUNITY,
+                        testUserId,
+                    ),
+                );
+                await prisma.post.update({
+                    where: { id: created.id },
+                    data: {
+                        createdAt: new Date(
+                            Date.now() - 30 * 24 * 60 * 60 * 1000,
+                        ),
+                    },
+                });
+
+                const candidates = await postRepo.findFeedCandidates({
+                    since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+                    limit: 100,
+                });
+
+                expect(candidates.map((c) => c.id)).not.toContain(created.id);
+            });
+
+            it("should keep the newest posts when the pool overflows", async () => {
+                const candidates = await postRepo.findFeedCandidates({
+                    since: new Date(0),
+                    limit: 2,
+                });
+
+                expect(candidates).toHaveLength(2);
+                expect(
+                    candidates[0].createdAt.getTime(),
+                ).toBeGreaterThanOrEqual(candidates[1].createdAt.getTime());
+            });
+        });
+
+        describe("findByIds()", () => {
+            it("should hydrate the posts asked for, author and all", async () => {
+                const first = await postRepo.create(
+                    Post.create("Hydrate me", PostType.COMMUNITY, testUserId),
+                );
+                const second = await postRepo.create(
+                    Post.create("And me", PostType.COMMUNITY, testUserId),
+                );
+
+                const posts = await postRepo.findByIds([second.id, first.id]);
+
+                expect(posts.map((p) => p.id).sort()).toEqual(
+                    [first.id, second.id].sort(),
+                );
+                expect(posts[0].author.username).toBeDefined();
+            });
+
+            it("should skip an id that no longer exists", async () => {
+                const created = await postRepo.create(
+                    Post.create("Still here", PostType.COMMUNITY, testUserId),
+                );
+
+                const posts = await postRepo.findByIds([
+                    created.id,
+                    "00000000-0000-0000-0000-000000000000",
+                ]);
+
+                expect(posts.map((p) => p.id)).toEqual([created.id]);
+            });
+
+            it("should return nothing for an empty id list without querying", async () => {
+                expect(await postRepo.findByIds([])).toEqual([]);
+            });
+        });
+
+        describe("countAll()", () => {
+            it("should count the same rows findAll pages over", async () => {
+                const filters = { type: PostType.COMMUNITY };
+
+                const counted = await postRepo.countAll(filters);
+                const { total } = await postRepo.findAll({
+                    page: 1,
+                    limit: 1,
+                    ...filters,
+                });
+
+                expect(counted).toBe(total);
+            });
+        });
+
+        describe("findAll() with an explicit skip", () => {
+            it("should offset by skip rather than by page", async () => {
+                const byPage = await postRepo.findAll({ page: 2, limit: 3 });
+                const bySkip = await postRepo.findAll({
+                    page: 1,
+                    limit: 3,
+                    skip: 3,
+                });
+
+                expect(bySkip.posts.map((p) => p.id)).toEqual(
+                    byPage.posts.map((p) => p.id),
+                );
+            });
+
+            it("should leave out the excluded ids", async () => {
+                const { posts } = await postRepo.findAll({
+                    page: 1,
+                    limit: 5,
+                });
+                const excluded = posts[0].id;
+
+                const { posts: filtered } = await postRepo.findAll({
+                    page: 1,
+                    limit: 5,
+                    excludeIds: [excluded],
+                });
+
+                expect(filtered.map((p) => p.id)).not.toContain(excluded);
+            });
+        });
+    });
 });

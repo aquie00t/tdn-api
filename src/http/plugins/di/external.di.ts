@@ -4,6 +4,7 @@ import { GithubAuthService } from "@infrastructure/external/github-auth.service"
 import { GoogleAuthService } from "@infrastructure/external/google-auth.service";
 import { S3StorageService } from "@infrastructure/external/s3-storage.service";
 import { DeepLTranslationService } from "@infrastructure/external/deepl-translation.service";
+import { HeuristicLanguageDetectionService } from "@infrastructure/external/heuristic-language-detection.service";
 
 export const externalModule = {
     // --- Services ---
@@ -37,4 +38,8 @@ export const externalModule = {
     translationService: asFunction((config) => {
         return new DeepLTranslationService({ apiKey: config.DEEPL_API_KEY });
     }).singleton(),
+
+    languageDetectionService: asClass(
+        HeuristicLanguageDetectionService,
+    ).singleton(),
 };

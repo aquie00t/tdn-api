@@ -157,6 +157,7 @@ export class PostController {
         const {
             page = 1,
             limit = 10,
+            cursor,
             type,
             tag,
             followedOnly,
@@ -175,6 +176,11 @@ export class PostController {
             followedOnly,
             categories,
             currentUserId,
+            cursor,
+            // Only ever a fallback: the ranker prefers the languages a signed-in
+            // user chose, and reads the header for visitors and for users who
+            // never set one.
+            acceptLanguage: request.headers["accept-language"],
         });
 
         const formattedData = PostPrismaMapper.toFeedResponse(
@@ -190,6 +196,13 @@ export class PostController {
                 currentPage: page,
                 limit,
                 totalPages: Math.ceil(result.total / limit),
+                nextCursor: result.nextCursor,
+                // A short page is the end of the feed. Comparing against the
+                // total would be wrong here: the ranked window is narrower
+                // than the total, and the total keeps moving.
+                hasMore:
+                    result.nextCursor !== null &&
+                    formattedData.length === limit,
             },
         });
     }

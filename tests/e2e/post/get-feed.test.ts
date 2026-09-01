@@ -91,6 +91,8 @@ describe("GET /posts - Get Post Feed", () => {
                 currentPage: number;
                 limit: number;
                 totalPages: number;
+                nextCursor: string | null;
+                hasMore: boolean;
             };
         }>(response);
 
@@ -101,6 +103,7 @@ describe("GET /posts - Get Post Feed", () => {
             currentPage: 1,
             limit: 10,
             totalPages: expect.any(Number),
+            hasMore: expect.any(Boolean),
         });
     });
 
@@ -182,6 +185,101 @@ describe("GET /posts - Get Post Feed", () => {
         expect(body.data.length).toBeGreaterThanOrEqual(1);
     });
 
+    it("should walk the whole feed by cursor without repeating a post", async () => {
+        // The reason cursors exist here: page numbers are recomputed against
+        // whatever ranked order is current, and this feed is written to
+        // constantly.
+        type FeedBody = {
+            data: { id: string }[];
+            meta: { nextCursor: string | null; hasMore: boolean };
+        };
+
+        const seen: string[] = [];
+        let cursor: string | null = null;
+
+        for (let page = 0; page < 5; page++) {
+            const url: string =
+                cursor === null
+                    ? "/posts?limit=2"
+                    : `/posts?limit=2&cursor=${encodeURIComponent(cursor)}`;
+
+            const response = await authRequest(accessToken, {
+                method: "GET",
+                url,
+            });
+            expect(response.statusCode).toBe(200);
+
+            const body = parseBody<FeedBody>(response);
+            seen.push(...body.data.map((post) => post.id));
+
+            if (!body.meta.hasMore) break;
+            cursor = body.meta.nextCursor;
+        }
+
+        expect(seen.length).toBeGreaterThan(0);
+        expect(new Set(seen).size).toBe(seen.length);
+    });
+
+    it("should serve the first page when handed a cursor it cannot read", async () => {
+        // A truncated or stale cursor should not fail a feed request; the
+        // reader gets the top of the feed, which is what they wanted anyway.
+        const response = await authRequest(accessToken, {
+            method: "GET",
+            url: "/posts?limit=2&cursor=obviously-not-a-cursor",
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(
+            parseBody<{ data: unknown[] }>(response).data.length,
+        ).toBeGreaterThan(0);
+    });
+
+    it("should not show a signed-in reader the same post twice across builds", async () => {
+        // Publishing retires the ranked pointer, so the second read rebuilds
+        // rather than replaying a cached order - which is exactly when the
+        // seen record has to earn its keep.
+        //
+        // Seeded generously on purpose. The filter is abandoned when it would
+        // leave fewer unseen posts than the reader asked for, and the E2E
+        // database is otherwise small enough to trip that fallback - which
+        // would make this assert something the feed deliberately does not
+        // promise.
+        for (let i = 0; i < 16; i++) {
+            const created = await authRequest(accessToken, {
+                method: "POST",
+                url: "/posts",
+                payload: { content: `E2E seen-set pool post ${i}` },
+            });
+            expect(created.statusCode).toBe(201);
+        }
+
+        type FeedBody = { data: { id: string }[] };
+
+        const first = await authRequest(tokenB, {
+            method: "GET",
+            url: "/posts?limit=3",
+        });
+        expect(first.statusCode).toBe(200);
+        const firstIds = parseBody<FeedBody>(first).data.map((p) => p.id);
+        expect(firstIds).toHaveLength(3);
+
+        await authRequest(accessToken, {
+            method: "POST",
+            url: "/posts",
+            payload: { content: "E2E seen-set rebuild trigger" },
+        });
+
+        const second = await authRequest(tokenB, {
+            method: "GET",
+            url: "/posts?limit=3",
+        });
+        expect(second.statusCode).toBe(200);
+        const secondIds = parseBody<FeedBody>(second).data.map((p) => p.id);
+
+        expect(secondIds).toHaveLength(3);
+        expect(secondIds.some((id) => firstIds.includes(id))).toBe(false);
+    });
+
     it("should carry the quote card through the feed, cached or not", async () => {
         const originalRes = await authRequest(accessToken, {
             method: "POST",
@@ -220,8 +318,9 @@ describe("GET /posts - Get Post Feed", () => {
 
         expect(fromDb.quotedPost?.id).toBe(originalId);
 
-        // The second read is served from the 60-second feed cache. The dates in
-        // it are revived by hand, so the shape must not drift between the two.
+        // The second read reuses the cached ranked order instead of rebuilding
+        // it. Only the ids are cached and the page is hydrated fresh either
+        // way, so the quote card must come back identical.
         const second = await request({ method: "GET", url: "/posts?limit=50" });
         expect(second.statusCode).toBe(200);
         const fromCache = findQuote(parseBody<FeedBody>(second));
