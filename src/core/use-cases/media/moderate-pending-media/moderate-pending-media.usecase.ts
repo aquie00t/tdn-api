@@ -313,11 +313,7 @@ export class ModeratePendingMediaUseCase {
                     asset.uploaderId,
                     asset.uploaderId,
                     NotificationType.MEDIA_REJECTED,
-                    owner?.ownerKind === MediaOwnerKind.POST
-                        ? { postId: owner.ownerId }
-                        : owner?.ownerKind === MediaOwnerKind.COMMENT
-                          ? { commentId: owner.ownerId }
-                          : {},
+                    await this.notificationTarget(owner),
                 ),
             );
         } catch (error) {
@@ -330,6 +326,38 @@ export class ModeratePendingMediaUseCase {
                 "Failed to notify the uploader about rejected media.",
             );
         }
+    }
+
+    /**
+     * Resolves what the notification should point at.
+     *
+     * A comment on an article needs the article alongside it: the client reads
+     * an article by slug, and the slug travels with the notification only when
+     * `articleId` is set. Without it a rejected comment attachment produces a
+     * notification the reader cannot tap. Comments on posts carry no article
+     * and are unaffected.
+     *
+     * @param owner - The content the rejected asset was attached to
+     * @returns The notification target, empty when nothing claimed the asset
+     */
+    private async notificationTarget(
+        owner: { ownerId: string; ownerKind: MediaOwnerKind } | null,
+    ): Promise<{ postId?: string; commentId?: string; articleId?: string }> {
+        if (!owner) return {};
+
+        if (owner.ownerKind === MediaOwnerKind.POST) {
+            return { postId: owner.ownerId };
+        }
+
+        if (owner.ownerKind !== MediaOwnerKind.COMMENT) return {};
+
+        const comment = await this.commentRepository.findById(owner.ownerId);
+
+        return {
+            commentId: owner.ownerId,
+            articleId: comment?.articleId ?? undefined,
+            postId: comment?.postId ?? undefined,
+        };
     }
 
     /**
