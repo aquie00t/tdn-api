@@ -102,6 +102,8 @@ Message media rides the same pipeline as post media through its own `MediaChanne
 
 Chat events are namespaced in `src/core/domain/constants/chat-events.constants.ts` and travel the existing Redis `realtime_events` channel; `RealtimeEventPayload` is a union of the notification and chat payload shapes.
 
+`docs/direct-messaging.md` is the client-facing contract for this feature — endpoints, response objects, realtime events and error titles. Keep it in step with the schemas when the surface changes.
+
 ### Realtime and background jobs
 
 `FastifyRealtimeService` publishes to the Redis `realtime_events` channel; each instance subscribes and fans out to locally connected sockets via `WebSocketManager` — so notifications work across multiple processes. Never write to sockets directly from a use-case; go through `RealtimePort`.
