@@ -29,9 +29,12 @@ model Post {
   /// True when moderation judged the media borderline rather than forbidden.
   /// The post is served as normal; the client blurs the media behind a tap.
   isSensitive Boolean               @default(false) @map("is_sensitive")
-  /// APPROVED for a text-only post. PENDING while an attached video is still
-  /// being scanned and REJECTED once one failed, both of which make the read
-  /// path withhold the media while leaving the text visible.
+  /// APPROVED for a text-only post, and for one whose media has all been
+  /// judged. PENDING while an attached video is still being scanned, which
+  /// makes the read path withhold the media while leaving the text visible.
+  /// A rejected file is dropped from `media_urls` instead of being recorded
+  /// here, so a post that loses one attachment of several keeps serving the
+  /// rest.
   mediaStatus MediaModerationStatus @default(APPROVED) @map("media_status")
 
   authorId String @map("author_id")

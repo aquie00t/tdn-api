@@ -11,11 +11,14 @@ import {
 } from "@core/domain/enums";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 import type { ICommentRepository } from "@core/ports/repositories/comment.repository";
+import type { IMessageRepository } from "@core/ports/repositories/message.repository";
 import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { MediaModerationPort } from "@core/ports/services/media-moderation.port";
 import type { StoragePort } from "@core/ports/services/storage.port";
+import type { RealtimePort } from "@core/ports/services/realtime.port";
+import { ChatEvents } from "@core/domain/constants/chat-events.constants";
 
 const CDN = "https://cdn.example.com";
 const UPLOADER = "user-1";
@@ -56,8 +59,16 @@ describe("ModeratePendingMediaUseCase", () => {
     let moderation: MediaModerationPort;
     let storageService: Pick<StoragePort, "delete">;
     let postRepository: Pick<IPostRepository, "updateMediaState">;
-    let commentRepository: Pick<ICommentRepository, "updateMediaState">;
+    let commentRepository: Pick<
+        ICommentRepository,
+        "updateMediaState" | "findById"
+    >;
+    let messageRepository: Pick<
+        IMessageRepository,
+        "updateMediaState" | "findById"
+    >;
     let notificationRepository: Pick<INotificationRepository, "create">;
+    let realtimeService: Pick<RealtimePort, "emitToUser">;
     let logger: Pick<LoggerPort, "error" | "warn">;
 
     beforeEach(() => {
@@ -89,10 +100,16 @@ describe("ModeratePendingMediaUseCase", () => {
         };
         commentRepository = {
             updateMediaState: vi.fn().mockResolvedValue(undefined),
+            findById: vi.fn().mockResolvedValue(null),
+        };
+        messageRepository = {
+            updateMediaState: vi.fn().mockResolvedValue(undefined),
+            findById: vi.fn().mockResolvedValue(null),
         };
         notificationRepository = {
             create: vi.fn().mockResolvedValue(undefined),
         };
+        realtimeService = { emitToUser: vi.fn() };
         logger = { error: vi.fn(), warn: vi.fn() };
 
         useCase = new ModeratePendingMediaUseCase(
@@ -101,7 +118,9 @@ describe("ModeratePendingMediaUseCase", () => {
             storageService as StoragePort,
             postRepository as IPostRepository,
             commentRepository as ICommentRepository,
+            messageRepository as IMessageRepository,
             notificationRepository as INotificationRepository,
+            realtimeService as RealtimePort,
             {
                 batchSize: 10,
                 maxAttempts: 3,
@@ -180,6 +199,159 @@ describe("ModeratePendingMediaUseCase", () => {
 
             expect(notification.recipientId).toBe(UPLOADER);
             expect(notification.type).toBe(NotificationType.MEDIA_REJECTED);
+        });
+
+        it("should point a comment notification at the article it lives under", async () => {
+            // An article is read by slug, and the slug only travels with the
+            // notification when articleId is set. Without it the reader gets a
+            // notice they cannot tap.
+            const onComment = videoAsset({
+                ownerKind: MediaOwnerKind.COMMENT,
+                ownerId: "comment-1",
+            });
+
+            vi.mocked(mediaAssetRepository.claimPending).mockResolvedValue([
+                onComment,
+            ]);
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [onComment],
+            );
+            vi.mocked(commentRepository.findById).mockResolvedValue({
+                articleId: "article-9",
+                postId: null,
+            } as never);
+
+            await useCase.execute();
+
+            const [notification] = vi.mocked(notificationRepository.create).mock
+                .calls[0];
+
+            expect(notification.commentId).toBe("comment-1");
+            expect(notification.articleId).toBe("article-9");
+        });
+
+        it("should strip a rejected video from the message carrying it", async () => {
+            const onMessage = videoAsset({
+                channel: MediaChannel.MESSAGE_MEDIA,
+                ownerKind: MediaOwnerKind.MESSAGE,
+                ownerId: "message-1",
+            });
+
+            vi.mocked(mediaAssetRepository.claimPending).mockResolvedValue([
+                onMessage,
+            ]);
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [onMessage],
+            );
+            vi.mocked(messageRepository.findById).mockResolvedValue({
+                id: "message-1",
+                conversationId: "conv-1",
+                senderId: UPLOADER,
+            } as never);
+
+            await useCase.execute();
+
+            expect(messageRepository.updateMediaState).toHaveBeenCalledWith(
+                "message-1",
+                expect.objectContaining({ mediaUrls: [] }),
+            );
+        });
+
+        it("should tell a message sender over the thread rather than the notification feed", async () => {
+            // The notification target can only point at public content, so a
+            // notification about a private message would be one the reader
+            // cannot tap. The recipient is told nothing at all: the read path
+            // withholds unscanned media, so for them the file never existed.
+            const onMessage = videoAsset({
+                channel: MediaChannel.MESSAGE_MEDIA,
+                ownerKind: MediaOwnerKind.MESSAGE,
+                ownerId: "message-1",
+            });
+
+            vi.mocked(mediaAssetRepository.claimPending).mockResolvedValue([
+                onMessage,
+            ]);
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [onMessage],
+            );
+            vi.mocked(messageRepository.findById).mockResolvedValue({
+                id: "message-1",
+                conversationId: "conv-1",
+                senderId: UPLOADER,
+            } as never);
+
+            await useCase.execute();
+
+            expect(notificationRepository.create).not.toHaveBeenCalled();
+            expect(realtimeService.emitToUser).toHaveBeenCalledWith(
+                UPLOADER,
+                ChatEvents.MESSAGE_MEDIA_REJECTED,
+                expect.objectContaining({
+                    conversationId: "conv-1",
+                    messageId: "message-1",
+                }),
+            );
+        });
+
+        it("should mark the owner REJECTED when every attachment was refused", async () => {
+            // APPROVED with no media is indistinguishable from content that
+            // never had any, so a message whose only attachment was refused
+            // would reload as a silent empty row instead of a "media removed"
+            // notice.
+            const result = await useCase.execute();
+
+            expect(result.rejected).toBe(1);
+            expect(postRepository.updateMediaState).toHaveBeenCalledWith(
+                POST_ID,
+                expect.objectContaining({
+                    mediaUrls: [],
+                    mediaStatus: MediaModerationStatus.REJECTED,
+                }),
+            );
+        });
+
+        it("should keep the owner APPROVED when only some attachments were refused", async () => {
+            // The files that survived are still worth serving; the refused one
+            // simply drops out of the list.
+            vi.mocked(mediaAssetRepository.findByOwner).mockResolvedValue([
+                videoAsset({ status: MediaModerationStatus.REJECTED }),
+                videoAsset({
+                    storageKey: "posts/user-1/keeper.mp4",
+                    status: MediaModerationStatus.APPROVED,
+                }),
+            ]);
+
+            await useCase.execute();
+
+            expect(postRepository.updateMediaState).toHaveBeenCalledWith(
+                POST_ID,
+                expect.objectContaining({
+                    mediaUrls: [`${CDN}/posts/user-1/keeper.mp4`],
+                    mediaStatus: MediaModerationStatus.APPROVED,
+                }),
+            );
+        });
+
+        it("should leave a targetless notification when nothing claimed the asset", async () => {
+            // A user can upload a video and never submit the post. The notice
+            // still goes out, but it has nowhere to point.
+            const orphan = videoAsset({ ownerId: null, ownerKind: null });
+
+            vi.mocked(mediaAssetRepository.claimPending).mockResolvedValue([
+                orphan,
+            ]);
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [orphan],
+            );
+
+            await useCase.execute();
+
+            const [notification] = vi.mocked(notificationRepository.create).mock
+                .calls[0];
+
+            expect(notification.postId).toBeUndefined();
+            expect(notification.commentId).toBeUndefined();
+            expect(notification.articleId).toBeUndefined();
         });
 
         it("should keep going when the object cannot be deleted", async () => {
@@ -330,6 +502,44 @@ describe("ModeratePendingMediaUseCase", () => {
             );
             expect(storageService.delete).toHaveBeenCalledWith(KEY);
             expect(notificationRepository.create).toHaveBeenCalled();
+        });
+
+        it("should still route a message rejection over the thread when the retry budget runs out", async () => {
+            // A rejection that took the retry-exhaustion path is no less
+            // private than one the provider handed down: a notification about
+            // a private message would carry no target and be untappable.
+            const onMessage = videoAsset({
+                channel: MediaChannel.MESSAGE_MEDIA,
+                ownerKind: MediaOwnerKind.MESSAGE,
+                ownerId: "message-1",
+            });
+
+            vi.mocked(mediaAssetRepository.claimPending).mockResolvedValue([
+                onMessage,
+            ]);
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [onMessage],
+            );
+            vi.mocked(
+                mediaAssetRepository.recordFailedAttempt,
+            ).mockResolvedValue(3);
+            vi.mocked(messageRepository.findById).mockResolvedValue({
+                id: "message-1",
+                conversationId: "conv-1",
+                senderId: UPLOADER,
+            } as never);
+
+            await useCase.execute();
+
+            expect(notificationRepository.create).not.toHaveBeenCalled();
+            expect(realtimeService.emitToUser).toHaveBeenCalledWith(
+                UPLOADER,
+                ChatEvents.MESSAGE_MEDIA_REJECTED,
+                expect.objectContaining({
+                    conversationId: "conv-1",
+                    messageId: "message-1",
+                }),
+            );
         });
 
         it("should not let the failure handler strand the rest of the batch", async () => {

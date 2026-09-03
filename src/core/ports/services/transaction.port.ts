@@ -9,6 +9,8 @@ import type { IVerificationTokenRepository } from "@core/ports/repositories/veri
 import type { IArticleRepository } from "@core/ports/repositories/article.repository";
 import type { IArticleLikeRepository } from "@core/ports/repositories/article-like.repository";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
+import type { IMessageRepository } from "@core/ports/repositories/message.repository";
 
 /**
  * Provides transactional access to repositories within a single atomic operation.
@@ -51,6 +53,18 @@ export interface TransactionContext {
      * job would then leave it in storage forever.
      */
     readonly mediaAssetRepository: IMediaAssetRepository;
+
+    /**
+     * Repository for conversations within the transaction.
+     *
+     * A message and the conversation counters it moves are written together:
+     * a preview and an unread badge committed outside the message's
+     * transaction would advertise a message a rollback took away.
+     */
+    readonly conversationRepository: IConversationRepository;
+
+    /** Repository for direct messages within the transaction. */
+    readonly messageRepository: IMessageRepository;
 }
 
 /**

@@ -27,6 +27,46 @@ export interface RealtimeNotificationPayload {
 }
 
 /**
+ * Payload structure for realtime chat events.
+ *
+ * Chat has nothing to say about issuers and reference ids, and a notification
+ * has nothing to say about conversations, so the two shapes stay separate
+ * rather than growing into one struct where most fields are always absent.
+ */
+export interface RealtimeChatPayload {
+    /** The conversation the event concerns. */
+    conversationId: string;
+
+    /** The message the event concerns, absent for a read receipt. */
+    messageId?: string;
+
+    /** Who wrote the message, or who read the thread. */
+    senderId: string;
+
+    /** Truncated message text, so an inbox can update without a refetch. */
+    preview?: string;
+
+    /** Whether the message carries attachments the client must fetch. */
+    hasMedia?: boolean;
+
+    /** When the message was written, as an ISO string. */
+    createdAt?: string;
+
+    /** When the thread was read, as an ISO string. */
+    readAt?: string;
+}
+
+/**
+ * Anything that can travel over the realtime channel.
+ *
+ * A union rather than a widened interface: each event still has to produce a
+ * payload that is completely one shape or completely the other, which is what
+ * keeps a chat event from being emitted with half a notification's fields.
+ */
+export type RealtimeEventPayload =
+    RealtimeNotificationPayload | RealtimeChatPayload;
+
+/**
  * Port interface for realtime communication operations.
  * Following Clean Architecture principles, this interface defines the contract
  * for realtime operations without exposing implementation details.
@@ -41,6 +81,6 @@ export interface RealtimePort {
     emitToUser(
         userId: string,
         event: string,
-        payload: RealtimeNotificationPayload,
+        payload: RealtimeEventPayload,
     ): void;
 }

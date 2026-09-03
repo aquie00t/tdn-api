@@ -34,6 +34,12 @@ export * from "./media/moderation-unavailable.error";
 export * from "./article/article-not-published.error";
 export * from "./article/invalid-article-state.error";
 
+// Conversation errors
+export * from "./conversation/conversation-not-found.error";
+export * from "./conversation/message-not-sendable.error";
+export * from "./conversation/empty-message.error";
+export * from "./conversation/invalid-recipient.error";
+
 // Common HTTP errors
 export * from "./common/bad-request.error";
 export * from "./common/conflict.error";

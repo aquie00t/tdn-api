@@ -80,6 +80,15 @@ import { LikeArticleUseCase } from "@core/use-cases/article/like-article";
 import { UnlikeArticleUseCase } from "@core/use-cases/article/unlike-article";
 import { SaveArticleBookmarkUseCase } from "@core/use-cases/article/save-article-bookmark";
 import { RemoveArticleBookmarkUseCase } from "@core/use-cases/article/remove-article-bookmark";
+import { StartConversationUseCase } from "@core/use-cases/conversation/start-conversation";
+import { ListConversationsUseCase } from "@core/use-cases/conversation/list-conversations";
+import { RespondToRequestUseCase } from "@core/use-cases/conversation/respond-to-request";
+import { MarkConversationReadUseCase } from "@core/use-cases/conversation/mark-conversation-read";
+import { GetUnreadMessageCountUseCase } from "@core/use-cases/conversation/get-unread-count";
+import { SendMessageUseCase } from "@core/use-cases/message/send-message";
+import { GetMessagesUseCase } from "@core/use-cases/message/get-messages";
+import { DeleteMessageUseCase } from "@core/use-cases/message/delete-message";
+import { UploadMessageMediaUseCase } from "@core/use-cases/message/upload-message-media";
 
 /**
  * Dependency injection module for use cases
@@ -384,7 +393,9 @@ export const useCasesModule = {
             storageService,
             postRepository,
             commentRepository,
+            messageRepository,
             notificationRepository,
+            realtimeService,
             config,
             logger,
         ) =>
@@ -394,7 +405,9 @@ export const useCasesModule = {
                 storageService,
                 postRepository,
                 commentRepository,
+                messageRepository,
                 notificationRepository,
+                realtimeService,
                 {
                     batchSize: config.MEDIA_MODERATION_BATCH_SIZE,
                     maxAttempts: config.MEDIA_MODERATION_MAX_ATTEMPTS,
@@ -679,4 +692,74 @@ export const useCasesModule = {
     removeArticleBookmarkUseCase: asClass(
         RemoveArticleBookmarkUseCase,
     ).singleton(),
+
+    // --- Direct messages ---
+
+    /**
+     * Use case for opening a conversation with another user
+     */
+    startConversationUseCase: asClass(StartConversationUseCase).singleton(),
+
+    /**
+     * Use case for reading one tab of the message inbox
+     */
+    listConversationsUseCase: asClass(ListConversationsUseCase).singleton(),
+
+    /**
+     * Use case for accepting or declining a conversation request
+     */
+    respondToRequestUseCase: asClass(RespondToRequestUseCase).singleton(),
+
+    /**
+     * Use case for clearing a thread's unread state
+     */
+    markConversationReadUseCase: asClass(
+        MarkConversationReadUseCase,
+    ).singleton(),
+
+    /**
+     * Use case for the unread message badge
+     */
+    getUnreadMessageCountUseCase: asClass(
+        GetUnreadMessageCountUseCase,
+    ).singleton(),
+
+    /**
+     * Use case for writing a message.
+     *
+     * Registered as a function because it needs the CDN origin to recover the
+     * storage key behind a submitted media URL, the same way comment creation
+     * does.
+     */
+    sendMessageUseCase: asFunction(
+        (
+            transactionService,
+            conversationRepository,
+            mediaAssetRepository,
+            realtimeService,
+            config,
+        ) =>
+            new SendMessageUseCase(
+                transactionService,
+                conversationRepository,
+                mediaAssetRepository,
+                realtimeService,
+                config.R2_PUBLIC_URL,
+            ),
+    ).singleton(),
+
+    /**
+     * Use case for reading a message thread
+     */
+    getMessagesUseCase: asClass(GetMessagesUseCase).singleton(),
+
+    /**
+     * Use case for withdrawing a message
+     */
+    deleteMessageUseCase: asClass(DeleteMessageUseCase).singleton(),
+
+    /**
+     * Use case for storing a file to attach to a message
+     */
+    uploadMessageMediaUseCase: asClass(UploadMessageMediaUseCase).singleton(),
 };

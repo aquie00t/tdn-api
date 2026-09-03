@@ -14,3 +14,4 @@ export { MediaOwnerKind } from "./media-owner-kind.enum";
 export { MediaModerationStatus } from "./media-moderation-status.enum";
 export type { MediaModerationVerdict } from "./media-moderation-status.enum";
 export { MediaModerationCategory } from "./media-moderation-category.enum";
+export { ConversationStatus } from "./conversation-status.enum";
