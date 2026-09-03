@@ -110,6 +110,10 @@ describe("Direct messaging", () => {
             payload: { recipientId: bobId },
         });
 
+        // 200, not 201: nothing was created. A client keying a "conversation
+        // started" toast off the status must not fire it for a thread that was
+        // already there.
+        expect(response.statusCode).toBe(200);
         expect(parseBody<{ data: { id: string } }>(response).data.id).toBe(
             conversationId,
         );

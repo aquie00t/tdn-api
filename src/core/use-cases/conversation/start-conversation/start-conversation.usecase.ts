@@ -5,6 +5,7 @@ import type { IConversationRepository } from "@core/ports/repositories/conversat
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { StartConversationUseCaseInput } from "./start-conversation-usecase.input";
+import type { StartConversationUseCaseOutput } from "./start-conversation-usecase.output";
 
 /**
  * Use case for opening a direct conversation with another user.
@@ -36,12 +37,14 @@ export class StartConversationUseCase {
      * which raises no unread badge until they accept.
      *
      * @param input - Who is writing to whom
-     * @returns The conversation, new or existing
+     * @returns The conversation, and whether this call created it
      *
      * @throws InvalidRecipientError - When the recipient is the initiator, a
      * bot, or an account being deleted
      */
-    async execute(input: StartConversationUseCaseInput): Promise<Conversation> {
+    async execute(
+        input: StartConversationUseCaseInput,
+    ): Promise<StartConversationUseCaseOutput> {
         const { initiatorId, recipientId } = input;
 
         if (initiatorId === recipientId) {
@@ -58,7 +61,7 @@ export class StartConversationUseCase {
         // A declined conversation is returned as it is rather than reopened.
         // Resetting it here would make declining pointless: the refused
         // account only has to tap "message" again to get a fresh request.
-        if (existing) return existing;
+        if (existing) return { conversation: existing, created: false };
 
         const recipient = await this.userRepository.findById(recipientId);
 
@@ -83,6 +86,10 @@ export class StartConversationUseCase {
                 : ConversationStatus.PENDING,
         );
 
-        return await this.conversationRepository.create(conversation);
+        return {
+            conversation:
+                await this.conversationRepository.create(conversation),
+            created: true,
+        };
     }
 }

@@ -93,6 +93,11 @@ export class ConversationController {
 
     /**
      * Opens a conversation, or returns the one that already exists.
+     *
+     * 201 only when a thread was actually opened. The idempotent branch
+     * answers 200, because a client that keys a "conversation started" toast
+     * off the status would otherwise fire it for a thread that has been
+     * sitting there for weeks - possibly a declined one it cannot write to.
      */
     async startConversation(
         request: FastifyRequest<{ Body: StartConversationBody }>,
@@ -100,12 +105,13 @@ export class ConversationController {
     ): Promise<void> {
         const userId = request.user.id;
 
-        const conversation = await this.startConversationUseCase.execute({
-            initiatorId: userId,
-            recipientId: request.body.recipientId,
-        });
+        const { conversation, created } =
+            await this.startConversationUseCase.execute({
+                initiatorId: userId,
+                recipientId: request.body.recipientId,
+            });
 
-        return reply.status(201).send({
+        return reply.status(created ? 201 : 200).send({
             data: ConversationPrismaMapper.toResponse(
                 conversation,
                 request.server.config.R2_PUBLIC_URL,

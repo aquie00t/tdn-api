@@ -56,16 +56,25 @@ export function conversationRoutes(fastify: FastifyInstance): void {
         conversationController.getConversations.bind(conversationController),
     );
 
+    // 201 when a thread is opened, 200 when one already existed - the call is
+    // idempotent, and a client keying off the status should be able to tell
+    // the two apart.
     fastify.post<{
         Body: StartConversationBody;
-        Reply: { 201: ConversationResponseBody };
+        Reply: {
+            200: ConversationResponseBody;
+            201: ConversationResponseBody;
+        };
     }>(
         "/conversations",
         {
             onRequest: [fastify.authenticate],
             schema: {
                 body: StartConversationBodySchema,
-                response: { 201: ConversationResponseSchema },
+                response: {
+                    200: ConversationResponseSchema,
+                    201: ConversationResponseSchema,
+                },
                 tags: ["Conversation"],
             },
             config: { rateLimit: RateLimitPolicies.SENSITIVE },

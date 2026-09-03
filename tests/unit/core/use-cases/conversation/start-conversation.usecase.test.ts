@@ -48,19 +48,20 @@ describe("StartConversationUseCase", () => {
     });
 
     it("opens a pending request when the recipient does not follow the initiator", async () => {
-        const conversation = await useCase.execute({
+        const { conversation, created } = await useCase.execute({
             initiatorId: INITIATOR,
             recipientId: RECIPIENT,
         });
 
         expect(conversation.status).toBe(ConversationStatus.PENDING);
         expect(conversation.initiatorId).toBe(INITIATOR);
+        expect(created).toBe(true);
     });
 
     it("opens an accepted conversation when the recipient already follows the initiator", async () => {
         vi.mocked(followRepo.checkIsFollowing).mockResolvedValue(true);
 
-        const conversation = await useCase.execute({
+        const { conversation } = await useCase.execute({
             initiatorId: INITIATOR,
             recipientId: RECIPIENT,
         });
@@ -83,12 +84,15 @@ describe("StartConversationUseCase", () => {
         );
         vi.mocked(conversationRepo.findBetween).mockResolvedValue(existing);
 
-        const conversation = await useCase.execute({
+        const { conversation, created } = await useCase.execute({
             initiatorId: INITIATOR,
             recipientId: RECIPIENT,
         });
 
         expect(conversation).toBe(existing);
+        // Reported so the endpoint answers 200 rather than claiming to have
+        // created a thread that was already there.
+        expect(created).toBe(false);
         expect(conversationRepo.create).not.toHaveBeenCalled();
     });
 
@@ -100,12 +104,13 @@ describe("StartConversationUseCase", () => {
         );
         vi.mocked(conversationRepo.findBetween).mockResolvedValue(declined);
 
-        const conversation = await useCase.execute({
+        const { conversation, created } = await useCase.execute({
             initiatorId: INITIATOR,
             recipientId: RECIPIENT,
         });
 
         expect(conversation.status).toBe(ConversationStatus.DECLINED);
+        expect(created).toBe(false);
         expect(conversationRepo.create).not.toHaveBeenCalled();
     });
 
