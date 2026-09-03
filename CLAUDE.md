@@ -88,6 +88,18 @@ Verdicts are tiered: explicit sexual content, gore, self-harm and hate imagery a
 
 Posts, comments and articles carry denormalised `isSensitive` / `mediaStatus` columns; the mappers withhold `mediaUrls` while `mediaStatus !== APPROVED` but still serve the text. `MODERATION_ENABLED=false` (test and local) swaps in `NoopModerationService`, which approves everything — it is never a fallback for a provider that is down.
 
+### Direct messaging
+
+One-to-one only. `Conversation` stores its participant pair **ordered** (`userAId < userBId`), which is the only thing making the unique constraint on the pair mean anything — `Conversation.orderPair` does the sorting and `PrismaConversationRepository.create` is an upsert, so two people writing to each other at once join one thread instead of racing. Nothing outside `conversation.entity.ts` and its mapper reads the A/B columns: every question is answered per-viewer (`otherParticipantId`, `unreadFor`, `canSend`, `isRequestFor`).
+
+A conversation opened by somebody the recipient does not follow starts `PENDING`: it goes to a requests tab, only the initiator may write, and it emits `conversation:request` rather than `message:new` so it raises no unread badge. `getTotalUnreadCount` sums `ACCEPTED` conversations only. Declining sets `DECLINED` and keeps the row — deleting it would let the refused account open a fresh request immediately.
+
+Per-side read state (`userXUnread`, `userXLastReadAt`) lives on the conversation, written in exactly two places: `applyNewMessage` (inside the message's transaction) and `markRead`. Messages are soft-deleted so the thread keeps its shape, and the mapper withholds a withdrawn message's text.
+
+Message media rides the same pipeline as post media through its own `MediaChannel.MESSAGE_MEDIA` (`POST /messages/media`) and `MediaOwnerKind.MESSAGE`; `SendMessageUseCase` resolves every submitted URL via `resolveAttachableMedia`, exactly as `CreatePostUseCase` does. A rejected video reaches its sender as a `message:media_rejected` realtime event instead of a `Notification` row — the notification target can only point at public content.
+
+Chat events are namespaced in `src/core/domain/constants/chat-events.constants.ts` and travel the existing Redis `realtime_events` channel; `RealtimeEventPayload` is a union of the notification and chat payload shapes.
+
 ### Realtime and background jobs
 
 `FastifyRealtimeService` publishes to the Redis `realtime_events` channel; each instance subscribes and fans out to locally connected sockets via `WebSocketManager` — so notifications work across multiple processes. Never write to sockets directly from a use-case; go through `RealtimePort`.
