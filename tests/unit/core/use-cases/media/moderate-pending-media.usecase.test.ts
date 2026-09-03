@@ -293,6 +293,45 @@ describe("ModeratePendingMediaUseCase", () => {
             );
         });
 
+        it("should mark the owner REJECTED when every attachment was refused", async () => {
+            // APPROVED with no media is indistinguishable from content that
+            // never had any, so a message whose only attachment was refused
+            // would reload as a silent empty row instead of a "media removed"
+            // notice.
+            const result = await useCase.execute();
+
+            expect(result.rejected).toBe(1);
+            expect(postRepository.updateMediaState).toHaveBeenCalledWith(
+                POST_ID,
+                expect.objectContaining({
+                    mediaUrls: [],
+                    mediaStatus: MediaModerationStatus.REJECTED,
+                }),
+            );
+        });
+
+        it("should keep the owner APPROVED when only some attachments were refused", async () => {
+            // The files that survived are still worth serving; the refused one
+            // simply drops out of the list.
+            vi.mocked(mediaAssetRepository.findByOwner).mockResolvedValue([
+                videoAsset({ status: MediaModerationStatus.REJECTED }),
+                videoAsset({
+                    storageKey: "posts/user-1/keeper.mp4",
+                    status: MediaModerationStatus.APPROVED,
+                }),
+            ]);
+
+            await useCase.execute();
+
+            expect(postRepository.updateMediaState).toHaveBeenCalledWith(
+                POST_ID,
+                expect.objectContaining({
+                    mediaUrls: [`${CDN}/posts/user-1/keeper.mp4`],
+                    mediaStatus: MediaModerationStatus.APPROVED,
+                }),
+            );
+        });
+
         it("should leave a targetless notification when nothing claimed the asset", async () => {
             // A user can upload a video and never submit the post. The notice
             // still goes out, but it has nowhere to point.
@@ -463,6 +502,44 @@ describe("ModeratePendingMediaUseCase", () => {
             );
             expect(storageService.delete).toHaveBeenCalledWith(KEY);
             expect(notificationRepository.create).toHaveBeenCalled();
+        });
+
+        it("should still route a message rejection over the thread when the retry budget runs out", async () => {
+            // A rejection that took the retry-exhaustion path is no less
+            // private than one the provider handed down: a notification about
+            // a private message would carry no target and be untappable.
+            const onMessage = videoAsset({
+                channel: MediaChannel.MESSAGE_MEDIA,
+                ownerKind: MediaOwnerKind.MESSAGE,
+                ownerId: "message-1",
+            });
+
+            vi.mocked(mediaAssetRepository.claimPending).mockResolvedValue([
+                onMessage,
+            ]);
+            vi.mocked(mediaAssetRepository.findByStorageKeys).mockResolvedValue(
+                [onMessage],
+            );
+            vi.mocked(
+                mediaAssetRepository.recordFailedAttempt,
+            ).mockResolvedValue(3);
+            vi.mocked(messageRepository.findById).mockResolvedValue({
+                id: "message-1",
+                conversationId: "conv-1",
+                senderId: UPLOADER,
+            } as never);
+
+            await useCase.execute();
+
+            expect(notificationRepository.create).not.toHaveBeenCalled();
+            expect(realtimeService.emitToUser).toHaveBeenCalledWith(
+                UPLOADER,
+                ChatEvents.MESSAGE_MEDIA_REJECTED,
+                expect.objectContaining({
+                    conversationId: "conv-1",
+                    messageId: "message-1",
+                }),
+            );
         });
 
         it("should not let the failure handler strand the rest of the batch", async () => {

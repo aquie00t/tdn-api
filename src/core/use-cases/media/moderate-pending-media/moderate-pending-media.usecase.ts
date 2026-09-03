@@ -178,15 +178,7 @@ export class ModeratePendingMediaUseCase {
         const owner = await this.refreshOwner(asset.storageKey);
 
         if (result.verdict === MediaModerationStatus.REJECTED) {
-            // A rejection inside a private conversation is told to the sender
-            // over the thread it happened in, not through the notification
-            // feed: the notification target can only point at public content,
-            // so a message notification would be one the recipient cannot tap.
-            if (owner?.ownerKind === MediaOwnerKind.MESSAGE) {
-                await this.notifyMessageSender(asset, owner.ownerId);
-            } else {
-                await this.notifyUploader(asset, owner);
-            }
+            await this.notifyRejection(asset, owner);
         }
 
         return result.verdict;
@@ -266,13 +258,7 @@ export class ModeratePendingMediaUseCase {
             isSensitive: siblings.some(
                 (sibling) => sibling.status === MediaModerationStatus.SENSITIVE,
             ),
-            mediaStatus: siblings.some(
-                (sibling) =>
-                    sibling.status === MediaModerationStatus.PENDING ||
-                    sibling.status === MediaModerationStatus.SCANNING,
-            )
-                ? MediaModerationStatus.PENDING
-                : MediaModerationStatus.APPROVED,
+            mediaStatus: this.resolveOwnerStatus(siblings),
         };
 
         if (ownerKind === MediaOwnerKind.POST) {
@@ -304,6 +290,71 @@ export class ModeratePendingMediaUseCase {
         );
 
         return null;
+    }
+
+    /**
+     * Tells whoever uploaded a refused file that it was removed.
+     *
+     * The single place that decides between the two channels, because there
+     * are two ways an asset gets rejected - a provider verdict, and a retry
+     * budget running out - and a rejection that took the second path is no
+     * less private than one that took the first.
+     *
+     * A rejection inside a conversation is reported over the thread it
+     * happened in rather than through the notification feed: a notification
+     * can only point at a post, an article or a comment, so one about a
+     * private message would be untappable.
+     *
+     * @param asset - The rejected asset
+     * @param owner - The content it was attached to, or null when nothing
+     * claimed it
+     */
+    private async notifyRejection(
+        asset: MediaAsset,
+        owner: { ownerId: string; ownerKind: MediaOwnerKind } | null,
+    ): Promise<void> {
+        if (owner?.ownerKind === MediaOwnerKind.MESSAGE) {
+            await this.notifyMessageSender(asset, owner.ownerId);
+            return;
+        }
+
+        await this.notifyUploader(asset, owner);
+    }
+
+    /**
+     * Resolves the moderation state the owning content should carry.
+     *
+     * Content whose attachments were all refused ends up REJECTED rather than
+     * APPROVED. Both leave `mediaUrls` empty, but they are not the same thing
+     * to a reader: APPROVED with no media is indistinguishable from content
+     * that never had any, so a message whose only attachment was refused would
+     * reload as a silent empty row instead of the "media removed" notice its
+     * sender needs to see. Only a message currently surfaces that distinction,
+     * but recording it costs nothing and keeps the stored state honest for the
+     * post and comment tables too.
+     *
+     * A partial rejection stays APPROVED: the files that survived are still
+     * worth serving, and the refused one simply drops out of the list.
+     *
+     * @param siblings - Every asset attached to the owning content
+     * @returns The status to write onto the owner
+     */
+    private resolveOwnerStatus(siblings: MediaAsset[]): MediaModerationStatus {
+        const hasUnscanned = siblings.some(
+            (sibling) =>
+                sibling.status === MediaModerationStatus.PENDING ||
+                sibling.status === MediaModerationStatus.SCANNING,
+        );
+
+        if (hasUnscanned) return MediaModerationStatus.PENDING;
+
+        const allRefused =
+            siblings.length > 0 &&
+            siblings.every((sibling) => !sibling.isServable);
+
+        return allRefused
+            ? MediaModerationStatus.REJECTED
+            : MediaModerationStatus.APPROVED;
     }
 
     /**
@@ -469,6 +520,6 @@ export class ModeratePendingMediaUseCase {
         await this.deleteFromStorage(asset);
 
         const owner = await this.refreshOwner(asset.storageKey);
-        await this.notifyUploader(asset, owner);
+        await this.notifyRejection(asset, owner);
     }
 }
