@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/the-developer-network/tdn-api/compare/v1.15.0...v1.16.0) (2026-09-03)
+
+
+### Features
+
+* **chat:** add one-to-one direct messaging ([#257](https://github.com/the-developer-network/tdn-api/issues/257)) ([b4e8b00](https://github.com/the-developer-network/tdn-api/commit/b4e8b003fa7abdd1640cd5a9a6f23385efb42ddd))
+
 # [1.15.0](https://github.com/the-developer-network/tdn-api/compare/v1.14.1...v1.15.0) (2026-09-01)
 
 
