@@ -1,0 +1,88 @@
+/// Where a direct conversation sits between "somebody wrote to you" and
+/// "you are talking".
+///
+/// A conversation opened by an account the recipient does not follow starts
+/// PENDING: it lands in a requests tab and produces no notification, so an
+/// open inbox cannot be turned into a notification firehose. One the
+/// recipient already follows skips straight to ACCEPTED, because they have
+/// already said they want to hear from that account.
+enum ConversationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+/// One direct conversation between exactly two users.
+///
+/// The pair is stored ordered - `userAId` always sorts before `userBId` - so
+/// that (a,b) and (b,a) are the same row and the unique constraint actually
+/// holds. Nothing outside the repository and the domain entity should read
+/// the A/B columns directly; the entity exposes the pair by viewer instead.
+model Conversation {
+  id String @id @default(uuid())
+
+  userAId String @map("user_a_id")
+  userBId String @map("user_b_id")
+
+  /// Who opened it. In PENDING this is the only participant allowed to write,
+  /// and it is the other side that owns the accept/decline decision.
+  initiatorId String @map("initiator_id")
+
+  status ConversationStatus @default(PENDING)
+
+  /// Per-side read state. `lastReadAt` is what tells a sender their message
+  /// was seen; the counters back the unread badge. Both are written in the
+  /// same two places - sending a message and marking one read - so they
+  /// cannot drift apart.
+  userALastReadAt DateTime? @map("user_a_last_read_at")
+  userBLastReadAt DateTime? @map("user_b_last_read_at")
+  userAUnread     Int       @default(0) @map("user_a_unread")
+  userBUnread     Int       @default(0) @map("user_b_unread")
+
+  /// Denormalised so an inbox page is one query. Ordering by the newest
+  /// message otherwise means joining and aggregating the whole message table
+  /// on every list request.
+  lastMessageAt      DateTime? @map("last_message_at")
+  lastMessagePreview String?   @map("last_message_preview")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userA    User      @relation("ConversationsAsA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB    User      @relation("ConversationsAsB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([userAId, userBId])
+  @@index([userAId, lastMessageAt])
+  @@index([userBId, lastMessageAt])
+  @@map("conversations")
+}
+
+/// One message inside a direct conversation.
+model Message {
+  id String @id @default(uuid())
+
+  conversationId String @map("conversation_id")
+  senderId       String @map("sender_id")
+
+  content String @default("")
+
+  /// R2 object keys, without any CDN prefix - the same contract posts and
+  /// comments use. The mapper rewrites them onto `R2_PUBLIC_URL`, and
+  /// withholds them entirely while `mediaStatus` is not APPROVED.
+  mediaUrls   String[]              @default([]) @map("media_urls")
+  isSensitive Boolean               @default(false) @map("is_sensitive")
+  mediaStatus MediaModerationStatus @default(APPROVED) @map("media_status")
+
+  /// Soft delete, so the thread keeps its shape: the other side sees that a
+  /// message was withdrawn rather than a hole where the reply they answered
+  /// used to be.
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}

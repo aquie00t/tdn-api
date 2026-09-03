@@ -5,11 +5,14 @@ import {
     MediaOwnerKind,
     NotificationType,
 } from "@core/domain/enums";
+import { ChatEvents } from "@core/domain/constants/chat-events.constants";
+import type { RealtimePort } from "@core/ports/services/realtime.port";
 import type {
     IMediaAssetRepository,
     MediaState,
 } from "@core/ports/repositories/media-asset.repository";
 import type { ICommentRepository } from "@core/ports/repositories/comment.repository";
+import type { IMessageRepository } from "@core/ports/repositories/message.repository";
 import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { LoggerPort } from "@core/ports/services/logger.port";
@@ -57,7 +60,9 @@ export class ModeratePendingMediaUseCase {
      * @param storageService - Object storage rejected files are deleted from
      * @param postRepository - Repository for posts carrying scanned media
      * @param commentRepository - Repository for comments carrying scanned media
+     * @param messageRepository - Repository for direct messages carrying scanned media
      * @param notificationRepository - Repository used to tell an author their media was removed
+     * @param realtimeService - Service used to tell a sender their message media was removed
      * @param moderatePendingMediaConfig - Batch size, retry budget and CDN origin
      * @param logger - Service for logging operations
      */
@@ -67,7 +72,9 @@ export class ModeratePendingMediaUseCase {
         private readonly storageService: StoragePort,
         private readonly postRepository: IPostRepository,
         private readonly commentRepository: ICommentRepository,
+        private readonly messageRepository: IMessageRepository,
         private readonly notificationRepository: INotificationRepository,
+        private readonly realtimeService: RealtimePort,
         private readonly moderatePendingMediaConfig: ModeratePendingMediaConfig,
         private readonly logger: LoggerPort,
     ) {}
@@ -171,7 +178,15 @@ export class ModeratePendingMediaUseCase {
         const owner = await this.refreshOwner(asset.storageKey);
 
         if (result.verdict === MediaModerationStatus.REJECTED) {
-            await this.notifyUploader(asset, owner);
+            // A rejection inside a private conversation is told to the sender
+            // over the thread it happened in, not through the notification
+            // feed: the notification target can only point at public content,
+            // so a message notification would be one the recipient cannot tap.
+            if (owner?.ownerKind === MediaOwnerKind.MESSAGE) {
+                await this.notifyMessageSender(asset, owner.ownerId);
+            } else {
+                await this.notifyUploader(asset, owner);
+            }
         }
 
         return result.verdict;
@@ -270,6 +285,11 @@ export class ModeratePendingMediaUseCase {
             return { ownerId, ownerKind };
         }
 
+        if (ownerKind === MediaOwnerKind.MESSAGE) {
+            await this.messageRepository.updateMediaState(ownerId, state);
+            return { ownerId, ownerKind };
+        }
+
         // An article cover is always an image, and images are scanned inside
         // the upload request, so one can never reach the queue this worker
         // reads. Saying so out loud beats an else that would quietly write a
@@ -284,6 +304,52 @@ export class ModeratePendingMediaUseCase {
         );
 
         return null;
+    }
+
+    /**
+     * Tells a message's sender that its attachment was removed.
+     *
+     * Sent over the conversation rather than as a notification, and only to
+     * the sender: the recipient never saw the file - the read path withholds
+     * media until it is cleared - so telling them something was taken down
+     * would announce content that, for them, never existed.
+     *
+     * A failure is logged rather than raised, for the same reason the
+     * notification path swallows one: the removal has already happened, and
+     * retrying the scan to redeliver a notice would spend another provider
+     * call on a file that is already gone.
+     *
+     * @param asset - The rejected asset
+     * @param messageId - The message it was attached to
+     */
+    private async notifyMessageSender(
+        asset: MediaAsset,
+        messageId: string,
+    ): Promise<void> {
+        try {
+            const message = await this.messageRepository.findById(messageId);
+
+            if (!message) return;
+
+            this.realtimeService.emitToUser(
+                message.senderId,
+                ChatEvents.MESSAGE_MEDIA_REJECTED,
+                {
+                    conversationId: message.conversationId,
+                    messageId: message.id,
+                    senderId: message.senderId,
+                },
+            );
+        } catch (error) {
+            this.logger.error(
+                {
+                    context: "MediaModeration",
+                    storageKey: asset.storageKey,
+                    err: error,
+                },
+                "Failed to notify a sender about rejected message media.",
+            );
+        }
     }
 
     /**

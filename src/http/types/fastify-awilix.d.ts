@@ -22,6 +22,7 @@ import type { ArticleController } from "@controllers/article.controller";
 import type { MediaModerationScheduler } from "@infrastructure/jobs/media-moderation/media-moderation.scheduler";
 import type { MediaModerationPort } from "@core/ports/services/media-moderation.port";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import type { ConversationController } from "@controllers/conversation.controller";
 /**
  * Fastify Awilix cradle interface for dependency injection
  * Defines all injectable services and components available in the application
@@ -99,6 +100,9 @@ declare module "@fastify/awilix" {
 
         /** Repository backing the media moderation pipeline */
         mediaAssetRepository: IMediaAssetRepository;
+
+        /** Controller for direct conversations and their messages */
+        conversationController: ConversationController;
     }
 }
 

@@ -15,6 +15,8 @@ import { PrismaVerificationTokenRepository } from "../repositories/prisma-verifi
 import { PrismaArticleRepository } from "../repositories/prisma-article.repository";
 import { PrismaArticleLikeRepository } from "../repositories/prisma-article-like.repository";
 import { PrismaMediaAssetRepository } from "../repositories/prisma-media-asset.repository";
+import { PrismaConversationRepository } from "../repositories/prisma-conversation.repository";
+import { PrismaMessageRepository } from "../repositories/prisma-message.repository";
 
 /**
  * Transaction service implementation for managing database transactions
@@ -59,6 +61,8 @@ export class TransactionService implements TransactionPort {
                 articleRepository: new PrismaArticleRepository(tx),
                 articleLikeRepository: new PrismaArticleLikeRepository(tx),
                 mediaAssetRepository: new PrismaMediaAssetRepository(tx),
+                conversationRepository: new PrismaConversationRepository(tx),
+                messageRepository: new PrismaMessageRepository(tx),
             };
 
             return await work(context);

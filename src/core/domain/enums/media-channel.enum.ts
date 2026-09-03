@@ -24,4 +24,12 @@ export enum MediaChannel {
     AVATAR = "AVATAR",
 
     BANNER = "BANNER",
+
+    /**
+     * The `POST /messages/media` endpoint, feeding direct messages. Separate
+     * from post media on purpose: the channel is fixed when the bytes arrive,
+     * so a file uploaded for a private conversation can never be attached to
+     * a public post, or the other way round.
+     */
+    MESSAGE_MEDIA = "MESSAGE_MEDIA",
 }

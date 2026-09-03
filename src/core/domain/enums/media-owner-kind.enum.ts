@@ -12,4 +12,5 @@ export enum MediaOwnerKind {
     POST = "POST",
     COMMENT = "COMMENT",
     ARTICLE = "ARTICLE",
+    MESSAGE = "MESSAGE",
 }

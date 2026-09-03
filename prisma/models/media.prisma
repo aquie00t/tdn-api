@@ -26,6 +26,7 @@ enum MediaChannel {
   ARTICLE_COVER
   AVATAR
   BANNER
+  MESSAGE_MEDIA
 }
 
 /// Which table `ownerId` points into. Posts and comments share one upload
@@ -35,6 +36,7 @@ enum MediaOwnerKind {
   POST
   COMMENT
   ARTICLE
+  MESSAGE
 }
 
 /// One stored file and everything the moderation pipeline knows about it.

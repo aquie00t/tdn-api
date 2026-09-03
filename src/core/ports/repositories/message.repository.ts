@@ -1,0 +1,75 @@
+import type { Message } from "@core/domain/entities/message.entity";
+import type { MediaState } from "./media-asset.repository";
+
+/**
+ * Parameters for reading one page of a thread.
+ *
+ * Cursor-paginated for the same reason the inbox is: a thread grows while it
+ * is being scrolled, and every message written during that scroll would shift
+ * an offset-based page.
+ */
+export interface ListMessagesInput {
+    /** The conversation being read. */
+    conversationId: string;
+
+    /** Most messages to return. */
+    limit: number;
+
+    /**
+     * `createdAt` of the oldest message on the previous page, as an ISO
+     * string. Messages older than this are returned.
+     */
+    cursor?: string;
+}
+
+/**
+ * Repository interface for managing Message entities.
+ */
+export interface IMessageRepository {
+    /**
+     * Persists a newly written message.
+     *
+     * @param message - The message to store
+     * @returns The stored message, with its generated id and timestamp
+     */
+    create(message: Message): Promise<Message>;
+
+    /**
+     * Retrieves a message by its id.
+     *
+     * @param id - The message's id
+     * @returns The message, or null when none exists
+     */
+    findById(id: string): Promise<Message | null>;
+
+    /**
+     * Reads one page of a thread, newest first.
+     *
+     * Withdrawn messages are returned rather than filtered out: the client
+     * renders them as a tombstone, and dropping them would leave a hole where
+     * a reply's context used to be.
+     *
+     * @param input - The conversation, page size, and where to resume
+     * @returns The messages on this page
+     */
+    listByConversation(input: ListMessagesInput): Promise<Message[]>;
+
+    /**
+     * Withdraws a message, keeping the row so the thread keeps its shape.
+     *
+     * @param id - The message's id
+     * @param deletedAt - When it was withdrawn
+     */
+    softDelete(id: string, deletedAt: Date): Promise<void>;
+
+    /**
+     * Rewrites the media columns after a video's verdict arrives.
+     *
+     * The moderation worker owns these three fields; nothing else writes them
+     * after the message is created.
+     *
+     * @param messageId - The message carrying the scanned media
+     * @param state - The surviving URLs and the new moderation flags
+     */
+    updateMediaState(messageId: string, state: MediaState): Promise<void>;
+}

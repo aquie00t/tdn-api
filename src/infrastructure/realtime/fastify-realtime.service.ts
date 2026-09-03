@@ -1,6 +1,6 @@
 import type {
     RealtimePort,
-    RealtimeNotificationPayload,
+    RealtimeEventPayload,
 } from "@core/ports/services/realtime.port";
 import type { WebSocketManager } from "./websocket/websocket-manager";
 import type { RedisService } from "./redis/redis.service";
@@ -11,7 +11,7 @@ const REDIS_CHANNEL = "realtime_events";
 interface RedisMessage {
     targetUserId: string;
     event: string;
-    payload: RealtimeNotificationPayload;
+    payload: RealtimeEventPayload;
 }
 
 export class FastifyRealtimeService implements RealtimePort {
@@ -31,7 +31,7 @@ export class FastifyRealtimeService implements RealtimePort {
     emitToUser(
         userId: string,
         event: string,
-        payload: RealtimeNotificationPayload,
+        payload: RealtimeEventPayload,
     ): void {
         const message: RedisMessage = { targetUserId: userId, event, payload };
 

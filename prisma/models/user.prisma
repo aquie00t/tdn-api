@@ -34,6 +34,12 @@ model User {
   articleLikes     ArticleLike[]
   articleBookmarks ArticleBookmark[]
 
+  // Two relations rather than one because a direct conversation stores its
+  // pair ordered; the repository resolves a user's conversations from both.
+  conversationsAsA Conversation[] @relation("ConversationsAsA")
+  conversationsAsB Conversation[] @relation("ConversationsAsB")
+  messages         Message[]
+
   deletedAt    DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

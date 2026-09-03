@@ -18,6 +18,8 @@ import { PrismaArticleRepository } from "@infrastructure/persistence/repositorie
 import { PrismaArticleLikeRepository } from "@infrastructure/persistence/repositories/prisma-article-like.repository";
 import { PrismaArticleBookmarkRepository } from "@infrastructure/persistence/repositories/prisma-article-bookmark.repository";
 import { PrismaMediaAssetRepository } from "@infrastructure/persistence/repositories/prisma-media-asset.repository";
+import { PrismaConversationRepository } from "@infrastructure/persistence/repositories/prisma-conversation.repository";
+import { PrismaMessageRepository } from "@infrastructure/persistence/repositories/prisma-message.repository";
 
 /**
  * Dependency injection module for persistence layer
@@ -137,4 +139,14 @@ export const persistenceModule = {
     articleBookmarkRepository: asClass(
         PrismaArticleBookmarkRepository,
     ).singleton(),
+
+    /**
+     * Conversation repository backing the direct message inbox
+     */
+    conversationRepository: asClass(PrismaConversationRepository).singleton(),
+
+    /**
+     * Message repository for direct message threads
+     */
+    messageRepository: asClass(PrismaMessageRepository).singleton(),
 };
