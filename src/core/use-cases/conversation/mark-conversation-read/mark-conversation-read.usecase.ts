@@ -45,7 +45,7 @@ export class MarkConversationReadUseCase {
         const readAt = new Date();
 
         await this.conversationRepository.markRead(
-            conversation.id,
+            conversation,
             input.userId,
             readAt,
         );

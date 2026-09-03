@@ -80,6 +80,14 @@ describe("Conversation entity", () => {
                 conversation.otherParticipantId("cccc-3333"),
             ).toThrow();
         });
+
+        it("reports which stored column each participant occupies", () => {
+            // The one place the A/B naming is allowed out, so the repository
+            // can address the per-side columns without re-reading the row.
+            expect(conversation.sideFor(alice)).toBe("A");
+            expect(conversation.sideFor(bob)).toBe("B");
+            expect(conversation.sideFor("cccc-3333")).toBeNull();
+        });
     });
 
     describe("per-viewer state", () => {

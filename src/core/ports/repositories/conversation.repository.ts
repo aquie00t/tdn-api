@@ -120,13 +120,28 @@ export interface IConversationRepository {
     /**
      * Clears one participant's unread count and moves their read watermark.
      *
-     * @param id - The conversation's id
+     * Takes the loaded conversation rather than an id because the caller has
+     * already read it to check membership, and the row carries the two things
+     * the write needs: which side the reader sits on, and how many messages
+     * they were shown as unread.
+     *
+     * That second number is what keeps the write from swallowing a message.
+     * Assigning zero would clobber a `applyNewMessage` increment that commits
+     * between the read and this write - the message would arrive already
+     * marked read. Taking away only what the reader actually saw leaves such a
+     * message counted.
+     *
+     * @param conversation - The conversation as the reader loaded it
      * @param userId - The participant who read it
      * @param readAt - When they read it
      * @returns True when a row was updated, false when the user is not a
-     * participant
+     * participant or another read already overtook this one
      */
-    markRead(id: string, userId: string, readAt: Date): Promise<boolean>;
+    markRead(
+        conversation: Conversation,
+        userId: string,
+        readAt: Date,
+    ): Promise<boolean>;
 
     /**
      * Sums a user's unread messages across every accepted conversation.

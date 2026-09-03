@@ -52,8 +52,11 @@ describe("MarkConversationReadUseCase", () => {
             userId: RECIPIENT,
         });
 
+        // The loaded conversation is handed over rather than its id: the
+        // repository needs the reader's side and their observed unread count,
+        // and re-reading the row for either would be a second round-trip.
         expect(conversationRepo.markRead).toHaveBeenCalledWith(
-            "conv-1",
+            expect.objectContaining({ id: "conv-1" }),
             RECIPIENT,
             expect.any(Date),
         );

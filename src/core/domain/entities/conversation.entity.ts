@@ -5,6 +5,14 @@ import type {
 } from "../interfaces/conversation-props.interface";
 
 /**
+ * Which of the two ordered participant columns a user occupies.
+ *
+ * A persistence detail, named here only so the repository can be handed the
+ * answer instead of re-deriving it.
+ */
+export type ConversationSide = "A" | "B";
+
+/**
  * Rich domain model for a one-to-one conversation.
  *
  * The participant pair is held ordered so that (a,b) and (b,a) are the same
@@ -144,6 +152,25 @@ export class Conversation {
         throw new Error(
             "otherParticipantId called with a user outside the conversation",
         );
+    }
+
+    /**
+     * Which side of the stored pair the given user sits on.
+     *
+     * The one place the A/B naming is allowed out, and it exists for the
+     * repository: the per-side columns cannot be addressed without knowing
+     * which side to write, and re-reading the row to work that out is a second
+     * query for something the caller is already holding. Nothing above the
+     * persistence layer should need this.
+     *
+     * @param userId - The participant to locate
+     * @returns Their side, or null when they are not in this conversation
+     */
+    public sideFor(userId: string): ConversationSide | null {
+        if (this.props.userAId === userId) return "A";
+        if (this.props.userBId === userId) return "B";
+
+        return null;
     }
 
     /**

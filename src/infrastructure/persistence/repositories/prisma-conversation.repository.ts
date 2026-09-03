@@ -189,26 +189,55 @@ export class PrismaConversationRepository implements IConversationRepository {
         });
     }
 
-    async markRead(id: string, userId: string, readAt: Date): Promise<boolean> {
-        const conversation = await this.prisma.conversation.findUnique({
-            where: { id },
-            select: { userAId: true, userBId: true },
+    /**
+     * Records that one participant read the thread.
+     *
+     * One statement, and it has to be. Re-reading the row to find the reader's
+     * side would be a second round-trip for something the caller already
+     * holds, and clearing the counter with an assignment would swallow any
+     * message that arrived since: `applyNewMessage` increments, so a write of
+     * zero landing after it marks a message read that nobody has seen. Taking
+     * away exactly the number the reader was shown leaves such a message
+     * counted, and the `gte` guard keeps a second concurrent read from
+     * subtracting the same messages twice and driving the counter negative.
+     */
+    async markRead(
+        conversation: Conversation,
+        userId: string,
+        readAt: Date,
+    ): Promise<boolean> {
+        const side = conversation.sideFor(userId);
+
+        if (!side) return false;
+
+        const seen = conversation.unreadFor(userId);
+
+        const { count } = await this.prisma.conversation.updateMany({
+            where:
+                side === "A"
+                    ? {
+                          id: conversation.id,
+                          userAId: userId,
+                          userAUnread: { gte: seen },
+                      }
+                    : {
+                          id: conversation.id,
+                          userBId: userId,
+                          userBUnread: { gte: seen },
+                      },
+            data:
+                side === "A"
+                    ? {
+                          userAUnread: { decrement: seen },
+                          userALastReadAt: readAt,
+                      }
+                    : {
+                          userBUnread: { decrement: seen },
+                          userBLastReadAt: readAt,
+                      },
         });
 
-        if (!conversation) return false;
-
-        const isA = conversation.userAId === userId;
-
-        if (!isA && conversation.userBId !== userId) return false;
-
-        await this.prisma.conversation.update({
-            where: { id },
-            data: isA
-                ? { userAUnread: 0, userALastReadAt: readAt }
-                : { userBUnread: 0, userBLastReadAt: readAt },
-        });
-
-        return true;
+        return count > 0;
     }
 
     /**
