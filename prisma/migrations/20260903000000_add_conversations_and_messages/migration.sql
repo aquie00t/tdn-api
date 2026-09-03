@@ -8,7 +8,13 @@
 -- without it (a,b) and (b,a) are two different rows, and the same two people
 -- end up with two threads the moment they write to each other at once.
 --
--- Second, the per-side read state lives here rather than on the messages.
+-- Second, the inbox is ordered by `last_activity_at`, which is never null,
+-- rather than by `last_message_at`, which is. Postgres puts NULLs first in a
+-- DESC order, so ordering on the nullable column would pin every empty thread
+-- above every active one, and a keyset cursor - which can only carry a value -
+-- could never resume from inside that block.
+--
+-- Third, the per-side read state lives here rather than on the messages.
 -- Marking a thread read is one row update instead of an update across every
 -- message in it, and the unread badge is a sum over conversations rather than
 -- a scan of the message table.
@@ -46,6 +52,7 @@ CREATE TABLE "public"."conversations" (
     "user_b_last_read_at" TIMESTAMP(3),
     "user_a_unread" INTEGER NOT NULL DEFAULT 0,
     "user_b_unread" INTEGER NOT NULL DEFAULT 0,
+    "last_activity_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "last_message_at" TIMESTAMP(3),
     "last_message_preview" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -74,14 +81,14 @@ CREATE TABLE "public"."messages" (
 -- CreateIndex
 CREATE UNIQUE INDEX "conversations_user_a_id_user_b_id_key" ON "public"."conversations" ("user_a_id", "user_b_id");
 
--- The inbox query is "my conversations, newest message first", and a user sits
--- on whichever side of the pair the ordering put them, so both sides need an
--- index of their own.
+-- The inbox query is "my conversations, most recent activity first", and a
+-- user sits on whichever side of the pair the ordering put them, so both sides
+-- need an index of their own.
 -- CreateIndex
-CREATE INDEX "conversations_user_a_id_last_message_at_idx" ON "public"."conversations" ("user_a_id", "last_message_at");
+CREATE INDEX "conversations_user_a_id_last_activity_at_idx" ON "public"."conversations" ("user_a_id", "last_activity_at");
 
 -- CreateIndex
-CREATE INDEX "conversations_user_b_id_last_message_at_idx" ON "public"."conversations" ("user_b_id", "last_message_at");
+CREATE INDEX "conversations_user_b_id_last_activity_at_idx" ON "public"."conversations" ("user_b_id", "last_activity_at");
 
 -- Backs paging a thread newest-first, which is every read of it.
 -- CreateIndex

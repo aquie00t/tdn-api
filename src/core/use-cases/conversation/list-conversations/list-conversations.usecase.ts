@@ -1,4 +1,5 @@
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
+import { encodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
 import type { ListConversationsUseCaseInput } from "./list-conversations-usecase.input";
 import type { ListConversationsUseCaseOutput } from "./list-conversations-usecase.output";
 
@@ -44,12 +45,16 @@ export class ListConversationsUseCase {
 
         const last = conversations.at(-1);
 
-        // A thread with no messages yet has no `lastMessageAt` to page on. It
-        // can only be the very first row of the first page - the ordering puts
-        // empty threads first - so there is nothing after it to resume from.
+        // The cursor pins both halves of the sort key. `lastActivityAt` alone
+        // would not identify a row: several conversations can share it to the
+        // millisecond, and resuming from a timestamp would skip every one of
+        // them that this page did not end on.
         const nextCursor =
-            hasMore && last?.lastMessageAt
-                ? last.lastMessageAt.toISOString()
+            hasMore && last
+                ? encodeKeysetCursor({
+                      timestamp: last.lastActivityAt,
+                      id: last.id,
+                  })
                 : null;
 
         return { conversations, nextCursor };

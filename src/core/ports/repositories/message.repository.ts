@@ -16,8 +16,8 @@ export interface ListMessagesInput {
     limit: number;
 
     /**
-     * `createdAt` of the oldest message on the previous page, as an ISO
-     * string. Messages older than this are returned.
+     * Opaque keyset cursor from the previous page, encoding both halves of
+     * the sort key. A cursor that cannot be decoded is treated as absent.
      */
     cursor?: string;
 }

@@ -78,6 +78,7 @@ export class ConversationPrismaMapper {
             userBLastReadAt: record.userBLastReadAt,
             userAUnread: record.userAUnread,
             userBUnread: record.userBUnread,
+            lastActivityAt: record.lastActivityAt,
             lastMessageAt: record.lastMessageAt,
             lastMessagePreview: record.lastMessagePreview,
             participants: [record.userA, record.userB].map((user) => ({

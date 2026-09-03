@@ -7,6 +7,7 @@ import type {
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
 import { MessagePrismaMapper } from "@infrastructure/persistence/mappers/message-prisma.mapper";
 import type { MediaModerationStatus as PrismaMediaModerationStatus } from "@generated/prisma/client";
+import { decodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
 
 /**
  * Prisma-backed implementation of {@link IMessageRepository}.
@@ -33,16 +34,32 @@ export class PrismaMessageRepository implements IMessageRepository {
     /**
      * Reads one page of a thread, newest first.
      *
-     * The id breaks ties on `createdAt`: two messages written in the same
-     * millisecond are ordinary in a live conversation, and a cursor over a
-     * non-unique column would drop whichever of them sorted second.
+     * The cursor carries the row's id as well as its timestamp, and the
+     * predicate uses both. Two messages written in the same millisecond are
+     * ordinary in a live conversation, and a bare `createdAt < cursor` would
+     * drop whichever of them the previous page did not end on. An `orderBy`
+     * tiebreaker cannot prevent that: ordering never decides which rows a
+     * page contains.
+     *
+     * A cursor that cannot be decoded is treated as absent, so a reader
+     * holding a stale one gets the newest page rather than an error.
      */
     async listByConversation(input: ListMessagesInput): Promise<Message[]> {
+        const after = input.cursor ? decodeKeysetCursor(input.cursor) : null;
+
         const records = await this.prisma.message.findMany({
             where: {
                 conversationId: input.conversationId,
-                ...(input.cursor
-                    ? { createdAt: { lt: new Date(input.cursor) } }
+                ...(after
+                    ? {
+                          OR: [
+                              { createdAt: { lt: after.timestamp } },
+                              {
+                                  createdAt: after.timestamp,
+                                  id: { lt: after.id },
+                              },
+                          ],
+                      }
                     : {}),
             },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],

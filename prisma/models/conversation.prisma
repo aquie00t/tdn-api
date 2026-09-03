@@ -39,9 +39,22 @@ model Conversation {
   userAUnread     Int       @default(0) @map("user_a_unread")
   userBUnread     Int       @default(0) @map("user_b_unread")
 
+  /// What the inbox is ordered by: the newest message, or the moment the
+  /// conversation was opened while it has none.
+  ///
+  /// Separate from `lastMessageAt` because that one is nullable, and a
+  /// nullable sort key cannot be paged. Postgres puts NULLs first in a DESC
+  /// order, so every empty thread would pin above every active one, and a
+  /// cursor - which can only carry a value - could never resume from inside
+  /// that block. Sorting on a column that is never null also reads better:
+  /// a thread you just opened sits at the top, and one you opened and
+  /// abandoned sinks like anything else that has gone quiet.
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+
   /// Denormalised so an inbox page is one query. Ordering by the newest
   /// message otherwise means joining and aggregating the whole message table
-  /// on every list request.
+  /// on every list request. Null while the thread has no messages, which is
+  /// what tells a client to render it as empty rather than as silent.
   lastMessageAt      DateTime? @map("last_message_at")
   lastMessagePreview String?   @map("last_message_preview")
 
@@ -53,8 +66,8 @@ model Conversation {
   messages Message[]
 
   @@unique([userAId, userBId])
-  @@index([userAId, lastMessageAt])
-  @@index([userBId, lastMessageAt])
+  @@index([userAId, lastActivityAt])
+  @@index([userBId, lastActivityAt])
   @@map("conversations")
 }
 

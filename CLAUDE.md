@@ -96,6 +96,8 @@ A conversation opened by somebody the recipient does not follow starts `PENDING`
 
 Per-side read state (`userXUnread`, `userXLastReadAt`) lives on the conversation, written in exactly two places: `applyNewMessage` (inside the message's transaction) and `markRead`. Messages are soft-deleted so the thread keeps its shape, and the mapper withholds a withdrawn message's text.
 
+The inbox and threads page on a **keyset cursor** (`src/core/use-cases/shared/pagination/keyset-cursor.ts`), which carries the timestamp *and* the row id — an `orderBy` tiebreaker cannot help, since ordering never decides which rows a page contains, and rows sharing a timestamp to the millisecond are routine here. Conversations sort on `lastActivityAt`, never on the nullable `lastMessageAt`: Postgres puts NULLs first in a DESC order, so empty threads would pin above active ones and no cursor could resume from inside that block.
+
 Message media rides the same pipeline as post media through its own `MediaChannel.MESSAGE_MEDIA` (`POST /messages/media`) and `MediaOwnerKind.MESSAGE`; `SendMessageUseCase` resolves every submitted URL via `resolveAttachableMedia`, exactly as `CreatePostUseCase` does. A rejected video reaches its sender as a `message:media_rejected` realtime event instead of a `Notification` row — the notification target can only point at public content.
 
 Chat events are namespaced in `src/core/domain/constants/chat-events.constants.ts` and travel the existing Redis `realtime_events` channel; `RealtimeEventPayload` is a union of the notification and chat payload shapes.

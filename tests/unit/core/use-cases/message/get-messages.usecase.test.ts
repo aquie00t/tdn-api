@@ -4,6 +4,7 @@ import { Conversation } from "@core/domain/entities/conversation.entity";
 import { Message } from "@core/domain/entities/message.entity";
 import { ConversationStatus, MediaModerationStatus } from "@core/domain/enums";
 import { ConversationNotFoundError } from "@core/errors";
+import { decodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { IMessageRepository } from "@core/ports/repositories/message.repository";
 
@@ -79,7 +80,39 @@ describe("GetMessagesUseCase", () => {
         });
 
         expect(result.messages).toHaveLength(2);
-        expect(result.nextCursor).toBe(messages[1].createdAt.toISOString());
+        expect(decodeKeysetCursor(result.nextCursor!)).toEqual({
+            timestamp: messages[1].createdAt,
+            id: "msg-2",
+        });
+    });
+
+    it("puts the id in the cursor so a millisecond tie can be resumed", async () => {
+        // Two messages written in the same millisecond is ordinary in a live
+        // thread. A cursor carrying only the timestamp would make the next
+        // page skip whichever of them this page did not end on.
+        const sameInstant = new Date("2026-09-03T12:00:00.000Z");
+        const tied = ["msg-1", "msg-2", "msg-3"].map((id) =>
+            Message.with({
+                id,
+                conversationId: "conv-1",
+                senderId: READER,
+                content: id,
+                mediaUrls: [],
+                isSensitive: false,
+                mediaStatus: MediaModerationStatus.APPROVED,
+                deletedAt: null,
+                createdAt: sameInstant,
+            }),
+        );
+        vi.mocked(messageRepo.listByConversation).mockResolvedValue(tied);
+
+        const result = await useCase.execute({
+            conversationId: "conv-1",
+            userId: READER,
+            limit: 2,
+        });
+
+        expect(decodeKeysetCursor(result.nextCursor!)?.id).toBe("msg-2");
     });
 
     it("returns no cursor at the start of the thread", async () => {

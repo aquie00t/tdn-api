@@ -1,6 +1,7 @@
 import { ConversationNotFoundError } from "@core/errors";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { IMessageRepository } from "@core/ports/repositories/message.repository";
+import { encodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
 import type { GetMessagesUseCaseInput } from "./get-messages-usecase.input";
 import type { GetMessagesUseCaseOutput } from "./get-messages-usecase.output";
 
@@ -55,11 +56,20 @@ export class GetMessagesUseCase {
 
         const oldest = messages.at(-1);
 
+        // Both halves of the sort key travel in the cursor. Two messages can
+        // share a `createdAt` to the millisecond in a live thread, and
+        // resuming from a timestamp alone would drop the one this page did
+        // not end on.
         return {
             conversation,
             messages,
             nextCursor:
-                hasMore && oldest ? oldest.createdAt.toISOString() : null,
+                hasMore && oldest
+                    ? encodeKeysetCursor({
+                          timestamp: oldest.createdAt,
+                          id: oldest.id,
+                      })
+                    : null,
         };
     }
 }

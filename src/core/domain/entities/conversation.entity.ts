@@ -94,6 +94,14 @@ export class Conversation {
         return this.props.status;
     }
 
+    /**
+     * The key the inbox is ordered and paged on. Always set on a conversation
+     * that was read back from storage.
+     */
+    get lastActivityAt(): Date {
+        return this.props.lastActivityAt!;
+    }
+
     get lastMessageAt(): Date | null {
         return this.props.lastMessageAt ?? null;
     }

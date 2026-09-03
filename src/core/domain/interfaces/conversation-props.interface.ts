@@ -58,6 +58,13 @@ export interface ConversationProps {
     /** Messages the second participant has not read */
     userBUnread: number;
 
+    /**
+     * What the inbox is ordered by: the newest message, or the moment the
+     * conversation was opened while it has none. Never null, because a
+     * nullable sort key cannot be paged.
+     */
+    lastActivityAt?: Date;
+
     /** When the newest message arrived, absent while the thread is empty */
     lastMessageAt?: Date | null;
 

@@ -22,8 +22,8 @@ export interface ListConversationsInput {
     limit: number;
 
     /**
-     * `lastMessageAt` of the last conversation on the previous page, as an
-     * ISO string. Threads older than this are returned.
+     * Opaque keyset cursor from the previous page, encoding both halves of
+     * the sort key. A cursor that cannot be decoded is treated as absent.
      */
     cursor?: string;
 }

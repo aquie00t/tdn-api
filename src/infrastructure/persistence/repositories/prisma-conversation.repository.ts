@@ -11,6 +11,7 @@ import {
     conversationParticipantSelect,
 } from "@infrastructure/persistence/mappers/conversation-prisma.mapper";
 import type { ConversationStatus as PrismaConversationStatus } from "@generated/prisma/client";
+import { decodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
 
 /**
  * Prisma-backed implementation of {@link IConversationRepository}.
@@ -85,23 +86,60 @@ export class PrismaConversationRepository implements IConversationRepository {
     }
 
     /**
-     * Reads one tab of a user's inbox.
+     * Reads one tab of a user's inbox, most recent activity first.
      *
-     * Ordered by the newest message with the id as a tiebreaker, because two
-     * conversations can share a `lastMessageAt` to the millisecond and a
-     * cursor over a non-unique column would then skip whichever one the
-     * database happened to put second.
+     * The cursor carries the row's id as well as its timestamp, and the
+     * predicate uses both. An `orderBy` tiebreaker alone would not do:
+     * ordering decides how a page is sorted, never which rows it contains, so
+     * a bare `lastActivityAt < cursor` drops every conversation sharing the
+     * boundary timestamp - which is exactly what several messages committing
+     * in the same millisecond produce.
+     *
+     * Ordering is on `lastActivityAt` rather than `lastMessageAt` because the
+     * latter is null until a thread has a message. Postgres sorts NULLs first
+     * in a DESC order, so empty threads would pin above every active one, and
+     * a cursor - which can only carry a value - could never resume from inside
+     * that block.
+     *
+     * A cursor that cannot be decoded is treated as absent rather than as an
+     * error, and the reader gets the first page back. That is what somebody
+     * holding a truncated or stale cursor actually wants to see.
      */
     async listForUser(input: ListConversationsInput): Promise<Conversation[]> {
+        const after = input.cursor ? decodeKeysetCursor(input.cursor) : null;
+
         const records = await this.prisma.conversation.findMany({
             where: {
                 status: input.status as PrismaConversationStatus,
-                OR: [{ userAId: input.userId }, { userBId: input.userId }],
-                ...(input.cursor
-                    ? { lastMessageAt: { lt: new Date(input.cursor) } }
-                    : {}),
+                // Two OR groups cannot sit side by side on one filter object,
+                // so membership and the cursor are ANDed explicitly.
+                AND: [
+                    {
+                        OR: [
+                            { userAId: input.userId },
+                            { userBId: input.userId },
+                        ],
+                    },
+                    ...(after
+                        ? [
+                              {
+                                  OR: [
+                                      {
+                                          lastActivityAt: {
+                                              lt: after.timestamp,
+                                          },
+                                      },
+                                      {
+                                          lastActivityAt: after.timestamp,
+                                          id: { lt: after.id },
+                                      },
+                                  ],
+                              },
+                          ]
+                        : []),
+                ],
             },
-            orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
+            orderBy: [{ lastActivityAt: "desc" }, { id: "desc" }],
             take: input.limit,
             include: this.include,
         });
@@ -141,6 +179,7 @@ export class PrismaConversationRepository implements IConversationRepository {
         await this.prisma.conversation.update({
             where: { id },
             data: {
+                lastActivityAt: input.sentAt,
                 lastMessageAt: input.sentAt,
                 lastMessagePreview: input.preview,
                 ...(recipientIsA
