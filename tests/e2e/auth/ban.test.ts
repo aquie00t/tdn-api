@@ -109,7 +109,11 @@ describe("Account suspension", () => {
         const response = await request({
             method: "POST",
             url: "/auth/refresh",
-            cookies: { refreshToken: refreshCookie },
+            // The helper already returns "refreshToken=<signed value>", so it
+            // goes in as a raw Cookie header. Handing it to `cookies` instead
+            // nests the name inside its own value and the signature check
+            // fails, which answers 401 and hides whatever the ban check did.
+            headers: { cookie: refreshCookie },
         });
 
         expect(response.statusCode).toBe(403);
