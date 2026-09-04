@@ -198,4 +198,84 @@ describe("PrismaUserRepository (integration)", () => {
             expect(row!.deletedAt).toBeNull();
         });
     });
+    describe("findManyByUsernames()", () => {
+        it("should resolve a batch of handles to id and username pairs", async () => {
+            const ada = await repo.create({
+                email: "ada@user-repo-test.com",
+                username: "ada_userrepo",
+                passwordHash: "hashed",
+            });
+            const zoe = await repo.create({
+                email: "zoe@user-repo-test.com",
+                username: "zoe_userrepo",
+                passwordHash: "hashed",
+            });
+
+            const found = await repo.findManyByUsernames([
+                "ada_userrepo",
+                "zoe_userrepo",
+            ]);
+
+            expect(found).toHaveLength(2);
+            expect(found).toEqual(
+                expect.arrayContaining([
+                    { id: ada.id, username: "ada_userrepo" },
+                    { id: zoe.id, username: "zoe_userrepo" },
+                ]),
+            );
+        });
+
+        it("should match a handle typed in a different case", async () => {
+            const user = await repo.create({
+                email: "casing@user-repo-test.com",
+                username: "Casing_UserRepo",
+                passwordHash: "hashed",
+            });
+
+            const found = await repo.findManyByUsernames(["casing_userrepo"]);
+
+            // The stored casing comes back, not what the author typed: it is
+            // the handle every other reader will see.
+            expect(found).toEqual([
+                { id: user.id, username: "Casing_UserRepo" },
+            ]);
+        });
+
+        it("should return one row for a handle that matches only one account", async () => {
+            await repo.create({
+                email: "single@user-repo-test.com",
+                username: "single_userrepo",
+                passwordHash: "hashed",
+            });
+
+            const found = await repo.findManyByUsernames(["single_userrepo"]);
+
+            expect(found).toHaveLength(1);
+        });
+
+        it("should leave out a soft-deleted account", async () => {
+            const user = await repo.create({
+                email: "gone@user-repo-test.com",
+                username: "gone_userrepo",
+                passwordHash: "hashed",
+            });
+            await repo.softDeleteById(user.id);
+
+            const found = await repo.findManyByUsernames(["gone_userrepo"]);
+
+            expect(found).toEqual([]);
+        });
+
+        it("should silently drop a handle nobody owns", async () => {
+            const found = await repo.findManyByUsernames([
+                "nobody_owns_this_handle",
+            ]);
+
+            expect(found).toEqual([]);
+        });
+
+        it("should not query at all for an empty batch", async () => {
+            expect(await repo.findManyByUsernames([])).toEqual([]);
+        });
+    });
 });

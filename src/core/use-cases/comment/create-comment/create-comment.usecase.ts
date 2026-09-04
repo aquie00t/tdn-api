@@ -12,6 +12,10 @@ import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import { MediaChannel, MediaOwnerKind } from "@core/domain/enums";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 import { resolveAttachableMedia } from "@core/use-cases/shared/media/resolve-attachable-media";
+import { resolveMentions } from "@core/use-cases/shared/mentions/resolve-mentions";
+import type { IUserRepository } from "@core/ports/repositories/user.repository";
+import type { LoggerPort } from "@core/ports/services/logger.port";
+import type { NotifyMentionedUsersUseCase } from "@core/use-cases/notification/notify-mentioned-users";
 import {
     ArticleNotPublishedError,
     BadRequestError,
@@ -28,12 +32,18 @@ export class CreateCommentUseCase {
      * @param mediaAssetRepository - Repository the submitted media keys are checked against
      * @param r2PublicUrl - CDN origin media URLs are served from, used to
      * recover the storage key behind a submitted URL
+     * @param userRepository - Repository the @handles in the content are resolved against
+     * @param notifyMentionedUsersUseCase - Use case that tells the users named in the content
+     * @param logger - Service for logging operations
      */
     constructor(
         private readonly transactionService: TransactionPort,
         private readonly realtimeService: RealtimePort,
         private readonly mediaAssetRepository: IMediaAssetRepository,
         private readonly r2PublicUrl: string,
+        private readonly userRepository: IUserRepository,
+        private readonly notifyMentionedUsersUseCase: NotifyMentionedUsersUseCase,
+        private readonly logger: LoggerPort,
     ) {}
 
     /**
@@ -104,127 +114,181 @@ export class CreateCommentUseCase {
             mediaAssetRepository: this.mediaAssetRepository,
         });
 
-        return await this.transactionService.runInTransaction(async (ctx) => {
-            const { target } = input;
-            const { authorId: targetAuthorId, slug: targetSlug } =
-                await this.resolveTarget(ctx, target, input.authorId);
+        const mentions = await resolveMentions({
+            content: input.content,
+            userRepository: this.userRepository,
+        });
 
-            let notifyUserId: string | null = null;
-            let notificationType = NotificationType.COMMENT;
+        // Both are decided inside the transaction and read again after it, so
+        // the mention fan-out can skip whoever the comment itself already
+        // notified and can deep-link an article by slug.
+        let notifyUserId: string | null = null;
+        let articleSlug: string | undefined;
 
-            if (input.parentId) {
-                const parentComment = await ctx.commentRepository.findById(
-                    input.parentId,
-                );
-                if (!parentComment) {
-                    throw new NotFoundError("Parent comment not found.");
+        const savedComment = await this.transactionService.runInTransaction(
+            async (ctx) => {
+                const { target } = input;
+                const { authorId: targetAuthorId, slug: targetSlug } =
+                    await this.resolveTarget(ctx, target, input.authorId);
+
+                articleSlug = targetSlug;
+                let notificationType = NotificationType.COMMENT;
+
+                if (input.parentId) {
+                    const parentComment = await ctx.commentRepository.findById(
+                        input.parentId,
+                    );
+                    if (!parentComment) {
+                        throw new NotFoundError("Parent comment not found.");
+                    }
+
+                    const parentTarget = parentComment.target;
+                    if (
+                        parentTarget.type !== target.type ||
+                        parentTarget.id !== target.id
+                    ) {
+                        throw new BadRequestError(
+                            "Parent comment belongs to a different post.",
+                        );
+                    }
+
+                    if (parentComment.authorId !== input.authorId) {
+                        notifyUserId = parentComment.authorId;
+                        // Post replies keep using COMMENT so their existing
+                        // notification behaviour is unchanged.
+                        if (target.type === "ARTICLE") {
+                            notificationType = NotificationType.COMMENT_REPLY;
+                        }
+                    }
+                } else if (targetAuthorId !== input.authorId) {
+                    notifyUserId = targetAuthorId;
                 }
 
-                const parentTarget = parentComment.target;
-                if (
-                    parentTarget.type !== target.type ||
-                    parentTarget.id !== target.id
-                ) {
-                    throw new BadRequestError(
-                        "Parent comment belongs to a different post.",
+                const tempComment =
+                    target.type === "POST"
+                        ? Comment.createForPost(
+                              input.content,
+                              target.id,
+                              input.authorId,
+                              input.parentId,
+                              input.mediaUrls || [],
+                              media.isSensitive,
+                              media.mediaStatus,
+                              mentions,
+                          )
+                        : Comment.createForArticle(
+                              input.content,
+                              target.id,
+                              input.authorId,
+                              input.parentId,
+                              input.mediaUrls || [],
+                              media.isSensitive,
+                              media.mediaStatus,
+                              mentions,
+                          );
+
+                const savedComment =
+                    await ctx.commentRepository.create(tempComment);
+
+                if (media.storageKeys.length > 0) {
+                    // The attach is the atomic claim, not the check above it: two
+                    // requests carrying the same key both pass that check, and only
+                    // one can come back with every row written.
+                    const attached =
+                        await ctx.mediaAssetRepository.attachToOwner(
+                            media.storageKeys,
+                            MediaOwnerKind.COMMENT,
+                            savedComment.id,
+                        );
+
+                    if (attached !== media.storageKeys.length) {
+                        throw new MediaNotOwnedError();
+                    }
+                }
+
+                // Articles derive their comment count from a relation count, so
+                // only posts carry a counter to maintain.
+                if (target.type === "POST") {
+                    await ctx.postRepository.incrementCommentsCount(target.id);
+                }
+
+                if (input.parentId) {
+                    await ctx.commentRepository.incrementRepliesCount(
+                        input.parentId,
                     );
                 }
 
-                if (parentComment.authorId !== input.authorId) {
-                    notifyUserId = parentComment.authorId;
-                    // Post replies keep using COMMENT so their existing
-                    // notification behaviour is unchanged.
-                    if (target.type === "ARTICLE") {
-                        notificationType = NotificationType.COMMENT_REPLY;
-                    }
+                if (notifyUserId) {
+                    const notification = Notification.create(
+                        notifyUserId,
+                        input.authorId,
+                        notificationType,
+                        {
+                            commentId: savedComment.id,
+                            postId:
+                                target.type === "POST" ? target.id : undefined,
+                            articleId:
+                                target.type === "ARTICLE"
+                                    ? target.id
+                                    : undefined,
+                        },
+                    );
+
+                    await ctx.notificationRepository.create(notification);
+
+                    this.realtimeService.emitToUser(
+                        notifyUserId,
+                        "new-notification",
+                        {
+                            type: notificationType,
+                            issuerId: input.authorId,
+                            postId:
+                                target.type === "POST" ? target.id : undefined,
+                            articleId:
+                                target.type === "ARTICLE"
+                                    ? target.id
+                                    : undefined,
+                            articleSlug: targetSlug,
+                            commentId: savedComment.id,
+                            referenceId: savedComment.id,
+                        },
+                    );
                 }
-            } else if (targetAuthorId !== input.authorId) {
-                notifyUserId = targetAuthorId;
-            }
 
-            const tempComment =
-                target.type === "POST"
-                    ? Comment.createForPost(
-                          input.content,
-                          target.id,
-                          input.authorId,
-                          input.parentId,
-                          input.mediaUrls || [],
-                          media.isSensitive,
-                          media.mediaStatus,
-                      )
-                    : Comment.createForArticle(
-                          input.content,
-                          target.id,
-                          input.authorId,
-                          input.parentId,
-                          input.mediaUrls || [],
-                          media.isSensitive,
-                          media.mediaStatus,
-                      );
+                return savedComment;
+            },
+        );
 
-            const savedComment =
-                await ctx.commentRepository.create(tempComment);
-
-            if (media.storageKeys.length > 0) {
-                // The attach is the atomic claim, not the check above it: two
-                // requests carrying the same key both pass that check, and only
-                // one can come back with every row written.
-                const attached = await ctx.mediaAssetRepository.attachToOwner(
-                    media.storageKeys,
-                    MediaOwnerKind.COMMENT,
-                    savedComment.id,
-                );
-
-                if (attached !== media.storageKeys.length) {
-                    throw new MediaNotOwnedError();
-                }
-            }
-
-            // Articles derive their comment count from a relation count, so
-            // only posts carry a counter to maintain.
-            if (target.type === "POST") {
-                await ctx.postRepository.incrementCommentsCount(target.id);
-            }
-
-            if (input.parentId) {
-                await ctx.commentRepository.incrementRepliesCount(
-                    input.parentId,
-                );
-            }
-
-            if (notifyUserId) {
-                const notification = Notification.create(
-                    notifyUserId,
-                    input.authorId,
-                    notificationType,
-                    {
+        if (mentions.length > 0) {
+            void this.notifyMentionedUsersUseCase
+                .execute({
+                    issuerId: input.authorId,
+                    mentionedUserIds: mentions.map((mention) => mention.id),
+                    target: {
                         commentId: savedComment.id,
-                        postId: target.type === "POST" ? target.id : undefined,
+                        postId:
+                            input.target.type === "POST"
+                                ? input.target.id
+                                : undefined,
                         articleId:
-                            target.type === "ARTICLE" ? target.id : undefined,
+                            input.target.type === "ARTICLE"
+                                ? input.target.id
+                                : undefined,
                     },
-                );
+                    articleSlug,
+                    // Whoever this comment already notified - the author being
+                    // answered, or the comment being replied to - must not get
+                    // a second row just for being named in the same body.
+                    excludeUserIds: notifyUserId ? [notifyUserId] : [],
+                })
+                .catch((err: unknown) => {
+                    this.logger.error(
+                        { err, commentId: savedComment.id },
+                        "Failed to notify the mentioned users",
+                    );
+                });
+        }
 
-                await ctx.notificationRepository.create(notification);
-
-                this.realtimeService.emitToUser(
-                    notifyUserId,
-                    "new-notification",
-                    {
-                        type: notificationType,
-                        issuerId: input.authorId,
-                        postId: target.type === "POST" ? target.id : undefined,
-                        articleId:
-                            target.type === "ARTICLE" ? target.id : undefined,
-                        articleSlug: targetSlug,
-                        commentId: savedComment.id,
-                        referenceId: savedComment.id,
-                    },
-                );
-            }
-
-            return savedComment;
-        });
+        return savedComment;
     }
 }

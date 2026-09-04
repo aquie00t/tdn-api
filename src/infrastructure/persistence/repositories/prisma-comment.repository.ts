@@ -4,6 +4,7 @@ import type { MediaState } from "@core/ports/repositories/media-asset.repository
  * Handles database operations for comments and nested comment relationships
  */
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
+import { MENTIONED_USERS_SELECT } from "./mention-select";
 import type {
     ICommentRepository,
     CommentTarget,
@@ -38,6 +39,11 @@ export class PrismaCommentRepository implements ICommentRepository {
                 parentId: comment.parentId,
                 isSensitive: comment.isSensitive,
                 mediaStatus: comment.mediaStatus,
+                mentionedUsers: {
+                    connect: comment.mentions.map((mention) => ({
+                        id: mention.id,
+                    })),
+                },
             },
             include: {
                 author: {
@@ -49,6 +55,7 @@ export class PrismaCommentRepository implements ICommentRepository {
                         },
                     },
                 },
+                mentionedUsers: MENTIONED_USERS_SELECT,
                 likes: false,
             },
         });
@@ -77,6 +84,7 @@ export class PrismaCommentRepository implements ICommentRepository {
                         profile: { select: { avatarUrl: true } },
                     },
                 },
+                mentionedUsers: MENTIONED_USERS_SELECT,
                 likes: currentUserId
                     ? { where: { userId: currentUserId } }
                     : false,
@@ -135,6 +143,7 @@ export class PrismaCommentRepository implements ICommentRepository {
                         },
                     },
                 },
+                mentionedUsers: MENTIONED_USERS_SELECT,
                 likes: currentUserId
                     ? { where: { userId: currentUserId } }
                     : false,
@@ -190,6 +199,7 @@ export class PrismaCommentRepository implements ICommentRepository {
                         },
                     },
                 },
+                mentionedUsers: MENTIONED_USERS_SELECT,
                 likes: currentUserId
                     ? { where: { userId: currentUserId } }
                     : false,

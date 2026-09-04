@@ -28,6 +28,7 @@ function makeDbComment(
             username: "testuser",
             profile: { avatarUrl: "uploads/avatar.jpg", fullName: "Test User" },
         },
+        mentionedUsers: [{ id: "user-2", username: "ada" }],
         likes: [],
         bookmarks: [],
         isSensitive: false,
@@ -37,6 +38,35 @@ function makeDbComment(
 }
 
 describe("CommentPrismaMapper", () => {
+    describe("mentions", () => {
+        it("should map the mentioned users onto the entity", () => {
+            const comment =
+                CommentPrismaMapper.toDomainComment(makeDbComment());
+
+            expect(comment.mentions).toEqual([
+                { id: "user-2", username: "ada" },
+            ]);
+        });
+
+        it("should read a comment that mentions nobody as an empty list", () => {
+            const comment = CommentPrismaMapper.toDomainComment(
+                makeDbComment({ mentionedUsers: [] }),
+            );
+
+            expect(comment.mentions).toEqual([]);
+        });
+
+        it("should serve the mentions as id and handle pairs", () => {
+            const comment =
+                CommentPrismaMapper.toDomainComment(makeDbComment());
+            const result = CommentPrismaMapper.toResponse(comment, CDN);
+
+            expect(result.mentions).toEqual([
+                { id: "user-2", username: "ada" },
+            ]);
+        });
+    });
+
     describe("toDomainComment", () => {
         it("should map all base fields correctly", () => {
             const comment =

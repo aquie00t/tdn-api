@@ -1,4 +1,5 @@
 import type { MediaModerationStatus } from "@core/domain/enums";
+import type { MentionedUser } from "./mentioned-user.interface";
 
 /**
  * Interface defining the properties of a comment entity
@@ -67,6 +68,11 @@ export interface CommentProps {
         /** Full name of the author */
         fullName?: string;
     };
+
+    /**
+     * Users named with an @handle in the content, resolved at write time
+     */
+    mentions: MentionedUser[];
 
     /**
      * Total number of likes the comment has received

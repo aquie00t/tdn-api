@@ -51,6 +51,13 @@ export class NotifyNewPostUseCase {
      * notify, or when the author has no followers. The author is filtered out
      * of the recipient list defensively - an account cannot normally follow
      * itself, but a self-notification would be visible nonsense if it ever did.
+     *
+     * `excludeUserIds` is how one post stays one notification per person. The
+     * three fan-outs a post can raise rank QUOTE > MENTION > NEW_POST, and the
+     * more specific signal wins: being named tells you something this
+     * broadcast does not. The caller knows both the mentioned users and the
+     * quoted author before either fan-out starts, so nothing here has to wait
+     * on the other.
      */
     async execute(input: NotifyNewPostInput): Promise<number> {
         if (!NOTIFYING_POST_TYPES.includes(input.postType)) return 0;
@@ -59,7 +66,10 @@ export class NotifyNewPostUseCase {
             input.authorId,
         );
 
-        const recipientIds = followerIds.filter((id) => id !== input.authorId);
+        const excluded = new Set(input.excludeUserIds ?? []);
+        excluded.add(input.authorId);
+
+        const recipientIds = followerIds.filter((id) => !excluded.has(id));
         if (recipientIds.length === 0) return 0;
 
         await this.notificationRepository.createMany(

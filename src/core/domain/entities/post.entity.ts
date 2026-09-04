@@ -1,6 +1,7 @@
 import { MediaModerationStatus } from "@core/domain/enums/media-moderation-status.enum";
 import type { PostType } from "@core/domain/enums/post-type.enum";
 import type { PostProps } from "@core/domain/interfaces/post-props.interface";
+import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
 import type { PostCategory } from "../enums/post-category-enum";
 import type { QuotedPostSnapshot } from "../interfaces/quoted-post.interface";
 
@@ -32,6 +33,8 @@ export class Post {
      * borderline by moderation.
      * @param mediaStatus - Optional. Moderation state of the attached media;
      * PENDING when an attached video has not been scanned yet.
+     * @param mentions - Optional. The users named with an @handle in the
+     * content, already resolved to real accounts by the use case.
      * @returns A new Post instance with the specified properties.
      */
     public static create(
@@ -44,6 +47,7 @@ export class Post {
         lang: string | null = null,
         isSensitive = false,
         mediaStatus: MediaModerationStatus = MediaModerationStatus.APPROVED,
+        mentions: MentionedUser[] = [],
     ): Post {
         return new Post({
             content,
@@ -51,6 +55,7 @@ export class Post {
             mediaUrls,
             author: { id: authorId },
             tags: [],
+            mentions,
             categories,
             quotedPostId,
             lang,
@@ -143,6 +148,14 @@ export class Post {
      */
     get tags(): string[] {
         return this.props.tags;
+    }
+
+    /**
+     * Get the users mentioned in the post content
+     * @returns Array of mentioned users, empty when the post names nobody
+     */
+    get mentions(): MentionedUser[] {
+        return this.props.mentions ?? [];
     }
 
     /**

@@ -34,6 +34,7 @@ function makeDbPost(
         tags: [
             { id: "t1", name: "typescript", postId: "post-1", createdAt: now },
         ],
+        mentionedUsers: [{ id: "user-2", username: "ada" }],
         likes: [],
         bookmarks: [],
         isSensitive: false,
@@ -65,6 +66,20 @@ describe("PostPrismaMapper", () => {
             const post = PostPrismaMapper.toDomainPost(makeDbPost());
 
             expect(post.tags).toEqual(["typescript"]);
+        });
+
+        it("should map the mentioned users onto the entity", () => {
+            const post = PostPrismaMapper.toDomainPost(makeDbPost());
+
+            expect(post.mentions).toEqual([{ id: "user-2", username: "ada" }]);
+        });
+
+        it("should read a post that mentions nobody as an empty list", () => {
+            const post = PostPrismaMapper.toDomainPost(
+                makeDbPost({ mentionedUsers: [] }),
+            );
+
+            expect(post.mentions).toEqual([]);
         });
 
         it("should set isLiked true when likes array is non-empty", () => {
@@ -152,11 +167,13 @@ describe("PostPrismaMapper", () => {
             expect(result.category).toEqual([PostCategory.BACKEND]);
         });
 
-        it("should not include tags, likeCount or commentCount", () => {
+        it("should not include tags, mentions, likeCount or commentCount", () => {
             const post = PostPrismaMapper.toDomainPost(makeDbPost());
             const result = PostPrismaMapper.toPrismaPost(post);
 
             expect(result).not.toHaveProperty("tags");
+            expect(result).not.toHaveProperty("mentions");
+            expect(result).not.toHaveProperty("mentionedUsers");
             expect(result).not.toHaveProperty("likeCount");
             expect(result).not.toHaveProperty("commentCount");
         });
@@ -259,6 +276,15 @@ describe("PostPrismaMapper", () => {
             expect(result.tags).toEqual([{ name: "typescript" }]);
             expect(result.categories).toEqual([
                 { name: PostCategory.FRONTEND },
+            ]);
+        });
+
+        it("should serve the mentions as id and handle pairs", () => {
+            const post = PostPrismaMapper.toDomainPost(makeDbPost());
+            const result = PostPrismaMapper.toResponse(post, CDN);
+
+            expect(result.mentions).toEqual([
+                { id: "user-2", username: "ada" },
             ]);
         });
     });

@@ -1,5 +1,6 @@
 import type { ArticleStatus } from "@core/domain/enums";
 import type { PostCategory } from "../enums/post-category-enum";
+import type { MentionedUser } from "./mentioned-user.interface";
 
 /**
  * Props interface for the Article entity.
@@ -77,6 +78,9 @@ export interface ArticleProps {
 
     /** Tag names attached to the article, supplied explicitly by the author */
     tags: string[];
+
+    /** Users named with an @handle in the body, re-resolved on every body edit */
+    mentions: MentionedUser[];
 
     /** Categories associated with the article */
     categories: PostCategory[];

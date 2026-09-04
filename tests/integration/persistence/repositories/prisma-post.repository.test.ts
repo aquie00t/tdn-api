@@ -68,6 +68,53 @@ describe("PrismaPostRepository (integration)", () => {
             });
             expect(nodejsTag).not.toBeNull();
         });
+
+        it("should persist the resolved mentions and read them back", async () => {
+            const userRepo = new PrismaUserRepository(prisma, {
+                gracePeriodDays: 30,
+            });
+            const mentioned = await userRepo.create({
+                email: "mentioned@post-repo-test.com",
+                username: "mentioned_postrepo",
+                passwordHash: "hashed",
+            });
+
+            const post = Post.create(
+                "hey @mentioned_postrepo",
+                PostType.COMMUNITY,
+                testUserId,
+                [],
+                [],
+                undefined,
+                null,
+                false,
+                undefined,
+                [{ id: mentioned.id, username: mentioned.username }],
+            );
+
+            const created = await postRepo.create(post);
+
+            expect(created.mentions).toEqual([
+                { id: mentioned.id, username: "mentioned_postrepo" },
+            ]);
+
+            const reloaded = await postRepo.findById(created.id);
+            expect(reloaded!.mentions).toEqual([
+                { id: mentioned.id, username: "mentioned_postrepo" },
+            ]);
+        });
+
+        it("should store a post that mentions nobody with an empty list", async () => {
+            const created = await postRepo.create(
+                Post.create(
+                    "a post naming nobody",
+                    PostType.COMMUNITY,
+                    testUserId,
+                ),
+            );
+
+            expect(created.mentions).toEqual([]);
+        });
     });
 
     describe("findAll()", () => {

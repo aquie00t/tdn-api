@@ -2,6 +2,7 @@ import { Post } from "@core/domain/entities/post.entity";
 import type { PostCategory } from "@core/domain/enums/post-category-enum";
 import { MediaModerationStatus } from "@core/domain/enums/media-moderation-status.enum";
 import type { PostType } from "@core/domain/enums/post-type.enum";
+import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
 import type { Prisma } from "@generated/prisma/client";
 
 export type PostWithRelations = Prisma.PostGetPayload<{
@@ -14,6 +15,7 @@ export type PostWithRelations = Prisma.PostGetPayload<{
             };
         };
         tags: true;
+        mentionedUsers: { select: { id: true; username: true } };
         likes: true;
         bookmarks: true;
         quotedPost: {
@@ -81,6 +83,8 @@ export interface PostResponse {
     /** Detected content language, null when the detector could not tell. */
     lang: string | null;
     tags?: { name: string }[];
+    /** Users named with an @handle in the content, resolved at write time. */
+    mentions: MentionedUser[];
     categories?: { name: string }[];
     quotedPost: QuotedPostResponse | null;
 }
@@ -111,6 +115,7 @@ export class PostPrismaMapper {
             },
 
             tags: dbPost.tags?.map((t) => t.name) || [],
+            mentions: dbPost.mentionedUsers ?? [],
             createdAt: dbPost.createdAt,
             updatedAt: dbPost.updatedAt,
             likeCount: dbPost.likeCount,
@@ -225,6 +230,7 @@ export class PostPrismaMapper {
                 isMe: currentUserId ? post.author.id === currentUserId : false,
             },
             tags: post.tags?.map((t) => ({ name: t })) || [],
+            mentions: post.mentions,
             categories: post.categories?.map((c) => ({ name: c })) || [],
             quotedPost: this.toQuotedPostResponse(post, cdnUrl),
         };

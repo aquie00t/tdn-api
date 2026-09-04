@@ -6,6 +6,8 @@ import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
+import type { NotifyMentionedUsersUseCase } from "@core/use-cases/notification/notify-mentioned-users";
+import { resolveMentions } from "@core/use-cases/shared/mentions/resolve-mentions";
 import type { LanguageDetectionPort } from "@core/ports/services/language-detection.port";
 import { MediaChannel, MediaOwnerKind, PostType } from "@core/domain/enums";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
@@ -30,6 +32,7 @@ export class CreatePostUseCase {
      * @param userRepository - Repository for managing user data
      * @param notifyNewPostUseCase - Use case that fans the post out to followers
      * @param notifyQuotedAuthorUseCase - Use case that tells an author their post was quoted
+     * @param notifyMentionedUsersUseCase - Use case that tells the users named in the content
      * @param languageDetectionService - Service that labels the content with the language it was written in
      * @param mediaAssetRepository - Repository the submitted media keys are checked against
      * @param r2PublicUrl - CDN origin media URLs are served from, used to
@@ -42,6 +45,7 @@ export class CreatePostUseCase {
         private readonly userRepository: IUserRepository,
         private readonly notifyNewPostUseCase: NotifyNewPostUseCase,
         private readonly notifyQuotedAuthorUseCase: NotifyQuotedAuthorUseCase,
+        private readonly notifyMentionedUsersUseCase: NotifyMentionedUsersUseCase,
         private readonly languageDetectionService: LanguageDetectionPort,
         private readonly mediaAssetRepository: IMediaAssetRepository,
         private readonly r2PublicUrl: string,
@@ -126,6 +130,16 @@ export class CreatePostUseCase {
             mediaAssetRepository: this.mediaAssetRepository,
         });
 
+        const mentions = await resolveMentions({
+            content: input.content,
+            userRepository: this.userRepository,
+        });
+
+        // Captured inside the transaction because that is where the quoted
+        // post is already loaded, and needed outside it to keep the quoted
+        // author from being told twice about the same post.
+        let quotedAuthorId: string | undefined;
+
         const rawPost = await this.transactionService.runInTransaction(
             async (ctx) => {
                 if (input.quotedPostId) {
@@ -135,6 +149,7 @@ export class CreatePostUseCase {
                     if (!quoted) {
                         throw new NotFoundError("Quoted post not found.");
                     }
+                    quotedAuthorId = quoted.author.id;
                 }
 
                 const post = Post.create(
@@ -147,6 +162,7 @@ export class CreatePostUseCase {
                     lang,
                     media.isSensitive,
                     media.mediaStatus,
+                    mentions,
                 );
 
                 const created = await ctx.postRepository.create(post);
@@ -184,6 +200,12 @@ export class CreatePostUseCase {
                 postId: rawPost.id,
                 authorId: input.authorId,
                 postType: input.type,
+                // Anyone this post already reaches by a more specific route
+                // hears about it once, not twice.
+                excludeUserIds: [
+                    ...mentions.map((mention) => mention.id),
+                    ...(quotedAuthorId ? [quotedAuthorId] : []),
+                ],
             })
             .catch((err: unknown) => {
                 this.logger.error(
@@ -203,6 +225,24 @@ export class CreatePostUseCase {
                     this.logger.error(
                         { err, postId: rawPost.id },
                         "Failed to notify the quoted author",
+                    );
+                });
+        }
+
+        if (mentions.length > 0) {
+            void this.notifyMentionedUsersUseCase
+                .execute({
+                    issuerId: input.authorId,
+                    mentionedUserIds: mentions.map((mention) => mention.id),
+                    target: { postId: rawPost.id },
+                    // The quoted author already hears about this post as a
+                    // QUOTE; naming them in the body should not add a second row.
+                    excludeUserIds: quotedAuthorId ? [quotedAuthorId] : [],
+                })
+                .catch((err: unknown) => {
+                    this.logger.error(
+                        { err, postId: rawPost.id },
+                        "Failed to notify the mentioned users",
                     );
                 });
         }

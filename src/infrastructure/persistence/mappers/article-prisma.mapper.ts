@@ -1,6 +1,7 @@
 import { Article } from "@core/domain/entities/article.entity";
 import type { ArticleStatus } from "@core/domain/enums";
 import type { PostCategory } from "@core/domain/enums/post-category-enum";
+import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
 import type { Prisma } from "@generated/prisma/client";
 
 export type ArticleWithRelations = Prisma.ArticleGetPayload<{
@@ -13,6 +14,7 @@ export type ArticleWithRelations = Prisma.ArticleGetPayload<{
             };
         };
         tags: true;
+        mentionedUsers: { select: { id: true; username: true } };
         likes: true;
         bookmarks: true;
         _count: { select: { comments: true } };
@@ -46,6 +48,8 @@ export interface ArticleResponse {
         isMe: boolean;
     };
     tags: { name: string }[];
+    /** Users named with an @handle in the body, resolved at write time. */
+    mentions: MentionedUser[];
     categories: { name: string }[];
 }
 
@@ -96,6 +100,7 @@ export class ArticlePrismaMapper {
                 fullName: dbArticle.author?.profile?.fullName ?? undefined,
             },
             tags: dbArticle.tags?.map((tag) => tag.name) ?? [],
+            mentions: dbArticle.mentionedUsers ?? [],
             categories: (dbArticle.category as PostCategory[]) || [],
             createdAt: dbArticle.createdAt,
             updatedAt: dbArticle.updatedAt,
@@ -114,14 +119,18 @@ export class ArticlePrismaMapper {
     /**
      * Maps a domain entity onto the flat shape Prisma writes.
      *
-     * Tags are excluded: the repository attaches them with connectOrCreate.
+     * Tags and mentions are excluded: the repository attaches them, with
+     * connectOrCreate and connect respectively.
      *
      * @param article - The Article domain entity
      * @returns The scalar fields of an article row
      */
     static toPrismaArticle(
         article: Article,
-    ): Omit<Prisma.ArticleUncheckedCreateInput, "id" | "tags"> {
+    ): Omit<
+        Prisma.ArticleUncheckedCreateInput,
+        "id" | "tags" | "mentionedUsers"
+    > {
         return {
             slug: article.slug,
             title: article.title,
@@ -206,6 +215,7 @@ export class ArticlePrismaMapper {
                     : false,
             },
             tags: article.tags.map((name) => ({ name })),
+            mentions: article.mentions,
             categories: article.categories.map((name) => ({ name })),
         };
     }

@@ -51,6 +51,9 @@ model Post {
   likes         PostLike[]
   bookmarks     PostBookmark[]
   comments      Comment[]
+
+  // Users named with @handle in the body, resolved once at write time.
+  mentionedUsers User[] @relation("PostMentions")
   notifications Notification[]
   commentCount  Int            @default(0)
   likeCount     Int            @default(0)
@@ -148,6 +151,9 @@ model Comment {
   likes         CommentLike[]
   bookmarks     CommentBookmark[]
   notifications Notification[]
+
+  // Users named with @handle in the body, resolved once at write time.
+  mentionedUsers User[] @relation("CommentMentions")
   likeCount     Int               @default(0) @map("like_count")
   replyCount    Int               @default(0) @map("reply_count")
 

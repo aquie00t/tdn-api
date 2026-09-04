@@ -15,4 +15,11 @@ export interface NotifyNewPostInput {
      * anything else is ignored.
      */
     postType: PostType;
+
+    /**
+     * Recipients that already receive a notification about this same post and
+     * must not also receive a NEW_POST - the people the post names, and the
+     * author of the post it quotes.
+     */
+    excludeUserIds?: string[];
 }

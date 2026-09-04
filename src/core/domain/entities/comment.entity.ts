@@ -4,6 +4,7 @@
  */
 import { MediaModerationStatus } from "@core/domain/enums";
 import type { CommentProps } from "@core/domain/interfaces/comment-props.interface";
+import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
 import type { CommentTarget } from "@core/ports/repositories/comment.repository";
 
 export class Comment {
@@ -164,6 +165,9 @@ export class Comment {
      * @param authorId - The ID of the user who authored this comment
      * @param parentId - Optional parent comment ID for nested comments
      * @param mediaUrls - Optional array of media URLs attached to the comment
+     * @param isSensitive - Whether moderation judged the media borderline
+     * @param mediaStatus - Moderation state of the attached media
+     * @param mentions - The users named with an @handle in the content
      * @returns A new Comment instance targeting a post
      */
     public static createForPost(
@@ -174,6 +178,7 @@ export class Comment {
         mediaUrls: string[] = [],
         isSensitive = false,
         mediaStatus: MediaModerationStatus = MediaModerationStatus.APPROVED,
+        mentions: MentionedUser[] = [],
     ): Comment {
         return new Comment({
             content,
@@ -184,6 +189,7 @@ export class Comment {
             mediaUrls,
             isSensitive,
             mediaStatus,
+            mentions,
         });
     }
 
@@ -194,6 +200,9 @@ export class Comment {
      * @param authorId - The ID of the user who authored this comment
      * @param parentId - Optional parent comment ID for nested comments
      * @param mediaUrls - Optional array of media URLs attached to the comment
+     * @param isSensitive - Whether moderation judged the media borderline
+     * @param mediaStatus - Moderation state of the attached media
+     * @param mentions - The users named with an @handle in the content
      * @returns A new Comment instance targeting an article
      */
     public static createForArticle(
@@ -204,6 +213,7 @@ export class Comment {
         mediaUrls: string[] = [],
         isSensitive = false,
         mediaStatus: MediaModerationStatus = MediaModerationStatus.APPROVED,
+        mentions: MentionedUser[] = [],
     ): Comment {
         return new Comment({
             content,
@@ -214,6 +224,7 @@ export class Comment {
             mediaUrls,
             isSensitive,
             mediaStatus,
+            mentions,
         });
     }
 
@@ -231,6 +242,14 @@ export class Comment {
           }
         | undefined {
         return this.props.author;
+    }
+
+    /**
+     * Gets the users mentioned in the comment content
+     * @returns Array of mentioned users, empty when the comment names nobody
+     */
+    public get mentions(): MentionedUser[] {
+        return this.props.mentions ?? [];
     }
 
     /**

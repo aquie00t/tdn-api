@@ -41,4 +41,9 @@ export enum NotificationType {
      * from the platform rather than another user.
      */
     MEDIA_REJECTED = "MEDIA_REJECTED",
+
+    /**
+     * The user was named with an @handle in a post, comment or article
+     */
+    MENTION = "MENTION",
 }

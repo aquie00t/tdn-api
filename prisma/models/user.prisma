@@ -40,6 +40,13 @@ model User {
   conversationsAsB Conversation[] @relation("ConversationsAsB")
   messages         Message[]
 
+  // Who this user was @-mentioned by. The relation stores ids rather than the
+  // handle written in the body, so a rename keeps every historical mention
+  // pointing at the right account and rendering the current username.
+  mentionedInPosts    Post[]    @relation("PostMentions")
+  mentionedInComments Comment[] @relation("CommentMentions")
+  mentionedInArticles Article[] @relation("ArticleMentions")
+
   deletedAt    DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

@@ -7,6 +7,7 @@ import { ArticleStatus } from "@core/domain/enums/article-status.enum";
 import { PostCategory } from "@core/domain/enums/post-category-enum";
 import { BadRequestError } from "@core/errors";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import { MediaModerationStatus, MediaOwnerKind } from "@core/domain/enums";
 
 const AUTHOR = "11111111-1111-4111-8111-111111111111";
@@ -17,6 +18,7 @@ describe("CreateArticleUseCase", () => {
     let useCase: CreateArticleUseCase;
     let articleRepository: Pick<IArticleRepository, "create">;
     let cryptoService: Pick<CryptoPort, "generateRandomHex">;
+    let userRepository: Pick<IUserRepository, "findManyByUsernames">;
     let mediaAssetRepository: Pick<
         IMediaAssetRepository,
         "findByStorageKeys" | "attachToOwner"
@@ -39,10 +41,14 @@ describe("CreateArticleUseCase", () => {
             findByStorageKeys: vi.fn().mockResolvedValue([]),
             attachToOwner: vi.fn().mockResolvedValue(1),
         };
+        userRepository = {
+            findManyByUsernames: vi.fn().mockResolvedValue([]),
+        };
         useCase = new CreateArticleUseCase(
             articleRepository as IArticleRepository,
             cryptoService as CryptoPort,
             mediaAssetRepository as IMediaAssetRepository,
+            userRepository as IUserRepository,
         );
     });
 
@@ -212,6 +218,36 @@ describe("CreateArticleUseCase", () => {
                 MediaOwnerKind.ARTICLE,
                 "article-1",
             );
+        });
+    });
+    describe("mentions", () => {
+        it("should resolve the handles in the body onto the draft", async () => {
+            vi.mocked(userRepository.findManyByUsernames).mockResolvedValue([
+                { id: "user-2", username: "ada" },
+            ]);
+
+            const article = await useCase.execute({
+                title: "Hello",
+                body: "a long enough body that names @ada somewhere in it",
+                authorId: "user-1",
+            });
+
+            expect(userRepository.findManyByUsernames).toHaveBeenCalledWith([
+                "ada",
+            ]);
+            expect(article.mentions).toEqual([
+                { id: "user-2", username: "ada" },
+            ]);
+        });
+
+        it("should not look anything up when the body names nobody", async () => {
+            await useCase.execute({
+                title: "Hello",
+                body: "a long enough body that names nobody at all",
+                authorId: "user-1",
+            });
+
+            expect(userRepository.findManyByUsernames).not.toHaveBeenCalled();
         });
     });
 });

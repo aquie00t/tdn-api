@@ -1,6 +1,7 @@
 import { Type as FBType, type Static } from "@fastify/type-provider-typebox";
 import { Type } from "@sinclair/typebox";
 import { PostType } from "@core/domain/enums/post-type.enum";
+import { MentionSchema } from "../shared/mention.schema";
 
 export const PostAuthorSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
@@ -56,6 +57,7 @@ export const PostItemSchema = FBType.Object({
     lang: FBType.Union([FBType.String(), FBType.Null()]),
     author: PostAuthorSchema,
     tags: FBType.Array(FBType.Object({ name: FBType.String() })),
+    mentions: FBType.Array(MentionSchema),
     categories: FBType.Array(FBType.Object({ name: FBType.String() })),
     quotedPost: FBType.Union([QuotedPostSchema, FBType.Null()]),
 });
