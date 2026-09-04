@@ -26,6 +26,7 @@ export class User {
             isEmailVerified: false,
             isBot: false,
             deletedAt: null,
+            bannedAt: null,
         });
     }
 
@@ -81,6 +82,14 @@ export class User {
     }
 
     /**
+     * Get the timestamp when the account was suspended
+     * @returns The ban timestamp, or null while the account is in good standing
+     */
+    get bannedAt(): Date | null {
+        return this.props.bannedAt;
+    }
+
+    /**
      * Get the creation timestamp of the user account
      * @returns The creation date
      */
@@ -102,6 +111,19 @@ export class User {
      */
     public isDeleted(): boolean {
         return this.props.deletedAt !== null;
+    }
+
+    /**
+     * Check if the account has been suspended
+     *
+     * Independent of deletion: an account can be both, and a ban is what the
+     * auth path reports first, so a suspended account is never handed the
+     * recovery token that a pending deletion would earn it.
+     *
+     * @returns True if the account is banned, false otherwise
+     */
+    public isBanned(): boolean {
+        return this.props.bannedAt !== null;
     }
 
     /**

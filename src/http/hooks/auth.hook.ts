@@ -1,6 +1,7 @@
 import { UnauthorizedError } from "@core/errors";
 import { type FastifyRequest } from "fastify";
 import { createHash } from "node:crypto";
+import { assertAccountActive } from "./assert-account-active";
 
 /**
  * Authentication hook for Fastify requests.
@@ -11,8 +12,13 @@ import { createHash } from "node:crypto";
  * - If the header starts with "Bearer ", it attempts to verify the JWT token.
  * - If authentication fails or the header is missing, it throws an `UnauthorizedError`.
  *
+ * Either way the account itself is checked, not just the credential: a token
+ * stays valid for fifteen minutes and a bot token indefinitely, so a suspended
+ * account would otherwise keep working long after it was banned.
+ *
  * @param request - The Fastify request object.
  * @throws {UnauthorizedError} If authentication fails or the authorization header is missing.
+ * @throws {AccountBannedError} If the authenticated account is suspended.
  * @returns {Promise<void>} Resolves if authentication is successful.
  */
 export async function authHook(request: FastifyRequest): Promise<void> {
@@ -29,8 +35,10 @@ export async function authHook(request: FastifyRequest): Promise<void> {
 
         const hashedToken = createHash("sha256").update(token).digest("hex");
 
+        // The ban is part of the lookup rather than a second query: this path
+        // already reads the row, so a suspended bot simply stops matching.
         const botUser = await request.server.prisma.user.findFirst({
-            where: { botToken: hashedToken, isBot: true },
+            where: { botToken: hashedToken, isBot: true, bannedAt: null },
         });
 
         if (!botUser) {
@@ -44,10 +52,12 @@ export async function authHook(request: FastifyRequest): Promise<void> {
     if (authHeader.startsWith("Bearer ")) {
         try {
             await request.jwtVerify();
-            return;
         } catch {
             throw new UnauthorizedError();
         }
+
+        await assertAccountActive(request);
+        return;
     }
 
     throw new UnauthorizedError();

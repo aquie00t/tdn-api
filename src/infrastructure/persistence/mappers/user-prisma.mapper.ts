@@ -20,6 +20,7 @@ export class UserPrismaMapper {
             isBot: dbUser.isBot,
             isEmailVerified: dbUser.isEmailVerified,
             deletedAt: dbUser.deletedAt,
+            bannedAt: dbUser.bannedAt,
             createdAt: dbUser.createdAt,
             updatedAt: dbUser.updatedAt,
         });

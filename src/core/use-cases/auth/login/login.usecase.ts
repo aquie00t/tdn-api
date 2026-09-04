@@ -1,6 +1,7 @@
 import {
-    InvalidCredentialsError,
+    AccountBannedError,
     AccountPendingDeletionError,
+    InvalidCredentialsError,
 } from "@core/errors";
 import type { PasswordPort } from "@core/ports/services/password.port";
 import type {
@@ -64,6 +65,14 @@ export class LoginUseCase {
 
         if (!isPasswordValid) {
             throw new InvalidCredentialsError();
+        }
+
+        // Checked before the deletion branch, and after the password: a
+        // suspended account must not be handed the recovery token a pending
+        // deletion would earn it, and neither state is worth telling somebody
+        // who cannot prove the account is theirs.
+        if (user.isBanned()) {
+            throw new AccountBannedError();
         }
 
         if (user.isDeleted()) {

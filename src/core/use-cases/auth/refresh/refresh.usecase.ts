@@ -1,4 +1,4 @@
-import { UnauthorizedError } from "@core/errors";
+import { AccountBannedError, UnauthorizedError } from "@core/errors";
 import type {
     AuthTokenPort,
     UserPayload,
@@ -66,6 +66,10 @@ export class RefreshUseCase {
             }
 
             const user = await ctx.userRepository.findById(currentToken.userId);
+            if (user?.isBanned()) {
+                throw new AccountBannedError();
+            }
+
             if (!user || user.isDeleted()) {
                 throw new UnauthorizedError("User account unavailable");
             }

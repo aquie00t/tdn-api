@@ -1,4 +1,8 @@
-import { BadRequestError, UnauthorizedError } from "@core/errors";
+import {
+    AccountBannedError,
+    BadRequestError,
+    UnauthorizedError,
+} from "@core/errors";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { IVerificationTokenRepository } from "@core/ports/repositories/verification-token.repository";
 import { TokenType } from "@core/domain/enums/token-type.enum";
@@ -32,6 +36,10 @@ export class VerifyEmailUseCase {
      */
     async execute(input: VerifyEmailInput): Promise<void> {
         const user = await this.userRepository.findById(input.userId);
+
+        if (user?.isBanned()) {
+            throw new AccountBannedError();
+        }
 
         if (!user || user.isDeleted()) {
             throw new UnauthorizedError("Unauthorized access.");

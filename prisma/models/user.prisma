@@ -47,7 +47,14 @@ model User {
   mentionedInComments Comment[] @relation("CommentMentions")
   mentionedInArticles Article[] @relation("ArticleMentions")
 
-  deletedAt    DateTime?
+  deletedAt DateTime?
+
+  /// When the account was suspended, null while it is in good standing.
+  /// Written by hand from the database - no endpoint sets it - and read on
+  /// every request that carries a token, so a ban takes effect at once
+  /// rather than when the current access token expires.
+  bannedAt DateTime?
+
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   commentLikes CommentLike[]
