@@ -1,3 +1,16 @@
+# [1.18.0](https://github.com/the-developer-network/tdn-api/compare/v1.17.0...v1.18.0) (2026-09-04)
+
+
+### Bug Fixes
+
+* **test:** send the refresh cookie the way the endpoint reads it ([#262](https://github.com/the-developer-network/tdn-api/issues/262)) ([6b441ea](https://github.com/the-developer-network/tdn-api/commit/6b441eaad94f99a00f91d4c65655a4fb4840b2b3))
+
+
+### Features
+
+* **auth:** suspend accounts with bannedAt ([#260](https://github.com/the-developer-network/tdn-api/issues/260)) ([0c91238](https://github.com/the-developer-network/tdn-api/commit/0c91238dfed8572214e36ca399c90349dc35f5c5))
+* **digest:** send a daily digest email ([#261](https://github.com/the-developer-network/tdn-api/issues/261)) ([91874cd](https://github.com/the-developer-network/tdn-api/commit/91874cd2cc94b8e4affe4162de063c9c2d8cc8e6))
+
 # [1.17.0](https://github.com/the-developer-network/tdn-api/compare/v1.16.0...v1.17.0) (2026-09-04)
 
 
