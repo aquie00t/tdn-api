@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { PrismaClient } from "../../../../src/generated/prisma/client";
 import { PrismaNotificationRepository } from "../../../../src/infrastructure/persistence/repositories/prisma-notification.repository";
 import { PrismaUserRepository } from "../../../../src/infrastructure/persistence/repositories/prisma-user.repository";
@@ -515,6 +515,103 @@ describe("PrismaNotificationRepository (integration)", () => {
             const written = await notifRepo.createMany([]);
 
             expect(written).toBe(0);
+        });
+    });
+    describe("findUnreadSince()", () => {
+        /** Writes one notification and pins when it happened. */
+        async function seed(options: {
+            isRead?: boolean;
+            createdAt?: Date;
+        }): Promise<string> {
+            const notification = Notification.create(
+                recipientId,
+                issuerId,
+                NotificationType.FOLLOW,
+            );
+            await notifRepo.create(notification);
+
+            const latest = await prisma.notification.findFirst({
+                where: { recipientId },
+                orderBy: { createdAt: "desc" },
+            });
+
+            await prisma.notification.update({
+                where: { id: latest!.id },
+                data: {
+                    isRead: options.isRead ?? false,
+                    ...(options.createdAt
+                        ? { createdAt: options.createdAt }
+                        : {}),
+                },
+            });
+
+            return latest!.id;
+        }
+
+        beforeEach(async () => {
+            await prisma.notification.deleteMany({ where: { recipientId } });
+        });
+
+        it("should return an unread notification inside the window", async () => {
+            const id = await seed({});
+
+            const found = await notifRepo.findUnreadSince(
+                recipientId,
+                new Date(Date.now() - 3_600_000),
+                10,
+            );
+
+            expect(found.map((one) => one.id)).toEqual([id]);
+        });
+
+        it("should leave out one that has been read", async () => {
+            await seed({ isRead: true });
+
+            const found = await notifRepo.findUnreadSince(
+                recipientId,
+                new Date(Date.now() - 3_600_000),
+                10,
+            );
+
+            expect(found).toEqual([]);
+        });
+
+        it("should leave out one older than the window", async () => {
+            await seed({ createdAt: new Date("2020-01-01T00:00:00.000Z") });
+
+            const found = await notifRepo.findUnreadSince(
+                recipientId,
+                new Date(Date.now() - 3_600_000),
+                10,
+            );
+
+            expect(found).toEqual([]);
+        });
+
+        it("should load the issuer's handle, so the email can name them", async () => {
+            await seed({});
+
+            const [found] = await notifRepo.findUnreadSince(
+                recipientId,
+                new Date(Date.now() - 3_600_000),
+                10,
+            );
+
+            expect(found.username).toBe("issuer_notifrepo");
+        });
+
+        it("should honour the limit, newest first", async () => {
+            await seed({ createdAt: new Date(Date.now() - 30_000) });
+            const newest = await seed({});
+
+            const found = await notifRepo.findUnreadSince(
+                recipientId,
+                new Date(Date.now() - 3_600_000),
+                1,
+            );
+
+            expect(found).toHaveLength(1);
+            expect(found[0].id).toBe(newest);
         });
     });
 });

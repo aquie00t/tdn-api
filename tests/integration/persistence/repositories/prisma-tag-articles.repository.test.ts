@@ -69,9 +69,17 @@ describe("PrismaTagRepository with articles (integration)", () => {
         });
         userId = user.id;
 
-        await makeArticle("Published tagged article", [PUBLISHED_TAG], "published");
+        await makeArticle(
+            "Published tagged article",
+            [PUBLISHED_TAG],
+            "published",
+        );
         await makeArticle("Draft tagged article", [DRAFT_TAG], "draft");
-        await makeArticle("Archived tagged article", [ARCHIVED_TAG], "archived");
+        await makeArticle(
+            "Archived tagged article",
+            [ARCHIVED_TAG],
+            "archived",
+        );
 
         // One tag used by both a post and a published article, to prove the
         // two counts are reported separately and ranked together.

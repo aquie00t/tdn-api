@@ -55,6 +55,13 @@ model User {
   /// rather than when the current access token expires.
   bannedAt DateTime?
 
+  /// When the user opted out of the daily digest, null while subscribed.
+  /// Written by the unsubscribe link, which carries a signed token and needs
+  /// no session - a digest lands in an inbox long after one has expired.
+  digestOptOutAt DateTime?
+
+  digestDeliveries DigestDelivery[]
+
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   commentLikes CommentLike[]

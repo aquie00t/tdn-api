@@ -6,6 +6,7 @@ import { PrismaOAuthAccountRepository } from "@infrastructure/persistence/reposi
 import { PrismaProfileRepository } from "@infrastructure/persistence/repositories/prisma-profile.repository";
 import { PrismaFollowUserRepository } from "@infrastructure/persistence/repositories/prisma-follow.repository";
 import { PrismaNotificationRepository } from "@infrastructure/persistence/repositories/prisma-notification.repository";
+import { PrismaDigestDeliveryRepository } from "@infrastructure/persistence/repositories/prisma-digest-delivery.repository";
 import { PrismaUserInterestRepository } from "@infrastructure/persistence/repositories/prisma-user-interest.repository";
 import { PrismaPostRepository } from "@infrastructure/persistence/repositories/prisma-post.repository";
 import { PrismaPostLikeRepository } from "@infrastructure/persistence/repositories/prisma-post-like.repository";
@@ -122,6 +123,9 @@ export const persistenceModule = {
     ).singleton(),
     /* Tags act as their own trends/categories in the modern architecture, so we can omit a separate category repository. --- IGNORE --- */
     tagRepository: asClass(PrismaTagRepository).singleton(),
+    digestDeliveryRepository: asClass(
+        PrismaDigestDeliveryRepository,
+    ).singleton(),
 
     /**
      * Article repository for managing long-form article persistence

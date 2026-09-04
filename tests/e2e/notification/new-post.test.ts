@@ -123,8 +123,7 @@ describe("NEW_POST notifications", () => {
             .poll(async () => {
                 const items = await notificationsOf(followerToken);
                 return items.some(
-                    (n) =>
-                        n.type === "NEW_POST" && n.postId === techNewsPostId,
+                    (n) => n.type === "NEW_POST" && n.postId === techNewsPostId,
                 );
             })
             .toBe(true);

@@ -1,0 +1,26 @@
+/// One digest email claimed for one user on one day.
+///
+/// The row is written *before* the email is handed to the provider, and the
+/// unique constraint is what makes that a claim: with several API instances
+/// running the same 09:00 schedule, the loser of the race sees a uniqueness
+/// violation and skips the user instead of sending a second copy. Nothing at
+/// the scheduler level coordinates the instances, exactly as the media
+/// moderation worker resolves its own races in the data layer.
+///
+/// The trade this makes is deliberate. A process that dies between the claim
+/// and the send costs that user one morning; the alternative costs everybody
+/// a duplicate.
+model DigestDelivery {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The calendar day this digest belongs to, in the digest timezone.
+  digestOn DateTime @db.Date @map("digest_on")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, digestOn])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("digest_deliveries")
+}

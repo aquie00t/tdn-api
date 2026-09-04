@@ -93,6 +93,55 @@ export class PrismaNotificationRepository implements INotificationRepository {
         return raws.map((raw) => NotificationPrismaMapper.toDomain(raw));
     }
 
+    /**
+     * Lists a user's unread notifications since a point in time.
+     *
+     * Loads the issuer's handle and the article slug for the same reason
+     * `findAllByUserId` does - a digest renders "@ada mentioned you" and needs
+     * a link that will not 404 - and matches the composite index created with
+     * this method, without which it reads every notification the account has
+     * ever received.
+     *
+     * @param userId - The recipient.
+     * @param since - Oldest notification to consider.
+     * @param take - Most notifications to return, newest first.
+     * @returns The matching notifications.
+     */
+    async findUnreadSince(
+        userId: string,
+        since: Date,
+        take: number,
+    ): Promise<Notification[]> {
+        const raws = await this.prisma.notification.findMany({
+            where: {
+                recipientId: userId,
+                isRead: false,
+                createdAt: { gte: since },
+            },
+            take,
+            orderBy: { createdAt: "desc" },
+            include: {
+                issuer: {
+                    select: {
+                        username: true,
+                        profile: {
+                            select: {
+                                avatarUrl: true,
+                            },
+                        },
+                    },
+                },
+                article: {
+                    select: {
+                        slug: true,
+                    },
+                },
+            },
+        });
+
+        return raws.map((raw) => NotificationPrismaMapper.toDomain(raw));
+    }
+
     async countByUserId(userId: string): Promise<number> {
         return this.prisma.notification.count({
             where: {

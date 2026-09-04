@@ -20,8 +20,7 @@ describe("PrismaArticleRepository (integration)", () => {
      * Each article needs a unique slug; a counter keeps them collision-free
      * without depending on randomness inside the test.
      */
-    const nextSuffix = (): string =>
-        (++suffix).toString(16).padStart(8, "0");
+    const nextSuffix = (): string => (++suffix).toString(16).padStart(8, "0");
 
     const makeArticle = (
         overrides: {
@@ -215,10 +214,7 @@ describe("PrismaArticleRepository (integration)", () => {
                 data: { articleId: article.id, userId: otherUserId },
             });
 
-            const asLiker = await articleRepo.findById(
-                article.id,
-                otherUserId,
-            );
+            const asLiker = await articleRepo.findById(article.id, otherUserId);
             const asAuthor = await articleRepo.findById(article.id, authorId);
             const asGuest = await articleRepo.findById(article.id);
 
@@ -348,9 +344,7 @@ describe("PrismaArticleRepository (integration)", () => {
         it("should not count a draft", async () => {
             const before = await articleRepo.countPublishedByAuthorId(authorId);
 
-            await articleRepo.create(
-                makeArticle({ title: "Uncounted draft" }),
-            );
+            await articleRepo.create(makeArticle({ title: "Uncounted draft" }));
 
             expect(await articleRepo.countPublishedByAuthorId(authorId)).toBe(
                 before,

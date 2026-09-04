@@ -6,6 +6,8 @@ import { RefreshTokenPurgeScheduler } from "@infrastructure/jobs/refresh-token/r
 import { NotificationPurgeJob } from "@infrastructure/jobs/notification/notification-purge.job";
 import { NotificationPurgeScheduler } from "@infrastructure/jobs/notification/notification-purge.scheduler";
 import { UserInterestRebuildJob } from "@infrastructure/jobs/user-interest/user-interest-rebuild.job";
+import { DailyDigestJob } from "@infrastructure/jobs/digest/daily-digest.job";
+import { DailyDigestScheduler } from "@infrastructure/jobs/digest/daily-digest.scheduler";
 import { UserInterestRebuildScheduler } from "@infrastructure/jobs/user-interest/user-interest-rebuild.scheduler";
 import { MediaModerationJob } from "@infrastructure/jobs/media-moderation/media-moderation.job";
 import { MediaModerationScheduler } from "@infrastructure/jobs/media-moderation/media-moderation.scheduler";
@@ -70,4 +72,18 @@ export const jobsModule = {
             );
         },
     ).singleton(),
+
+    dailyDigestJob: asClass(DailyDigestJob).singleton(),
+
+    dailyDigestScheduler: asFunction((dailyDigestJob, config, logger) => {
+        return new DailyDigestScheduler(
+            dailyDigestJob,
+            {
+                cronExpression: config.DAILY_DIGEST_CRON,
+                timezone: config.DAILY_DIGEST_TIMEZONE,
+                enabled: config.DAILY_DIGEST_ENABLED,
+            },
+            logger,
+        );
+    }).singleton(),
 };

@@ -24,6 +24,7 @@ import websocketPlugin from "./http/plugins/websocket.plugin";
 import realtimeRoutes from "@routes/realtime.routes";
 import notificationRoutes from "@routes/notification.routes";
 import notificationPurgePlugin from "@plugins/custom/notification-purge.plugin";
+import dailyDigestPlugin from "@plugins/custom/daily-digest.plugin";
 import userInterestRebuildPlugin from "@plugins/custom/user-interest-rebuild.plugin";
 import mediaModerationPlugin from "@plugins/custom/media-moderation.plugin";
 import { postRoutes } from "@routes/post/post.routes";
@@ -31,6 +32,7 @@ import { commentRoutes } from "@routes/post/comment.routes";
 import { likeRoutes } from "@routes/post/like.routes";
 import { bookmarkRoutes } from "@routes/post/bookmark.routes";
 import { tagRoutes } from "@routes/tags.routes";
+import { emailRoutes } from "@routes/emails.routes";
 import { translateRoutes } from "@routes/translate.routes";
 import { articleRoutes } from "@routes/article/article.routes";
 import { articleCommentRoutes } from "@routes/article/article-comment.routes";
@@ -109,6 +111,7 @@ export class App {
         this.server.register(notificationPurgePlugin);
         this.server.register(userInterestRebuildPlugin);
         this.server.register(mediaModerationPlugin);
+        this.server.register(dailyDigestPlugin);
     }
 
     /**
@@ -161,6 +164,10 @@ export class App {
 
         this.server.register(tagRoutes, {
             prefix: "/api/v1/tags",
+        });
+
+        this.server.register(emailRoutes, {
+            prefix: "/api/v1",
         });
 
         this.server.register(translateRoutes, {

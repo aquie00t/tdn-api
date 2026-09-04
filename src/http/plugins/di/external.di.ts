@@ -16,6 +16,8 @@ export const externalModule = {
             {
                 apiKey: config.RESEND_API_KEY,
                 from: config.EMAIL_FROM,
+                digestBatchSize: config.DAILY_DIGEST_BATCH_SIZE,
+                digestBatchPauseMs: config.DAILY_DIGEST_BATCH_PAUSE_MS,
             },
             logger,
         );

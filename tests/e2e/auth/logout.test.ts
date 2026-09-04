@@ -119,6 +119,8 @@ describe("POST /auth/logout - Logout Flow", () => {
         );
 
         expect(body.title).toBe("UnauthorizedError");
-        expect(body.detail).toBe("Security alert: Session compromised. All sessions revoked.");
+        expect(body.detail).toBe(
+            "Security alert: Session compromised. All sessions revoked.",
+        );
     });
 });

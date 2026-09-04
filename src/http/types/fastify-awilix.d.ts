@@ -20,9 +20,11 @@ import type { SeenPostsPort } from "@core/ports/services/seen-posts.port";
 import type { TranslationController } from "@controllers/translation.controller";
 import type { ArticleController } from "@controllers/article.controller";
 import type { MediaModerationScheduler } from "@infrastructure/jobs/media-moderation/media-moderation.scheduler";
+import type { DailyDigestScheduler } from "@infrastructure/jobs/digest/daily-digest.scheduler";
 import type { MediaModerationPort } from "@core/ports/services/media-moderation.port";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 import type { ConversationController } from "@controllers/conversation.controller";
+import type { EmailController } from "@controllers/email.controller";
 /**
  * Fastify Awilix cradle interface for dependency injection
  * Defines all injectable services and components available in the application
@@ -64,6 +66,12 @@ declare module "@fastify/awilix" {
 
         /** Scheduler for the nightly interest profile rebuild */
         userInterestRebuildScheduler: UserInterestRebuildScheduler;
+
+        /** Scheduler for the morning digest email */
+        dailyDigestScheduler: DailyDigestScheduler;
+
+        /** Controller for the endpoints an email links to */
+        emailController: EmailController;
 
         /** Controller for post operations */
         postController: PostController;

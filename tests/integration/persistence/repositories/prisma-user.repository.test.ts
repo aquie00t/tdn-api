@@ -331,4 +331,143 @@ describe("PrismaUserRepository (integration)", () => {
             expect(reloaded!.isBanned()).toBe(false);
         });
     });
+    describe("findDigestRecipients()", () => {
+        /** Creates a user eligible for the digest unless told otherwise. */
+        async function makeRecipient(
+            name: string,
+            overrides: Record<string, unknown> = {},
+        ): Promise<string> {
+            const user = await repo.create({
+                email: `${name}@user-repo-test.com`,
+                username: `${name}_userrepo`,
+                passwordHash: "hashed",
+            });
+
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { isEmailVerified: true, ...overrides },
+            });
+
+            return user.id;
+        }
+
+        /** Walks every page so a single ineligible row cannot hide off the end. */
+        async function allRecipientIds(): Promise<string[]> {
+            const ids: string[] = [];
+            let cursor: string | undefined;
+
+            for (;;) {
+                const page = await repo.findDigestRecipients(50, cursor);
+                ids.push(...page.recipients.map((one) => one.id));
+                if (!page.nextCursor) break;
+                cursor = page.nextCursor;
+            }
+
+            return ids;
+        }
+
+        it("should include a verified, active, subscribed account", async () => {
+            const id = await makeRecipient("digestok");
+
+            expect(await allRecipientIds()).toContain(id);
+        });
+
+        it("should carry the address and the chosen languages", async () => {
+            const id = await makeRecipient("digestlang");
+            await prisma.profile.update({
+                where: { userId: id },
+                data: { languages: ["en", "tr"] },
+            });
+
+            const page = await repo.findDigestRecipients(500);
+            const found = page.recipients.find((one) => one.id === id);
+
+            expect(found?.email).toBe("digestlang@user-repo-test.com");
+            expect(found?.languages).toEqual(["en", "tr"]);
+        });
+
+        it("should leave out an unverified address", async () => {
+            const id = await makeRecipient("digestunverified", {
+                isEmailVerified: false,
+            });
+
+            expect(await allRecipientIds()).not.toContain(id);
+        });
+
+        it("should leave out a soft-deleted account", async () => {
+            const id = await makeRecipient("digestdeleted", {
+                deletedAt: new Date(),
+            });
+
+            expect(await allRecipientIds()).not.toContain(id);
+        });
+
+        it("should leave out a suspended account", async () => {
+            const id = await makeRecipient("digestbanned", {
+                bannedAt: new Date(),
+            });
+
+            expect(await allRecipientIds()).not.toContain(id);
+        });
+
+        it("should leave out a bot", async () => {
+            const id = await makeRecipient("digestbot", { isBot: true });
+
+            expect(await allRecipientIds()).not.toContain(id);
+        });
+
+        it("should leave out somebody who unsubscribed", async () => {
+            const id = await makeRecipient("digestout", {
+                digestOptOutAt: new Date(),
+            });
+
+            expect(await allRecipientIds()).not.toContain(id);
+        });
+
+        it("should page without repeating or losing a recipient", async () => {
+            await makeRecipient("digestpage1");
+            await makeRecipient("digestpage2");
+            await makeRecipient("digestpage3");
+
+            const first = await repo.findDigestRecipients(2);
+            expect(first.recipients).toHaveLength(2);
+            expect(first.nextCursor).toBe(first.recipients[1].id);
+
+            const second = await repo.findDigestRecipients(
+                2,
+                first.nextCursor!,
+            );
+            const firstIds = first.recipients.map((one) => one.id);
+
+            for (const one of second.recipients) {
+                expect(firstIds).not.toContain(one.id);
+            }
+        });
+
+        it("should close the sweep with a null cursor on a short page", async () => {
+            const page = await repo.findDigestRecipients(1000);
+
+            expect(page.nextCursor).toBeNull();
+        });
+    });
+
+    describe("setDigestOptOut()", () => {
+        it("should record and then clear the opt-out", async () => {
+            const user = await repo.create({
+                email: "optout@user-repo-test.com",
+                username: "optout_userrepo",
+                passwordHash: "hashed",
+            });
+
+            await repo.setDigestOptOut(user.id, new Date());
+            expect((await repo.findById(user.id))!.isDigestSubscribed()).toBe(
+                false,
+            );
+
+            await repo.setDigestOptOut(user.id, null);
+            expect((await repo.findById(user.id))!.isDigestSubscribed()).toBe(
+                true,
+            );
+        });
+    });
 });

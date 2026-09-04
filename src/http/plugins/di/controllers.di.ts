@@ -12,6 +12,7 @@ import { BookmarkController } from "@controllers/bookmark.controller";
 import { TrendController } from "@controllers/trend.controller";
 import { TranslationController } from "@controllers/translation.controller";
 import { ArticleController } from "@controllers/article.controller";
+import { EmailController } from "@controllers/email.controller";
 import { ConversationController } from "@controllers/conversation.controller";
 
 /**
@@ -63,4 +64,8 @@ export const controllersModule = {
     translationController: asClass(TranslationController).singleton(),
     articleController: asClass(ArticleController).singleton(),
     conversationController: asClass(ConversationController).singleton(),
+    emailController: asFunction(
+        (unsubscribeDigestUseCase, config) =>
+            new EmailController(unsubscribeDigestUseCase, config.FRONTEND_URL),
+    ).singleton(),
 };

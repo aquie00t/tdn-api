@@ -12,10 +12,7 @@ describe("GetProfileUseCase", () => {
     let profileRepository: Pick<IProfileRepository, "findByUsername">;
     let followRepository: Pick<IFollowRepository, "checkIsFollowing">;
     let postRepository: Pick<IPostRepository, "countByUserId">;
-    let articleRepository: Pick<
-        IArticleRepository,
-        "countPublishedByAuthorId"
-    >;
+    let articleRepository: Pick<IArticleRepository, "countPublishedByAuthorId">;
 
     beforeEach(() => {
         profileRepository = {

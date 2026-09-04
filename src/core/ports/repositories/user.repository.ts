@@ -1,5 +1,6 @@
 import type { User } from "@core/domain/entities/user.entity";
 import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
+import type { DigestRecipientPage } from "@core/domain/interfaces/digest.interface";
 
 /**
  * Interface for User persistence operations.
@@ -79,6 +80,32 @@ export interface IUserRepository {
      * @returns The id and current username of every account that matched.
      */
     findManyByUsernames(usernames: string[]): Promise<MentionedUser[]>;
+
+    /**
+     * Pages through the accounts the daily digest is allowed to email.
+     *
+     * Keyset rather than offset, for the reason the interest rebuild gives:
+     * the sweep visits every user, and rows shifting under an offset would
+     * skip some of them. Eligibility is decided here rather than by the
+     * caller - verified address, real person, not deleted, not suspended, and
+     * still subscribed.
+     *
+     * @param limit - How many recipients to return.
+     * @param after - Id to resume after, from a previous page's cursor.
+     * @returns A page of recipients and the cursor for the next one.
+     */
+    findDigestRecipients(
+        limit: number,
+        after?: string,
+    ): Promise<DigestRecipientPage>;
+
+    /**
+     * Records that a user left, or rejoined, the daily digest.
+     *
+     * @param id - The account to update.
+     * @param optedOutAt - When they left, or null to resubscribe them.
+     */
+    setDigestOptOut(id: string, optedOutAt: Date | null): Promise<void>;
 
     /**
      * Registers a user originating from an external OAuth provider (Google, GitHub, etc.).
