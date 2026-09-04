@@ -1,6 +1,7 @@
 import { ArticleStatus } from "@core/domain/enums";
 import type { PostCategory } from "../enums/post-category-enum";
 import type { ArticleProps } from "../interfaces/article-props.interface";
+import type { MentionedUser } from "../interfaces/mentioned-user.interface";
 
 /** Words per minute used to estimate reading time. */
 const WORDS_PER_MINUTE = 200;
@@ -71,6 +72,9 @@ export interface CreateArticleData {
     /** Explicit tag names, already normalized by the caller */
     tags?: string[];
 
+    /** Users named with an @handle in the body, already resolved by the caller */
+    mentions?: MentionedUser[];
+
     /** Categories the article belongs to */
     categories?: PostCategory[];
 }
@@ -111,6 +115,7 @@ export class Article {
             readingTimeMinutes: Article.calculateReadingTime(body),
             author: { id: data.authorId },
             tags: data.tags ?? [],
+            mentions: data.mentions ?? [],
             categories: data.categories ?? [],
         });
     }
@@ -343,6 +348,11 @@ export class Article {
         return this.props.tags;
     }
 
+    /** Users mentioned in the body, empty when the article names nobody */
+    get mentions(): MentionedUser[] {
+        return this.props.mentions ?? [];
+    }
+
     /** Categories this article belongs to */
     get categories(): PostCategory[] {
         return this.props.categories;
@@ -467,6 +477,7 @@ export class Article {
         coverImageAlt?: string | null;
         isSensitive?: boolean;
         tags?: string[];
+        mentions?: MentionedUser[];
         categories?: PostCategory[];
     }): void {
         if (changes.title !== undefined) this.props.title = changes.title;
@@ -502,6 +513,11 @@ export class Article {
             this.props.isSensitive = changes.isSensitive;
         }
         if (changes.tags !== undefined) this.props.tags = changes.tags;
+        // Replaced wholesale rather than merged: the body is the only source
+        // of mentions, so a handle removed from it has to disappear here too.
+        if (changes.mentions !== undefined) {
+            this.props.mentions = changes.mentions;
+        }
         if (changes.categories !== undefined) {
             this.props.categories = changes.categories;
         }

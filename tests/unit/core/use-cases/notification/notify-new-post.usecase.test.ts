@@ -70,7 +70,9 @@ describe("NotifyNewPostUseCase", () => {
                 expect(
                     followUserRepository.getFollowerIds,
                 ).toHaveBeenCalledWith("bot-1");
-                expect(notificationRepository.createMany).toHaveBeenCalledOnce();
+                expect(
+                    notificationRepository.createMany,
+                ).toHaveBeenCalledOnce();
             },
         );
     });
@@ -166,5 +168,93 @@ describe("NotifyNewPostUseCase", () => {
         );
 
         await expect(useCase.execute(input)).rejects.toThrow("DB error");
+    });
+    describe("suppression", () => {
+        it("should skip a follower the post already notifies another way", async () => {
+            vi.mocked(followUserRepository.getFollowerIds).mockResolvedValue([
+                "user-1",
+                "user-2",
+            ]);
+
+            const result = await useCase.execute({
+                ...input,
+                excludeUserIds: ["user-2"],
+            });
+
+            expect(result).toBe(1);
+            const [notifications] = vi.mocked(notificationRepository.createMany)
+                .mock.calls[0];
+            expect(notifications.map((n) => n.recipientId)).toEqual(["user-1"]);
+            expect(realtimeService.emitToUser).toHaveBeenCalledOnce();
+            expect(realtimeService.emitToUser).not.toHaveBeenCalledWith(
+                "user-2",
+                expect.anything(),
+                expect.anything(),
+            );
+        });
+
+        it("should ignore excluded ids that do not follow the author", async () => {
+            vi.mocked(followUserRepository.getFollowerIds).mockResolvedValue([
+                "user-1",
+            ]);
+
+            const result = await useCase.execute({
+                ...input,
+                excludeUserIds: ["stranger-1", "stranger-2"],
+            });
+
+            expect(result).toBe(1);
+        });
+
+        it("should touch nothing when every follower is excluded", async () => {
+            vi.mocked(followUserRepository.getFollowerIds).mockResolvedValue([
+                "user-1",
+                "user-2",
+            ]);
+
+            const result = await useCase.execute({
+                ...input,
+                excludeUserIds: ["user-1", "user-2"],
+            });
+
+            expect(result).toBe(0);
+            expect(notificationRepository.createMany).not.toHaveBeenCalled();
+            expect(realtimeService.emitToUser).not.toHaveBeenCalled();
+        });
+
+        it("should still drop the author when an exclusion list is given", async () => {
+            vi.mocked(followUserRepository.getFollowerIds).mockResolvedValue([
+                "bot-1",
+                "user-1",
+                "user-2",
+            ]);
+
+            const result = await useCase.execute({
+                ...input,
+                excludeUserIds: ["user-2"],
+            });
+
+            expect(result).toBe(1);
+            const [notifications] = vi.mocked(notificationRepository.createMany)
+                .mock.calls[0];
+            expect(notifications.map((n) => n.recipientId)).toEqual(["user-1"]);
+        });
+
+        it("should behave exactly as before when no exclusions are given", async () => {
+            vi.mocked(followUserRepository.getFollowerIds).mockResolvedValue([
+                "user-1",
+                "user-2",
+            ]);
+
+            const result = await useCase.execute(input);
+
+            expect(result).toBe(2);
+            const [notifications] = vi.mocked(notificationRepository.createMany)
+                .mock.calls[0];
+            expect(notifications.map((n) => n.recipientId)).toEqual([
+                "user-1",
+                "user-2",
+            ]);
+        });
     });
 });

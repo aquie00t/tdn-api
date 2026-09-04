@@ -1,4 +1,5 @@
 import type { User } from "@core/domain/entities/user.entity";
+import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import { UserPrismaMapper } from "@infrastructure/persistence/mappers/user-prisma.mapper";
 import {
@@ -206,6 +207,47 @@ export class PrismaUserRepository implements IUserRepository {
         if (!user) return null;
 
         return UserPrismaMapper.toDomainUser(user);
+    }
+
+    /**
+     * Resolves a batch of handles into the accounts behind them.
+     *
+     * Done in two passes on purpose. `username` carries a plain unique btree
+     * index and Postgres compares text case-sensitively, so an exact `in`
+     * lookup is index-backed and answers everything a client typed through
+     * autocomplete - which is nearly every mention. Only the leftovers fall
+     * through to `mode: "insensitive"`, which compiles to ILIKE and cannot use
+     * that index; the mention limit caps that second query at ten predicates.
+     *
+     * @param usernames - The handles to look up, without a leading "@".
+     * @returns The id and current username of every account that matched.
+     */
+    async findManyByUsernames(usernames: string[]): Promise<MentionedUser[]> {
+        if (usernames.length === 0) return [];
+
+        const selection = { id: true, username: true } as const;
+
+        const exact = await this.prisma.user.findMany({
+            where: { username: { in: usernames }, deletedAt: null },
+            select: selection,
+        });
+
+        const matched = new Set(exact.map((user) => user.username));
+        const unmatched = usernames.filter((name) => !matched.has(name));
+
+        if (unmatched.length === 0) return exact;
+
+        const insensitive = await this.prisma.user.findMany({
+            where: {
+                deletedAt: null,
+                OR: unmatched.map((name) => ({
+                    username: { equals: name, mode: "insensitive" as const },
+                })),
+            },
+            select: selection,
+        });
+
+        return [...exact, ...insensitive];
     }
     /**
      * Deletes users who have been marked as deleted for longer than the configured grace period.

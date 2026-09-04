@@ -11,6 +11,7 @@ import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 import type { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import type { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
+import type { NotifyMentionedUsersUseCase } from "@core/use-cases/notification/notify-mentioned-users";
 import type { LanguageDetectionPort } from "@core/ports/services/language-detection.port";
 import { NotFoundError } from "@core/errors/common/not-found.error";
 import { ForbiddenError } from "@core/errors/common/forbidden.error";
@@ -23,7 +24,7 @@ import {
     MediaModerationStatus,
     MediaOwnerKind,
 } from "@core/domain/enums";
-import { MediaNotOwnedError } from "@core/errors";
+import { MediaNotOwnedError, MentionLimitExceededError } from "@core/errors";
 import { buildUser, buildPost } from "../../../helpers/mock-factories";
 
 const CDN_URL = "https://cdn.example.com";
@@ -36,10 +37,17 @@ describe("CreatePostUseCase", () => {
         "create" | "findById" | "incrementQuoteCount"
     >;
     let transactionService: Pick<TransactionPort, "runInTransaction">;
-    let userRepository: Pick<IUserRepository, "findById">;
+    let userRepository: Pick<
+        IUserRepository,
+        "findById" | "findManyByUsernames"
+    >;
     let cacheService: Pick<CachePort, "deleteByPattern">;
     let notifyNewPostUseCase: Pick<NotifyNewPostUseCase, "execute">;
     let notifyQuotedAuthorUseCase: Pick<NotifyQuotedAuthorUseCase, "execute">;
+    let notifyMentionedUsersUseCase: Pick<
+        NotifyMentionedUsersUseCase,
+        "execute"
+    >;
     let languageDetectionService: LanguageDetectionPort;
     let logger: Pick<LoggerPort, "error">;
     let mediaAssetRepository: Pick<
@@ -67,6 +75,7 @@ describe("CreatePostUseCase", () => {
         };
         userRepository = {
             findById: vi.fn(),
+            findManyByUsernames: vi.fn().mockResolvedValue([]),
         };
         cacheService = {
             deleteByPattern: vi.fn().mockResolvedValue(undefined),
@@ -75,6 +84,9 @@ describe("CreatePostUseCase", () => {
             execute: vi.fn().mockResolvedValue(0),
         };
         notifyQuotedAuthorUseCase = {
+            execute: vi.fn().mockResolvedValue(0),
+        };
+        notifyMentionedUsersUseCase = {
             execute: vi.fn().mockResolvedValue(0),
         };
         languageDetectionService = {
@@ -87,6 +99,7 @@ describe("CreatePostUseCase", () => {
             userRepository as IUserRepository,
             notifyNewPostUseCase as NotifyNewPostUseCase,
             notifyQuotedAuthorUseCase as NotifyQuotedAuthorUseCase,
+            notifyMentionedUsersUseCase as NotifyMentionedUsersUseCase,
             languageDetectionService,
             mediaAssetRepository as IMediaAssetRepository,
             CDN_URL,
@@ -183,6 +196,7 @@ describe("CreatePostUseCase", () => {
                 postId: "post-9",
                 authorId: "bot-1",
                 postType: PostType.TECH_NEWS,
+                excludeUserIds: [],
             });
         });
 
@@ -564,6 +578,186 @@ describe("CreatePostUseCase", () => {
             });
 
             expect(order).toEqual(["detect", "transaction"]);
+        });
+    });
+    describe("mentions", () => {
+        it("should resolve the handles in the content onto the post", async () => {
+            vi.mocked(userRepository.findManyByUsernames).mockResolvedValue([
+                { id: "user-2", username: "ada" },
+            ]);
+
+            await useCase.execute({
+                content: "great point @ada",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(userRepository.findManyByUsernames).toHaveBeenCalledWith([
+                "ada",
+            ]);
+            const stored = vi.mocked(postRepository.create).mock.calls[0][0];
+            expect(stored.mentions).toEqual([
+                { id: "user-2", username: "ada" },
+            ]);
+        });
+
+        it("should not look anything up when the content names nobody", async () => {
+            await useCase.execute({
+                content: "no handles here",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(userRepository.findManyByUsernames).not.toHaveBeenCalled();
+            expect(notifyMentionedUsersUseCase.execute).not.toHaveBeenCalled();
+        });
+
+        it("should notify the resolved users after the post is stored", async () => {
+            const created = buildPost({ id: "post-9" });
+            vi.mocked(postRepository.create).mockResolvedValue(created);
+            vi.mocked(userRepository.findManyByUsernames).mockResolvedValue([
+                { id: "user-2", username: "ada" },
+            ]);
+
+            await useCase.execute({
+                content: "hey @ada",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            await vi.waitFor(() => {
+                expect(
+                    notifyMentionedUsersUseCase.execute,
+                ).toHaveBeenCalledWith({
+                    issuerId: "user-1",
+                    mentionedUserIds: ["user-2"],
+                    target: { postId: "post-9" },
+                    excludeUserIds: [],
+                });
+            });
+        });
+
+        it("should leave the quoted author out, since a QUOTE already tells them", async () => {
+            const created = buildPost({ id: "post-9" });
+            vi.mocked(postRepository.create).mockResolvedValue(created);
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ id: "post-0", author: { id: "user-2" } }),
+            );
+            vi.mocked(userRepository.findManyByUsernames).mockResolvedValue([
+                { id: "user-2", username: "ada" },
+            ]);
+
+            await useCase.execute({
+                content: "agreed @ada",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+                quotedPostId: "post-0",
+            });
+
+            await vi.waitFor(() => {
+                expect(
+                    notifyMentionedUsersUseCase.execute,
+                ).toHaveBeenCalledWith(
+                    expect.objectContaining({ excludeUserIds: ["user-2"] }),
+                );
+            });
+        });
+
+        it("should refuse a post naming more people than allowed", async () => {
+            const body = Array.from(
+                { length: 11 },
+                (_, index) => `@user${index}`,
+            ).join(" ");
+
+            await expect(
+                useCase.execute({
+                    content: body,
+                    type: PostType.COMMUNITY,
+                    authorId: "user-1",
+                }),
+            ).rejects.toThrow(MentionLimitExceededError);
+
+            expect(postRepository.create).not.toHaveBeenCalled();
+        });
+
+        it("should keep a mentioned follower out of the NEW_POST fan-out", async () => {
+            // The mention is the more specific signal, so it wins: one post
+            // must never raise two rows for the same person.
+            vi.mocked(userRepository.findById).mockResolvedValue(
+                buildUser({ isBot: true }),
+            );
+            vi.mocked(userRepository.findManyByUsernames).mockResolvedValue([
+                { id: "user-2", username: "ada" },
+            ]);
+
+            await useCase.execute({
+                content: "shipping this, thanks @ada",
+                type: PostType.TECH_NEWS,
+                authorId: "bot-1",
+            });
+
+            expect(notifyNewPostUseCase.execute).toHaveBeenCalledWith(
+                expect.objectContaining({ excludeUserIds: ["user-2"] }),
+            );
+        });
+
+        it("should keep the quoted author out of the NEW_POST fan-out too", async () => {
+            vi.mocked(userRepository.findById).mockResolvedValue(
+                buildUser({ isBot: true }),
+            );
+            vi.mocked(postRepository.findById).mockResolvedValue(
+                buildPost({ id: "post-0", author: { id: "user-3" } }),
+            );
+            vi.mocked(userRepository.findManyByUsernames).mockResolvedValue([
+                { id: "user-2", username: "ada" },
+            ]);
+
+            await useCase.execute({
+                content: "worth reading, @ada",
+                type: PostType.TECH_NEWS,
+                authorId: "bot-1",
+                quotedPostId: "post-0",
+            });
+
+            expect(notifyNewPostUseCase.execute).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    excludeUserIds: ["user-2", "user-3"],
+                }),
+            );
+        });
+
+        it("should exclude nobody from the fan-out for a plain post", async () => {
+            await useCase.execute({
+                content: "nothing special here",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(notifyNewPostUseCase.execute).toHaveBeenCalledWith(
+                expect.objectContaining({ excludeUserIds: [] }),
+            );
+        });
+
+        it("should still return the post when the mention notification fails", async () => {
+            const created = buildPost({ id: "post-9" });
+            vi.mocked(postRepository.create).mockResolvedValue(created);
+            vi.mocked(userRepository.findManyByUsernames).mockResolvedValue([
+                { id: "user-2", username: "ada" },
+            ]);
+            vi.mocked(notifyMentionedUsersUseCase.execute).mockRejectedValue(
+                new Error("notifier exploded"),
+            );
+
+            const result = await useCase.execute({
+                content: "hey @ada",
+                type: PostType.COMMUNITY,
+                authorId: "user-1",
+            });
+
+            expect(result).toBe(created);
+            await vi.waitFor(() => {
+                expect(logger.error).toHaveBeenCalled();
+            });
         });
     });
 });

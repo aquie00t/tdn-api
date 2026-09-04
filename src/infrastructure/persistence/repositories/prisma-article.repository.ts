@@ -10,6 +10,7 @@ import {
     type ArticleWithRelations,
 } from "@infrastructure/persistence/mappers/article-prisma.mapper";
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
+import { MENTIONED_USERS_SELECT } from "./mention-select";
 import type { Prisma } from "@generated/prisma/client";
 
 /**
@@ -29,6 +30,7 @@ type ArticleRelationInclude = {
         };
     };
     tags: true;
+    mentionedUsers: { select: { id: true; username: true } };
     likes: { where: { userId: string } } | false;
     bookmarks: { where: { userId: string } } | false;
     _count: { select: { comments: true } };
@@ -68,6 +70,7 @@ export class PrismaArticleRepository implements IArticleRepository {
                 },
             },
             tags: true,
+            mentionedUsers: MENTIONED_USERS_SELECT,
             likes: currentUserId
                 ? ({ where: { userId: currentUserId } } as const)
                 : (false as const),
@@ -110,6 +113,11 @@ export class PrismaArticleRepository implements IArticleRepository {
             data: {
                 ...data,
                 tags: { connectOrCreate: this.buildTagConnect(article.tags) },
+                mentionedUsers: {
+                    connect: article.mentions.map((mention) => ({
+                        id: mention.id,
+                    })),
+                },
             },
             include: this.buildInclude(),
         });
@@ -135,6 +143,14 @@ export class PrismaArticleRepository implements IArticleRepository {
                 tags: {
                     set: [],
                     connectOrCreate: this.buildTagConnect(article.tags),
+                },
+                // Replaced wholesale like the tags: the body is the only
+                // source, so a handle deleted from it has to lose its row.
+                mentionedUsers: {
+                    set: [],
+                    connect: article.mentions.map((mention) => ({
+                        id: mention.id,
+                    })),
                 },
             },
             include: this.buildInclude(article.author.id),

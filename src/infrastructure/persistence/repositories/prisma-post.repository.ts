@@ -13,6 +13,7 @@ import {
 } from "@infrastructure/persistence/mappers/post-prisma.mapper";
 import type { PostType } from "@core/domain/enums/post-type.enum";
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
+import { MENTIONED_USERS_SELECT } from "./mention-select";
 import type { Prisma } from "@generated/prisma/client";
 
 /**
@@ -83,10 +84,19 @@ export class PrismaPostRepository implements IPostRepository {
                         },
                     })),
                 },
+                // Connect, never connectOrCreate: an unknown tag is worth
+                // inventing, an unknown user is not. The use case has already
+                // resolved these to accounts that exist.
+                mentionedUsers: {
+                    connect: post.mentions.map((mention) => ({
+                        id: mention.id,
+                    })),
+                },
             },
             include: {
                 author: POST_AUTHOR_SELECT,
                 tags: true,
+                mentionedUsers: MENTIONED_USERS_SELECT,
                 likes: false,
                 bookmarks: false,
                 quotedPost: QUOTED_POST_INCLUDE,
@@ -125,6 +135,7 @@ export class PrismaPostRepository implements IPostRepository {
                 include: {
                     author: POST_AUTHOR_SELECT,
                     tags: true,
+                    mentionedUsers: MENTIONED_USERS_SELECT,
                     likes: currentUserId
                         ? { where: { userId: currentUserId } }
                         : false,
@@ -274,6 +285,7 @@ export class PrismaPostRepository implements IPostRepository {
             include: {
                 author: POST_AUTHOR_SELECT,
                 tags: true,
+                mentionedUsers: MENTIONED_USERS_SELECT,
                 likes: currentUserId
                     ? { where: { userId: currentUserId } }
                     : false,
@@ -301,6 +313,7 @@ export class PrismaPostRepository implements IPostRepository {
             include: {
                 author: POST_AUTHOR_SELECT,
                 tags: true,
+                mentionedUsers: MENTIONED_USERS_SELECT,
                 likes: currentUserId
                     ? { where: { userId: currentUserId } }
                     : false,
@@ -434,6 +447,7 @@ export class PrismaPostRepository implements IPostRepository {
                 include: {
                     author: POST_AUTHOR_SELECT,
                     tags: true,
+                    mentionedUsers: MENTIONED_USERS_SELECT,
                     likes: currentUserId
                         ? { where: { userId: currentUserId } }
                         : false,

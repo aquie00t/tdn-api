@@ -38,6 +38,10 @@ model Article {
   comments      Comment[]
   notifications Notification[]
 
+  // Users named with @handle in the body. Unlike a post, an article is
+  // editable, so the set is replaced on every body edit.
+  mentionedUsers User[] @relation("ArticleMentions")
+
   likeCount Int @default(0) @map("like_count")
 
   createdAt DateTime @default(now()) @map("created_at")

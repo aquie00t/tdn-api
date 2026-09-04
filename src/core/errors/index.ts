@@ -23,6 +23,7 @@ export * from "./user/user-already-exists.error";
 export * from "./post/invalid-file-type.error";
 export * from "./post/invalid-media-type.error";
 export * from "./post/media-limit-exceeded.error";
+export * from "./post/mention-limit-exceeded.error";
 export * from "./post/no-media-provided.error";
 
 // Media moderation errors

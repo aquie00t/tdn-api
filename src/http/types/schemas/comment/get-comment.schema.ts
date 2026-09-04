@@ -1,6 +1,7 @@
 import { Type as FBType, type Static } from "@fastify/type-provider-typebox";
 import { Type } from "@sinclair/typebox";
 import { ResponseSchema } from "../create-response-schema";
+import { MentionSchema } from "../shared/mention.schema";
 
 export const CommentAuthorSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
@@ -33,6 +34,7 @@ export const CommentItemSchema = FBType.Object({
     replyCount: FBType.Number(),
     isLiked: FBType.Boolean(),
     isBookmarked: FBType.Boolean(),
+    mentions: FBType.Array(MentionSchema),
     author: CommentAuthorSchema,
 });
 

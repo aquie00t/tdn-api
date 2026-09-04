@@ -104,6 +104,16 @@ Chat events are namespaced in `src/core/domain/constants/chat-events.constants.t
 
 `docs/direct-messaging.md` is the client-facing contract for this feature — endpoints, response objects, realtime events and error titles. Keep it in step with the schemas when the surface changes.
 
+### Mentions
+
+`@handle` in a post, comment or article body resolves to real accounts at **write time** and is stored as a relation, never as the text that was typed — so a rename keeps historical mentions pointing at the right account and the response always serves the current handle. Reads carry `mentions: [{ id, username }]` beside `tags`.
+
+Parsing is a pure helper, `src/core/use-cases/shared/mentions/extract-mentions.ts` — deliberately *not* the pattern post hashtags follow, which are regex-extracted inside `PrismaPostRepository.create` and therefore invisible to the use-case layer. `resolveMentions` (same folder) turns handles into accounts via `IUserRepository.findManyByUsernames`, which tries an index-backed exact `in` first and only falls back to `mode: "insensitive"` for what is left. An unresolvable handle is dropped silently; more than `MAX_MENTIONS` (10) distinct handles in one body is a `MentionLimitExceededError` (400) raised on the *written* handles, before any lookup.
+
+`NotifyMentionedUsersUseCase` (`src/core/use-cases/notification/notify-mentioned-users/`) is the single fan-out, called fire-and-forget after the write commits, the way `NotifyNewPostUseCase` is. It enforces the three suppression rules in one place: never the issuer, once per person, and never for someone in `excludeUserIds` — which each caller fills with whoever that same action already notified (the post author being commented on, the quoted author). `NotifyNewPostUseCase` takes the same `excludeUserIds` field, and `CreatePostUseCase` fills it with the mentioned ids plus the quoted author, so one post is one notification per person: **QUOTE > MENTION > NEW_POST**, more specific wins. Both exclusion inputs are already resolved before either fan-out is dispatched, so neither has to wait on the other. Articles are quiet while they are drafts: `PublishArticleUseCase` notifies everyone the body names, and `UpdateArticleUseCase` notifies only the *newly* named.
+
+`docs/mentions.md` is the client-facing contract — handle grammar, the `mentions` object, notification targets and error titles.
+
 ### Realtime and background jobs
 
 `FastifyRealtimeService` publishes to the Redis `realtime_events` channel; each instance subscribes and fans out to locally connected sockets via `WebSocketManager` — so notifications work across multiple processes. Never write to sockets directly from a use-case; go through `RealtimePort`.

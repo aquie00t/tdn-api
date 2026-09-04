@@ -1,5 +1,6 @@
 import type { MediaModerationStatus, PostType } from "@core/domain/enums";
 import type { PostCategory } from "../enums/post-category-enum";
+import type { MentionedUser } from "./mentioned-user.interface";
 import type { QuotedPostSnapshot } from "./quoted-post.interface";
 
 /**
@@ -49,6 +50,9 @@ export interface PostProps {
 
     /** Array of tags associated with the post for categorization and discovery */
     tags: string[];
+
+    /** Users named with an @handle in the content, resolved at write time */
+    mentions: MentionedUser[];
 
     /** Optional creation timestamp, defaults to current time if not provided */
     createdAt?: Date;

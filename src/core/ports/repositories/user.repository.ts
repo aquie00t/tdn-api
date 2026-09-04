@@ -1,4 +1,5 @@
 import type { User } from "@core/domain/entities/user.entity";
+import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
 
 /**
  * Interface for User persistence operations.
@@ -66,6 +67,18 @@ export interface IUserRepository {
      * @returns User entity if found, otherwise null.
      */
     findByUsername(username: string): Promise<User | null>;
+
+    /**
+     * Resolves a batch of handles into the accounts behind them.
+     *
+     * Matching ignores letter case, and deleted accounts are left out, so the
+     * result is what a mention may legitimately point at. Handles that match
+     * nothing are simply absent from the result rather than reported.
+     *
+     * @param usernames - The handles to look up, without a leading "@".
+     * @returns The id and current username of every account that matched.
+     */
+    findManyByUsernames(usernames: string[]): Promise<MentionedUser[]>;
 
     /**
      * Registers a user originating from an external OAuth provider (Google, GitHub, etc.).

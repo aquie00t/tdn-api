@@ -1,6 +1,7 @@
 import { Article } from "@core/domain/entities/article.entity";
 import type { ArticleStatus } from "@core/domain/enums";
 import type { PostCategory } from "@core/domain/enums/post-category-enum";
+import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
 import type { IArticleRepository } from "@core/ports/repositories/article.repository";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
@@ -42,6 +43,7 @@ interface CachedArticle {
         fullName?: string;
     };
     tags: string[];
+    mentions?: MentionedUser[];
     categories: string[];
     createdAt: string;
     updatedAt: string;
@@ -245,6 +247,7 @@ export class GetArticlesUseCase {
                 fullName: article.author.fullName,
             },
             tags: article.tags,
+            mentions: article.mentions,
             categories: article.categories,
             createdAt: article.createdAt.toISOString(),
             updatedAt: article.updatedAt.toISOString(),
@@ -278,6 +281,9 @@ export class GetArticlesUseCase {
             readingTimeMinutes: entry.readingTimeMinutes,
             author: entry.author,
             tags: entry.tags,
+            // Older cache entries predate the field; an article that named
+            // nobody and one written before mentions existed read the same.
+            mentions: entry.mentions ?? [],
             categories: entry.categories as PostCategory[],
             createdAt: new Date(entry.createdAt),
             updatedAt: new Date(entry.updatedAt),

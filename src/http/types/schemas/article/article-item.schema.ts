@@ -1,6 +1,7 @@
 import { Type as FBType, type Static } from "@fastify/type-provider-typebox";
 import { ResponseSchema } from "../create-response-schema";
 import { ArticleStatus } from "@core/domain/enums/article-status.enum";
+import { MentionSchema } from "../shared/mention.schema";
 
 export const ArticleAuthorSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
@@ -38,6 +39,7 @@ export const ArticleItemSchema = FBType.Object({
     isBookmarked: FBType.Boolean(),
     author: ArticleAuthorSchema,
     tags: FBType.Array(FBType.Object({ name: FBType.String() })),
+    mentions: FBType.Array(MentionSchema),
     categories: FBType.Array(FBType.Object({ name: FBType.String() })),
 });
 

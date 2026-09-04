@@ -1,6 +1,7 @@
 import type { Prisma } from "@generated/prisma/client";
 import { Comment } from "@core/domain/entities/comment.entity";
 import { MediaModerationStatus } from "@core/domain/enums";
+import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
 
 export type CommentWithRelations = Prisma.CommentGetPayload<{
     include: {
@@ -11,6 +12,7 @@ export type CommentWithRelations = Prisma.CommentGetPayload<{
                 profile: { select: { avatarUrl: true; fullName: true } };
             };
         };
+        mentionedUsers: { select: { id: true; username: true } };
         likes: true;
         bookmarks: true;
     };
@@ -50,6 +52,8 @@ export interface CommentResponse {
     replyCount: number;
     isLiked: boolean;
     isBookmarked: boolean;
+    /** Users named with an @handle in the content, resolved at write time. */
+    mentions: MentionedUser[];
 }
 
 /**
@@ -83,6 +87,7 @@ export class CommentPrismaMapper {
             replyCount: dbComment.replyCount,
             isLiked: dbComment.likes && dbComment.likes.length > 0,
             isBookmarked: dbComment.bookmarks && dbComment.bookmarks.length > 0,
+            mentions: dbComment.mentionedUsers ?? [],
         });
     }
 
@@ -117,6 +122,7 @@ export class CommentPrismaMapper {
             replyCount: comment.replyCount,
             isLiked: comment.isLiked,
             isBookmarked: comment.isBookmarked,
+            mentions: comment.mentions,
             author: {
                 id: comment.authorId,
                 username: author.username,

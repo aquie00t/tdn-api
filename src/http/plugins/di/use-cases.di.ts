@@ -36,6 +36,7 @@ import { PurgeExpiredNotificationsUseCase } from "@core/use-cases/notification/p
 import { CreatePostUseCase } from "@core/use-cases/post/create-post";
 import { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
+import { NotifyMentionedUsersUseCase } from "@core/use-cases/notification/notify-mentioned-users";
 import { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
 import { UploadModeratedMediaUseCase } from "@core/use-cases/media/upload-moderated-media";
 import { ModeratePendingMediaUseCase } from "@core/use-cases/media/moderate-pending-media";
@@ -342,6 +343,7 @@ export const useCasesModule = {
             userRepository,
             notifyNewPostUseCase,
             notifyQuotedAuthorUseCase,
+            notifyMentionedUsersUseCase,
             languageDetectionService,
             mediaAssetRepository,
             config,
@@ -353,6 +355,7 @@ export const useCasesModule = {
                 userRepository,
                 notifyNewPostUseCase,
                 notifyQuotedAuthorUseCase,
+                notifyMentionedUsersUseCase,
                 languageDetectionService,
                 mediaAssetRepository,
                 config.R2_PUBLIC_URL,
@@ -369,6 +372,13 @@ export const useCasesModule = {
      * Use case for telling an author that one of their posts was quoted
      */
     notifyQuotedAuthorUseCase: asClass(NotifyQuotedAuthorUseCase).singleton(),
+
+    /**
+     * Use case for telling the users named with an @handle in a body
+     */
+    notifyMentionedUsersUseCase: asClass(
+        NotifyMentionedUsersUseCase,
+    ).singleton(),
 
     /**
      * Use case for uploading post media files
@@ -554,12 +564,23 @@ export const useCasesModule = {
      * Use case for creating a comment on a post
      */
     createCommentUseCase: asFunction(
-        (transactionService, realtimeService, mediaAssetRepository, config) =>
+        (
+            transactionService,
+            realtimeService,
+            mediaAssetRepository,
+            config,
+            userRepository,
+            notifyMentionedUsersUseCase,
+            logger,
+        ) =>
             new CreateCommentUseCase(
                 transactionService,
                 realtimeService,
                 mediaAssetRepository,
                 config.R2_PUBLIC_URL,
+                userRepository,
+                notifyMentionedUsersUseCase,
+                logger,
             ),
     ).singleton(),
     /**
