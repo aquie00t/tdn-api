@@ -124,11 +124,25 @@ Parsing is a pure helper, `src/core/use-cases/shared/mentions/extract-mentions.t
 
 `docs/mentions.md` is the client-facing contract — handle grammar, the `mentions` object, notification targets and error titles.
 
+### Daily digest
+
+One email a morning (`DAILY_DIGEST_CRON`, default 09:00 `Europe/Istanbul`) to every verified, active, subscribed account with something waiting: unread notifications, and posts from the last day matching their interests. Both sections empty means **no email** — nothing teaches people to filter a digest faster than one that says nothing happened.
+
+`SendDailyDigestUseCase` (`src/core/use-cases/digest/send-daily-digest/`) fetches the candidate pool **once per run** via `IPostRepository.findFeedCandidates` — the only repository method taking a date range — then ranks it per recipient with the feed's own `indexInterests` + `scoreCandidate`. That ranker is pure, so one query serves thousands of rankings, and `followingIds` is deliberately empty: the digest is about topics, the feed is about follows. A user with no interest profile needs no fallback — every affinity term scores zero and the order degrades to freshness and engagement.
+
+**`DigestDelivery` is the whole multi-instance guard.** Several instances run the same schedule and nothing coordinates them, so the claim is the write: a unique `(userId, digestOn)` row inserted *before* the send, with a P2002 meaning somebody else got there first. The claim is taken last, only once there is something to send, so a skipped morning does not burn the slot. That same table carries the window — `since` is the last delivery, floored at `DAILY_DIGEST_MAX_WINDOW_DAYS` — so a skipped day is not lost and a returning user is not mailed three months at once.
+
+Sending goes through `EmailPort.sendDailyDigests`, which unlike the three transactional methods **reports what happened**: `resend.batch.send` in chunks of `DAILY_DIGEST_BATCH_SIZE` with `batchValidation: "permissive"` (so one bad address does not sink ninety-nine good ones) and a per-chunk `idempotencyKey`. Copy is bilingual from `Profile.languages` (`digest-copy.ts`), and everything a user wrote goes through `escapeHtml` — the transactional emails only ever interpolated an OTP, so nothing needed it before.
+
+Unsubscribing is a signed link, no session: an HMAC of the user id under `ACCESS_TOKEN_SECRET_KEY` with a `digest-unsubscribe:` domain separator, never expiring. `GET|POST /api/v1/emails/unsubscribe` serves an HTML page with an undo link; the POST exists because RFC 8058 one-click is what makes Gmail show its own unsubscribe button, and the alternative people reach for is the spam button.
+
+`docs/daily-digest.md` is the operator-facing description — what goes in the email, who receives it, and every knob.
+
 ### Realtime and background jobs
 
 `FastifyRealtimeService` publishes to the Redis `realtime_events` channel; each instance subscribes and fans out to locally connected sockets via `WebSocketManager` — so notifications work across multiple processes. Never write to sockets directly from a use-case; go through `RealtimePort`.
 
-Purge jobs (`src/infrastructure/jobs/**`, wired by `src/http/plugins/custom/*-purge.plugin.ts`) run under `node-cron` on `Europe/Istanbul` schedules from env cron expressions. Users are soft-deleted (`deletedAt`) and recoverable until `USER_PURGE_GRACE_PERIOD_DAYS` elapses, after which the purge job hard-deletes them.
+Purge jobs (`src/infrastructure/jobs/**`, wired by `src/http/plugins/custom/*-purge.plugin.ts`) run under `node-cron` from env cron expressions. They pass **no timezone**, so they fire on the container's local clock — fine for a purge, and the reason the daily digest is the one scheduler that pins one. Users are soft-deleted (`deletedAt`) and recoverable until `USER_PURGE_GRACE_PERIOD_DAYS` elapses, after which the purge job hard-deletes them.
 
 ### Prisma
 

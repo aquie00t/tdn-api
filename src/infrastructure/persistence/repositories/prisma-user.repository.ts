@@ -1,5 +1,6 @@
 import type { User } from "@core/domain/entities/user.entity";
 import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
+import type { DigestRecipientPage } from "@core/domain/interfaces/digest.interface";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import { UserPrismaMapper } from "@infrastructure/persistence/mappers/user-prisma.mapper";
 import {
@@ -249,6 +250,71 @@ export class PrismaUserRepository implements IUserRepository {
 
         return [...exact, ...insensitive];
     }
+    /**
+     * Pages through the accounts the daily digest may email.
+     *
+     * Keyset rather than offset, for the reason the interest rebuild gives:
+     * the sweep walks the whole table once a morning and rows shifting under
+     * an offset would silently skip people. The five eligibility conditions
+     * are matched by a partial index created alongside them, without which
+     * this is a sequential scan of every user every day.
+     *
+     * @param limit - Page size.
+     * @param after - Resume after this user id.
+     * @returns A page of recipients in ascending id order.
+     */
+    async findDigestRecipients(
+        limit: number,
+        after?: string,
+    ): Promise<DigestRecipientPage> {
+        const rows = await this.prisma.user.findMany({
+            where: {
+                deletedAt: null,
+                bannedAt: null,
+                digestOptOutAt: null,
+                isBot: false,
+                isEmailVerified: true,
+            },
+            select: {
+                id: true,
+                email: true,
+                profile: { select: { languages: true } },
+            },
+            orderBy: { id: "asc" },
+            take: limit,
+            ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+        });
+
+        const recipients = rows.map((row) => ({
+            id: row.id,
+            email: row.email,
+            languages: row.profile?.languages ?? [],
+        }));
+
+        return {
+            recipients,
+            // A short page is the last one; handing back a cursor there would
+            // cost the run one more empty round trip.
+            nextCursor:
+                recipients.length === limit
+                    ? (recipients[recipients.length - 1]?.id ?? null)
+                    : null,
+        };
+    }
+
+    /**
+     * Records that a user left, or rejoined, the daily digest.
+     *
+     * @param id - The account to update.
+     * @param optedOutAt - When they left, or null to resubscribe them.
+     */
+    async setDigestOptOut(id: string, optedOutAt: Date | null): Promise<void> {
+        await this.prisma.user.update({
+            where: { id },
+            data: { digestOptOutAt: optedOutAt },
+        });
+    }
+
     /**
      * Deletes users who have been marked as deleted for longer than the configured grace period.
      * This method performs a hard delete on accounts that have exceeded the soft deletion threshold.

@@ -160,7 +160,9 @@ describe("PrismaMediaAssetRepository (integration)", () => {
             await store(MediaModerationStatus.APPROVED);
             await store(MediaModerationStatus.REJECTED);
 
-            await expect(repository.claimPending(10, LEASE_SECONDS)).resolves.toEqual([]);
+            await expect(
+                repository.claimPending(10, LEASE_SECONDS),
+            ).resolves.toEqual([]);
         });
 
         it("should claim the oldest first and honour the batch size", async () => {
@@ -221,7 +223,9 @@ describe("PrismaMediaAssetRepository (integration)", () => {
         it("should return nothing for a non-positive limit", async () => {
             await store();
 
-            await expect(repository.claimPending(0, LEASE_SECONDS)).resolves.toEqual([]);
+            await expect(
+                repository.claimPending(0, LEASE_SECONDS),
+            ).resolves.toEqual([]);
         });
     });
 
@@ -316,9 +320,7 @@ describe("PrismaMediaAssetRepository (integration)", () => {
             ),
         ).resolves.toBe(0);
 
-        const [stored] = await repository.findByStorageKeys([
-            asset.storageKey,
-        ]);
+        const [stored] = await repository.findByStorageKeys([asset.storageKey]);
         expect(stored.ownerId).toBe("post-first");
     });
 

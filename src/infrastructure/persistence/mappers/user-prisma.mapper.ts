@@ -21,6 +21,7 @@ export class UserPrismaMapper {
             isEmailVerified: dbUser.isEmailVerified,
             deletedAt: dbUser.deletedAt,
             bannedAt: dbUser.bannedAt,
+            digestOptOutAt: dbUser.digestOptOutAt,
             createdAt: dbUser.createdAt,
             updatedAt: dbUser.updatedAt,
         });

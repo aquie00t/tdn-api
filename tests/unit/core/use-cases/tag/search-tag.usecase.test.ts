@@ -3,7 +3,12 @@ import { SearchTagsUseCase } from "@core/use-cases/tag/search-tag";
 import type { ITagRepository } from "@core/ports/repositories/tag.repository";
 
 const mockTags = [
-    { name: "typescript", postCount: 42, articleCount: 3, category: "programming" },
+    {
+        name: "typescript",
+        postCount: 42,
+        articleCount: 3,
+        category: "programming",
+    },
     { name: "typeorm", postCount: 10, articleCount: 0, category: null },
 ];
 
@@ -42,7 +47,12 @@ describe("SearchTagsUseCase", () => {
         const result = await useCase.execute({ query: "type", limit: 10 });
 
         expect(result).toEqual([
-            { name: "typescript", postCount: 42, articleCount: 3, category: "programming" },
+            {
+                name: "typescript",
+                postCount: 42,
+                articleCount: 3,
+                category: "programming",
+            },
             { name: "typeorm", postCount: 10, articleCount: 0, category: null },
         ]);
     });

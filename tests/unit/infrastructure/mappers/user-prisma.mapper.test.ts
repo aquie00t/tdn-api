@@ -13,6 +13,7 @@ const basePrismaUser: PrismaUser = {
     isEmailVerified: true,
     deletedAt: null,
     bannedAt: null,
+    digestOptOutAt: null,
     createdAt: now,
     updatedAt: now,
     botToken: null,

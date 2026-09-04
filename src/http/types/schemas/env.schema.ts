@@ -160,6 +160,36 @@ export const EnvSchema = Type.Object({
     // nightly job unbounded.
     USER_INTEREST_SIGNAL_LIMIT: Type.Number({ default: 500, minimum: 1 }),
 
+    // --- Daily digest ---
+    // One email a morning to anyone with something waiting: notifications they
+    // have not read, and posts from the last day matching their interests.
+    // Interest profiles are rebuilt at 04:00, so 09:00 reads a fresh one.
+    DAILY_DIGEST_ENABLED: Type.Boolean({ default: false }),
+    DAILY_DIGEST_CRON: Type.String({ default: "0 9 * * *" }),
+    // The only scheduler in the codebase that pins a timezone. The others run
+    // in the container's local time, which is fine for a purge and wrong for
+    // something that has to land at breakfast.
+    DAILY_DIGEST_TIMEZONE: Type.String({ default: "Europe/Istanbul" }),
+    // How far back a first-ever digest reaches, and the ceiling for someone
+    // who has not received one in a while - without it, a user returning after
+    // three months is mailed three months of notifications.
+    DAILY_DIGEST_WINDOW_HOURS: Type.Number({ default: 24, minimum: 1 }),
+    DAILY_DIGEST_MAX_WINDOW_DAYS: Type.Number({ default: 7, minimum: 1 }),
+    // Recipients per page of the audience sweep, and the largest batch the
+    // provider accepts in one request.
+    DAILY_DIGEST_USER_PAGE_SIZE: Type.Number({ default: 200, minimum: 1 }),
+    DAILY_DIGEST_BATCH_SIZE: Type.Number({
+        default: 100,
+        minimum: 1,
+        maximum: 100,
+    }),
+    DAILY_DIGEST_BATCH_PAUSE_MS: Type.Number({ default: 600, minimum: 0 }),
+    // Most items each section shows, and the shared pool every recipient is
+    // ranked against.
+    DAILY_DIGEST_MAX_NOTIFICATIONS: Type.Number({ default: 8, minimum: 1 }),
+    DAILY_DIGEST_MAX_POSTS: Type.Number({ default: 5, minimum: 1 }),
+    DAILY_DIGEST_CANDIDATE_POOL_SIZE: Type.Number({ default: 300, minimum: 1 }),
+
     // Set to true to bypass rate limiting (e.g. in test environments)
     DISABLE_RATE_LIMIT: Type.Boolean({ default: false }),
 });

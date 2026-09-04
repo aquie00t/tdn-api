@@ -9,7 +9,8 @@ function makeSocket(readyState = 1) {
 }
 
 describe("FastifyRealtimeService", () => {
-    let onMessageHandler: ((channel: string, message: string) => void) | undefined;
+    let onMessageHandler:
+        ((channel: string, message: string) => void) | undefined;
     let mockPublisher: { publish: ReturnType<typeof vi.fn> };
     let mockSubscriber: {
         subscribe: ReturnType<typeof vi.fn>;
@@ -28,11 +29,16 @@ describe("FastifyRealtimeService", () => {
         mockPublisher = { publish: vi.fn().mockResolvedValue(1) };
         mockSubscriber = {
             subscribe: vi.fn().mockResolvedValue(undefined),
-            on: vi.fn().mockImplementation((event: string, handler: unknown) => {
-                if (event === "message") {
-                    onMessageHandler = handler as (ch: string, msg: string) => void;
-                }
-            }),
+            on: vi
+                .fn()
+                .mockImplementation((event: string, handler: unknown) => {
+                    if (event === "message") {
+                        onMessageHandler = handler as (
+                            ch: string,
+                            msg: string,
+                        ) => void;
+                    }
+                }),
         };
         mockWsManager = { getClient: vi.fn() };
         mockLogger = { error: vi.fn(), info: vi.fn() };
@@ -153,7 +159,9 @@ describe("FastifyRealtimeService", () => {
         });
 
         it("should call logger.error and not throw when message JSON is invalid", () => {
-            expect(() => onMessageHandler!(REDIS_CHANNEL, "{{invalid-json")).not.toThrow();
+            expect(() =>
+                onMessageHandler!(REDIS_CHANNEL, "{{invalid-json"),
+            ).not.toThrow();
 
             expect(mockLogger.error).toHaveBeenCalled();
         });

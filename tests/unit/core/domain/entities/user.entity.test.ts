@@ -13,6 +13,7 @@ function buildUserProps(overrides: Partial<UserProps> = {}): UserProps {
         isBot: false,
         deletedAt: null,
         bannedAt: null,
+        digestOptOutAt: null,
         createdAt: new Date("2024-01-01T00:00:00Z"),
         updatedAt: new Date("2024-01-01T00:00:00Z"),
         ...overrides,
@@ -117,6 +118,38 @@ describe("User Entity", () => {
 
             const deletedOnly = buildUser({ deletedAt: new Date() });
             expect(deletedOnly.isBanned()).toBe(false);
+        });
+    });
+
+    describe("isDigestSubscribed()", () => {
+        it("should return true while the user has not opted out", () => {
+            expect(
+                buildUser({ digestOptOutAt: null }).isDigestSubscribed(),
+            ).toBe(true);
+        });
+
+        it("should return false once the user has opted out", () => {
+            const user = buildUser({ digestOptOutAt: new Date() });
+
+            expect(user.isDigestSubscribed()).toBe(false);
+        });
+
+        it("should expose digestOptOutAt, null by default", () => {
+            expect(buildUser().digestOptOutAt).toBeNull();
+
+            const optedOutAt = new Date("2026-09-06T09:00:00.000Z");
+            expect(
+                buildUser({ digestOptOutAt: optedOutAt }).digestOptOutAt,
+            ).toStrictEqual(optedOutAt);
+        });
+
+        it("should be independent of being banned or deleted", () => {
+            const user = buildUser({
+                bannedAt: new Date(),
+                deletedAt: new Date(),
+            });
+
+            expect(user.isDigestSubscribed()).toBe(true);
         });
     });
 

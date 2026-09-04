@@ -143,7 +143,6 @@ describe("GET /profiles/:username - Get Profile", () => {
         expect(body.detail).toBe("Profile not found.");
     });
 
-
     describe("GET /profiles/:username - articleCount", () => {
         /**
          * Reads the article count off a profile as the given viewer.

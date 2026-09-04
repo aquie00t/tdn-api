@@ -27,6 +27,7 @@ export class User {
             isBot: false,
             deletedAt: null,
             bannedAt: null,
+            digestOptOutAt: null,
         });
     }
 
@@ -124,6 +125,22 @@ export class User {
      */
     public isBanned(): boolean {
         return this.props.bannedAt !== null;
+    }
+
+    /**
+     * Get the timestamp when the user left the daily digest
+     * @returns The opt-out timestamp, or null while they are subscribed
+     */
+    get digestOptOutAt(): Date | null {
+        return this.props.digestOptOutAt;
+    }
+
+    /**
+     * Check whether the user still wants the daily digest
+     * @returns True while the user has not opted out
+     */
+    public isDigestSubscribed(): boolean {
+        return this.props.digestOptOutAt === null;
     }
 
     /**

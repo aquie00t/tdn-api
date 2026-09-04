@@ -34,6 +34,11 @@ export interface UserProps {
      */
     bannedAt: Date | null;
 
+    /**
+     * When the user opted out of the daily digest, or null while subscribed.
+     */
+    digestOptOutAt: Date | null;
+
     /** Creation timestamp of the user account */
     createdAt?: Date;
 

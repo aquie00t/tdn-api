@@ -1,3 +1,8 @@
+import type {
+    DailyDigestEmail,
+    DigestSendResult,
+} from "@core/domain/interfaces/digest.interface";
+
 /**
  * Base input structure for sending an email.
  */
@@ -41,4 +46,18 @@ export interface EmailPort {
      * @returns A promise that resolves when the email has been sent.
      */
     sendDeleteUserEmail(input: EmailInput): Promise<void>;
+
+    /**
+     * Sends a morning digest to many recipients at once.
+     *
+     * Unlike the transactional methods above, this one reports what happened.
+     * They send one email in response to something the user just did, and a
+     * failure surfaces as the user not receiving it; a digest run sends
+     * thousands unattended, and a run that cannot tell success from silence is
+     * indistinguishable from one that is quietly delivering nothing.
+     *
+     * @param digests - One assembled digest per recipient.
+     * @returns How many the provider accepted, and which it refused.
+     */
+    sendDailyDigests(digests: DailyDigestEmail[]): Promise<DigestSendResult>;
 }

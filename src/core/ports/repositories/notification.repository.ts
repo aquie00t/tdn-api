@@ -73,6 +73,25 @@ export interface INotificationRepository {
     getUnreadCount(userId: string): Promise<number>;
 
     /**
+     * Lists the notifications a user has not read since a point in time.
+     *
+     * The digest asks "what did you miss", which `getUnreadCount` can only
+     * answer with a number and `findAllByUserId` answers with read and unread
+     * alike. Bounded by `since` so a user who never opens their notifications
+     * is not mailed the same backlog every morning.
+     *
+     * @param userId - The recipient.
+     * @param since - Oldest notification to consider.
+     * @param take - Most notifications to return, newest first.
+     * @returns The matching notifications, issuer and article slug loaded.
+     */
+    findUnreadSince(
+        userId: string,
+        since: Date,
+        take: number,
+    ): Promise<Notification[]>;
+
+    /**
      * Retrieves a paginated list of notifications for a specific user.
      * @param input - Pagination parameters including user ID, take, and skip.
      * @returns An array of Notification entities.

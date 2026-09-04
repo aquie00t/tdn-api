@@ -166,7 +166,9 @@ describe("PrismaProfileRepository (integration)", () => {
             personaBotId = personaBot.id;
 
             await prisma.user.updateMany({
-                where: { id: { in: [backendBotId, mobileBotId, personaBotId] } },
+                where: {
+                    id: { in: [backendBotId, mobileBotId, personaBotId] },
+                },
                 data: { isBot: true },
             });
             await prisma.user.update({

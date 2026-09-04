@@ -29,6 +29,7 @@ export function buildUser(overrides: Partial<UserProps> = {}): User {
         isBot: false,
         deletedAt: null,
         bannedAt: null,
+        digestOptOutAt: null,
         createdAt: new Date("2024-01-01T00:00:00Z"),
         updatedAt: new Date("2024-01-01T00:00:00Z"),
         ...overrides,

@@ -36,6 +36,8 @@ import { PurgeExpiredNotificationsUseCase } from "@core/use-cases/notification/p
 import { CreatePostUseCase } from "@core/use-cases/post/create-post";
 import { NotifyNewPostUseCase } from "@core/use-cases/notification/notify-new-post";
 import { NotifyQuotedAuthorUseCase } from "@core/use-cases/notification/notify-quoted-author";
+import { SendDailyDigestUseCase } from "@core/use-cases/digest/send-daily-digest";
+import { UnsubscribeDigestUseCase } from "@core/use-cases/digest/unsubscribe-digest";
 import { NotifyMentionedUsersUseCase } from "@core/use-cases/notification/notify-mentioned-users";
 import { UploadPostMediaUseCase } from "@core/use-cases/post/upload-post-media";
 import { UploadModeratedMediaUseCase } from "@core/use-cases/media/upload-moderated-media";
@@ -97,6 +99,56 @@ import { UploadMessageMediaUseCase } from "@core/use-cases/message/upload-messag
  * shared dependencies across the application.
  */
 export const useCasesModule = {
+    /**
+     * Use case for the morning digest email
+     */
+    sendDailyDigestUseCase: asFunction(
+        (
+            userRepository,
+            notificationRepository,
+            userInterestRepository,
+            postRepository,
+            digestDeliveryRepository,
+            emailService,
+            feedRankingWeights,
+            config,
+            logger,
+        ) =>
+            new SendDailyDigestUseCase(
+                userRepository,
+                notificationRepository,
+                userInterestRepository,
+                postRepository,
+                digestDeliveryRepository,
+                emailService,
+                feedRankingWeights,
+                {
+                    windowHours: config.DAILY_DIGEST_WINDOW_HOURS,
+                    maxWindowDays: config.DAILY_DIGEST_MAX_WINDOW_DAYS,
+                    userPageSize: config.DAILY_DIGEST_USER_PAGE_SIZE,
+                    maxNotifications: config.DAILY_DIGEST_MAX_NOTIFICATIONS,
+                    maxPosts: config.DAILY_DIGEST_MAX_POSTS,
+                    candidatePoolSize: config.DAILY_DIGEST_CANDIDATE_POOL_SIZE,
+                    frontendUrl: config.FRONTEND_URL,
+                    apiUrl: config.API_URL,
+                    unsubscribeSecret: config.ACCESS_TOKEN_SECRET_KEY,
+                    timezone: config.DAILY_DIGEST_TIMEZONE,
+                },
+                logger,
+            ),
+    ).singleton(),
+
+    /**
+     * Use case for leaving, or rejoining, the daily digest
+     */
+    unsubscribeDigestUseCase: asFunction(
+        (userRepository, config) =>
+            new UnsubscribeDigestUseCase(
+                userRepository,
+                config.ACCESS_TOKEN_SECRET_KEY,
+            ),
+    ).singleton(),
+
     /**
      * Use case for soft deleting a user account
      */
