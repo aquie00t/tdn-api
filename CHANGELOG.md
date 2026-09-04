@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/the-developer-network/tdn-api/compare/v1.16.0...v1.17.0) (2026-09-04)
+
+
+### Features
+
+* **mentions:** resolve [@handles](https://github.com/handles) and notify the people named ([#259](https://github.com/the-developer-network/tdn-api/issues/259)) ([de2b99b](https://github.com/the-developer-network/tdn-api/commit/de2b99bc1c2a2fd1656011b9117c17491efa1a50))
+
 # [1.16.0](https://github.com/the-developer-network/tdn-api/compare/v1.15.0...v1.16.0) (2026-09-03)
 
 
