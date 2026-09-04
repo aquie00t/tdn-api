@@ -9,6 +9,7 @@
  */
 
 // Authentication errors
+export * from "./auth/account-banned.error";
 export * from "./auth/account-pending-deletion.error";
 export * from "./auth/invalid-credentials.error";
 export * from "./auth/oauth-provider.error";

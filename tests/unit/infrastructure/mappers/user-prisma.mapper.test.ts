@@ -12,6 +12,7 @@ const basePrismaUser: PrismaUser = {
     isBot: false,
     isEmailVerified: true,
     deletedAt: null,
+    bannedAt: null,
     createdAt: now,
     updatedAt: now,
     botToken: null,
@@ -35,6 +36,24 @@ describe("UserPrismaMapper", () => {
             const user = UserPrismaMapper.toDomainUser(basePrismaUser);
 
             expect(user.passwordHash).toBe("hashed_password");
+        });
+
+        it("should map bannedAt when the account is suspended", () => {
+            const bannedAt = new Date("2026-09-05T10:00:00.000Z");
+
+            const user = UserPrismaMapper.toDomainUser({
+                ...basePrismaUser,
+                bannedAt,
+            });
+
+            expect(user.bannedAt).toStrictEqual(bannedAt);
+            expect(user.isBanned()).toBe(true);
+        });
+
+        it("should read an unbanned account as not banned", () => {
+            expect(
+                UserPrismaMapper.toDomainUser(basePrismaUser).isBanned(),
+            ).toBe(false);
         });
 
         it("should map deletedAt when user is soft-deleted", () => {

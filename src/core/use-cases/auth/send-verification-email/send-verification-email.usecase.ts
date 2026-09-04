@@ -1,4 +1,4 @@
-import { UnauthorizedError } from "@core/errors";
+import { AccountBannedError, UnauthorizedError } from "@core/errors";
 import type { EmailPort } from "@core/ports/services/email.port";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import { TokenType } from "@core/domain/enums/token-type.enum";
@@ -43,6 +43,10 @@ export class SendVerificationEmailUseCase {
      */
     async execute(input: SendVerificationEmailInput): Promise<void> {
         const user = await this.userRepository.findById(input.userId);
+
+        if (user?.isBanned()) {
+            throw new AccountBannedError();
+        }
 
         if (!user || user.isDeleted()) {
             throw new UnauthorizedError("User not found");

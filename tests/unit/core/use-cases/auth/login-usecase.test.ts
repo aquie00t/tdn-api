@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginUseCase } from "@core/use-cases/auth/login/login.usecase";
 import {
+    AccountBannedError,
     AccountPendingDeletionError,
     InvalidCredentialsError,
 } from "@core/errors";
@@ -77,6 +78,45 @@ describe("LoginUseCase", () => {
         );
         await expect(useCase.execute(input)).rejects.toThrow(
             AccountPendingDeletionError,
+        );
+    });
+
+    it("should throw AccountBannedError when the account is suspended", async () => {
+        vi.mocked(userRepo.findByIdentifier).mockResolvedValue(
+            buildUser({ bannedAt: new Date() }),
+        );
+        vi.mocked(passwordSvc.verify).mockResolvedValue(true);
+
+        await expect(useCase.execute(input)).rejects.toThrow(
+            AccountBannedError,
+        );
+        expect(refreshTokenRepo.create).not.toHaveBeenCalled();
+    });
+
+    it("should not hand a suspended account a recovery token", async () => {
+        // A ban outranks a pending deletion: recovering out of it would undo
+        // the ban, which is not the account owner's to undo.
+        vi.mocked(userRepo.findByIdentifier).mockResolvedValue(
+            buildUser({ bannedAt: new Date(), deletedAt: new Date() }),
+        );
+        vi.mocked(passwordSvc.verify).mockResolvedValue(true);
+
+        await expect(useCase.execute(input)).rejects.toThrow(
+            AccountBannedError,
+        );
+        expect(authTokenSvc.generateRecoveryToken).not.toHaveBeenCalled();
+    });
+
+    it("should reject a suspended account before checking nothing else", async () => {
+        // The password is still verified first: neither state is worth
+        // revealing to somebody who cannot prove the account is theirs.
+        vi.mocked(userRepo.findByIdentifier).mockResolvedValue(
+            buildUser({ bannedAt: new Date() }),
+        );
+        vi.mocked(passwordSvc.verify).mockResolvedValue(false);
+
+        await expect(useCase.execute(input)).rejects.toThrow(
+            InvalidCredentialsError,
         );
     });
 

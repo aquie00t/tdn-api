@@ -2,7 +2,7 @@ import type { GithubLoginInput } from "./github-login.input";
 import type { GithubAuthPort } from "@core/ports/services/github-auth.port";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { AuthTokenPort } from "@core/ports/services/auth-token.port";
-import { AccountPendingDeletionError } from "@core/errors";
+import { AccountBannedError, AccountPendingDeletionError } from "@core/errors";
 import type { CryptoPort } from "@core/ports/services/crypto.port";
 import type { CachePort } from "@core/ports/services/cache.port";
 import type { OAuthExchangePayload } from "../oauth-exchange/oauth-exchange.usecase";
@@ -26,6 +26,12 @@ export class GithubLoginUseCase {
         let user = await this.userRepository.findByEmail(profile.email);
 
         if (user) {
+            // Before the deletion branch: a suspended account must not be
+            // handed the recovery token a pending deletion would earn it.
+            if (user.isBanned()) {
+                throw new AccountBannedError();
+            }
+
             if (user.isDeleted()) {
                 const recoveryToken =
                     this.authTokenService.generateRecoveryToken(user.id);

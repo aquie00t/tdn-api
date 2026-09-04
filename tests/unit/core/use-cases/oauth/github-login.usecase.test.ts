@@ -5,7 +5,7 @@ import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { AuthTokenPort } from "@core/ports/services/auth-token.port";
 import type { CryptoPort } from "@core/ports/services/crypto.port";
 import type { CachePort } from "@core/ports/services/cache.port";
-import { AccountPendingDeletionError } from "@core/errors";
+import { AccountBannedError, AccountPendingDeletionError } from "@core/errors";
 import { buildUser } from "../../../helpers/mock-factories";
 
 const mockProfile = {
@@ -55,6 +55,27 @@ describe("GithubLoginUseCase", () => {
             cryptoService as CryptoPort,
             cacheService as CachePort,
         );
+    });
+
+    it("should throw AccountBannedError when the account is suspended", async () => {
+        vi.mocked(userRepository.findByEmail).mockResolvedValue(
+            buildUser({ bannedAt: new Date() }),
+        );
+
+        await expect(useCase.execute({ code: "auth-code" })).rejects.toThrow(
+            AccountBannedError,
+        );
+    });
+
+    it("should not hand a suspended account a recovery token", async () => {
+        vi.mocked(userRepository.findByEmail).mockResolvedValue(
+            buildUser({ bannedAt: new Date(), deletedAt: new Date() }),
+        );
+
+        await expect(useCase.execute({ code: "auth-code" })).rejects.toThrow(
+            AccountBannedError,
+        );
+        expect(authTokenService.generateRecoveryToken).not.toHaveBeenCalled();
     });
 
     it("should throw AccountPendingDeletionError when user is soft-deleted", async () => {

@@ -12,6 +12,7 @@ function buildUserProps(overrides: Partial<UserProps> = {}): UserProps {
         isEmailVerified: false,
         isBot: false,
         deletedAt: null,
+        bannedAt: null,
         createdAt: new Date("2024-01-01T00:00:00Z"),
         updatedAt: new Date("2024-01-01T00:00:00Z"),
         ...overrides,
@@ -81,6 +82,41 @@ describe("User Entity", () => {
         it("should return true when deletedAt is set", () => {
             const user = buildUser({ deletedAt: new Date() });
             expect(user.isDeleted()).toBe(true);
+        });
+    });
+
+    describe("isBanned()", () => {
+        it("should return false when bannedAt is null", () => {
+            const user = buildUser({ bannedAt: null });
+            expect(user.isBanned()).toBe(false);
+        });
+
+        it("should return true when bannedAt is set", () => {
+            const user = buildUser({ bannedAt: new Date() });
+            expect(user.isBanned()).toBe(true);
+        });
+
+        it("should expose bannedAt, null by default", () => {
+            expect(buildUser().bannedAt).toBeNull();
+
+            const bannedAt = new Date("2026-09-05T10:00:00.000Z");
+            expect(buildUser({ bannedAt }).bannedAt).toStrictEqual(bannedAt);
+        });
+
+        it("should be independent of deletion", () => {
+            // An account can be both, and the two answer different questions.
+            const both = buildUser({
+                bannedAt: new Date(),
+                deletedAt: new Date(),
+            });
+            expect(both.isBanned()).toBe(true);
+            expect(both.isDeleted()).toBe(true);
+
+            const bannedOnly = buildUser({ bannedAt: new Date() });
+            expect(bannedOnly.isDeleted()).toBe(false);
+
+            const deletedOnly = buildUser({ deletedAt: new Date() });
+            expect(deletedOnly.isBanned()).toBe(false);
         });
     });
 

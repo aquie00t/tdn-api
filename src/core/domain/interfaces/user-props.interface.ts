@@ -27,6 +27,13 @@ export interface UserProps {
     /** Optional timestamp when the user account was soft-deleted */
     deletedAt: Date | null;
 
+    /**
+     * When the account was suspended, or null while it is in good standing.
+     *
+     * Set by hand against the database; nothing in the application writes it.
+     */
+    bannedAt: Date | null;
+
     /** Creation timestamp of the user account */
     createdAt?: Date;
 

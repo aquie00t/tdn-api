@@ -73,7 +73,17 @@ Auth decorators: `fastify.authenticate` (required) and `fastify.optionalAuthenti
 
 ### Rate limiting
 
-`RateLimitPolicies` in `src/http/plugins/rate-limit.plugin.ts`: `STRICT` (3/15 min, `continueExceeding`) for login/register, `SENSITIVE` (5/min) for password reset, verification, and write/social actions, `STANDARD` (60/min) for authenticated reads, `PUBLIC` (100/min). Global default is 100/min. Requests with `Authorization: Bot <token>` are allow-listed after a sha256 lookup against `user.botToken`.
+`RateLimitPolicies` in `src/http/plugins/rate-limit.plugin.ts`: `STRICT` (3/15 min, `continueExceeding`) for login/register, `SENSITIVE` (5/min) for password reset, verification, and write/social actions, `STANDARD` (60/min) for authenticated reads, `PUBLIC` (100/min). Global default is 100/min. Requests with `Authorization: Bot <token>` are allow-listed after a sha256 lookup against `user.botToken` — suspended bots (`bannedAt`) are excluded from that lookup.
+
+### Account suspension
+
+`User.bannedAt` suspends an account. There is no endpoint and no admin panel: a ban is applied by hand against the database (`UPDATE "users" SET "bannedAt" = now() WHERE username = '…'` — the quotes matter, the column is camelCase like the rest of that table).
+
+Because of that, the check has to read the row. `assertAccountActive` (`src/http/hooks/assert-account-active.ts`) runs from **both** auth hooks after the token verifies: one primary-key lookup selecting one column, paid only by requests that carry a token, so guest traffic on public endpoints is unchanged. A JWT is good for 15 minutes and proves who signed in, not that they are still allowed in — reading the row is what makes a ban immediate instead of eventual. The same lookup also rejects a token whose account no longer exists, which the purge job could previously leave live. The bot path folds `bannedAt: null` into the lookup it already does, and the WebSocket handshake repeats the check before `wsManager.addClient`.
+
+There is no event to hang "close their socket" on, so `assertAccountActive` does it opportunistically: the banned client's next HTTP request both 403s and drops the socket. Best effort — `WebSocketManager` is an in-process map, so a socket held by another instance survives until it drops on its own; a banned user can act through none of it either way.
+
+`AccountBannedError` is **403**, not 401: a 401 makes the client refresh, fail, and dump the user at the login screen with no explanation. The same check sits beside every existing `isDeleted()` call (login, refresh, both OAuth logins, the token flows) and is tested **before** it, so a suspended account is never handed the recovery token a pending deletion would earn it.
 
 ### Media moderation
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RefreshUseCase } from "@core/use-cases/auth/refresh/refresh.usecase";
-import { UnauthorizedError } from "@core/errors";
+import { AccountBannedError, UnauthorizedError } from "@core/errors";
 import type {
     TransactionPort,
     TransactionContext,
@@ -133,6 +133,24 @@ describe("RefreshUseCase", () => {
         await expect(useCase.execute(input)).rejects.toThrow(
             new UnauthorizedError("User account unavailable"),
         );
+    });
+
+    it("should reject a suspended account and mint nothing", async () => {
+        vi.mocked(authTokenSvc.hashRefreshSecret).mockReturnValue(
+            "hashed_token",
+        );
+        vi.mocked(refreshTokenRepo.findByTokenHash).mockResolvedValue(
+            buildRefreshToken(),
+        );
+        vi.mocked(userRepo.findById).mockResolvedValue(
+            buildUser({ bannedAt: new Date() }),
+        );
+
+        await expect(useCase.execute(input)).rejects.toThrow(
+            AccountBannedError,
+        );
+        expect(authTokenSvc.generate).not.toHaveBeenCalled();
+        expect(refreshTokenRepo.create).not.toHaveBeenCalled();
     });
 
     it("should revoke old token, create new token, and return new credentials", async () => {

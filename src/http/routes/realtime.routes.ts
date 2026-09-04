@@ -27,6 +27,11 @@ export default function realtimeRoutes(fastify: FastifyInstance): void {
         (connection, req: FastifyRequest) => {
             const AUTH_TIMEOUT_MS = 10_000;
             let authenticated = false;
+            // Set while the account behind a verified token is being looked
+            // up. Authentication is no longer decided within one synchronous
+            // message, so a second message arriving in that window must not
+            // start a second attempt.
+            let authInFlight = false;
 
             const authTimeout = setTimeout(() => {
                 if (!authenticated) {
@@ -43,6 +48,8 @@ export default function realtimeRoutes(fastify: FastifyInstance): void {
 
             connection.on("message", (raw: unknown) => {
                 if (!authenticated) {
+                    if (authInFlight) return;
+
                     let parsed: { event?: string; token?: string };
 
                     try {
@@ -100,41 +107,97 @@ export default function realtimeRoutes(fastify: FastifyInstance): void {
                         return;
                     }
 
-                    clearTimeout(authTimeout);
-                    authenticated = true;
+                    // The account, not just the token. A token minted before
+                    // the ban stays cryptographically valid for another
+                    // fifteen minutes, and a socket opened with one would
+                    // outlive that by hours.
+                    authInFlight = true;
 
-                    wsManager.addClient(userId, connection);
+                    void (async (): Promise<void> => {
+                        try {
+                            const account =
+                                await fastify.prisma.user.findUnique({
+                                    where: { id: userId },
+                                    select: { bannedAt: true },
+                                });
 
-                    connection.send(JSON.stringify({ event: "auth_success" }));
+                            if (!account || account.bannedAt) {
+                                fastify.log.warn(
+                                    {
+                                        event: "ws_auth_rejected",
+                                        ip: req.ip,
+                                        userId,
+                                        reason: account
+                                            ? "Account suspended"
+                                            : "Account no longer exists",
+                                    },
+                                    "WebSocket auth rejected: account unavailable",
+                                );
+                                connection.close(
+                                    1008,
+                                    "Policy Violation: Account suspended",
+                                );
+                                return;
+                            }
+                        } catch (error: unknown) {
+                            // Fail closed: an unreachable database is not a
+                            // reason to hand out a connection unchecked.
+                            fastify.log.error(
+                                { event: "ws_auth_error", err: error, userId },
+                                "WebSocket auth failed: account check errored",
+                            );
+                            connection.close(1011, "Internal Error");
+                            return;
+                        } finally {
+                            authInFlight = false;
+                        }
 
-                    fastify.log.info(
-                        { event: "ws_client_connected", userId, ip: req.ip },
-                        "WebSocket client authenticated and connected",
-                    );
+                        clearTimeout(authTimeout);
+                        authenticated = true;
 
-                    connection.on("close", (code: number, reason: Buffer) => {
+                        wsManager.addClient(userId, connection);
+
+                        connection.send(
+                            JSON.stringify({ event: "auth_success" }),
+                        );
+
                         fastify.log.info(
                             {
-                                event: "ws_client_disconnected",
+                                event: "ws_client_connected",
                                 userId,
-                                code,
-                                reason:
-                                    reason.toString() || "No reason provided",
+                                ip: req.ip,
                             },
-                            "WebSocket client disconnected",
+                            "WebSocket client authenticated and connected",
                         );
-                    });
 
-                    connection.on("error", (error: Error) => {
-                        fastify.log.error(
-                            {
-                                event: "ws_client_error",
-                                userId,
-                                error: error.message,
+                        connection.on(
+                            "close",
+                            (code: number, reason: Buffer) => {
+                                fastify.log.info(
+                                    {
+                                        event: "ws_client_disconnected",
+                                        userId,
+                                        code,
+                                        reason:
+                                            reason.toString() ||
+                                            "No reason provided",
+                                    },
+                                    "WebSocket client disconnected",
+                                );
                             },
-                            "WebSocket connection encountered an error",
                         );
-                    });
+
+                        connection.on("error", (error: Error) => {
+                            fastify.log.error(
+                                {
+                                    event: "ws_client_error",
+                                    userId,
+                                    error: error.message,
+                                },
+                                "WebSocket connection encountered an error",
+                            );
+                        });
+                    })();
 
                     return;
                 }

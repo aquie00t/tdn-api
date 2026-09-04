@@ -4,7 +4,7 @@ import type {
     AuthTokenPort,
     RecoveryPayload,
 } from "@core/ports/services/auth-token.port";
-import { UnauthorizedError } from "@core/errors";
+import { AccountBannedError, UnauthorizedError } from "@core/errors";
 import { type LoginOutput } from "../login/login.output";
 import type { RecoverAccountInput } from "./recover-account.input";
 import { AuthMapper } from "../auth.mapper";
@@ -60,6 +60,12 @@ export class RecoverAccountUseCase {
         const userId = payload.sub;
 
         const user = await this.userRepository.findById(userId);
+
+        // A suspended account stays suspended: recovery undoes a deletion the
+        // owner asked for, not a ban somebody else applied.
+        if (user?.isBanned()) {
+            throw new AccountBannedError();
+        }
 
         if (!user || !user.isDeleted()) {
             throw new UnauthorizedError("Invalid or expired recovery token.");

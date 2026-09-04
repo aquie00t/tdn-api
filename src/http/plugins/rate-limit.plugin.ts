@@ -76,8 +76,11 @@ function rateLimitPlugin(fastify: FastifyInstance): void {
             const token = auth.split(/\s+/)[1];
             const hashed = createHash("sha256").update(token).digest("hex");
 
+            // A suspended bot loses the allow-list along with everything else.
+            // The auth hook would reject its requests anyway; there is no
+            // reason to spend the raised budget rejecting them.
             const user = await fastify.prisma.user.findFirst({
-                where: { botToken: hashed, isBot: true },
+                where: { botToken: hashed, isBot: true, bannedAt: null },
             });
 
             return user !== null;

@@ -1,4 +1,4 @@
-import { BadRequestError } from "@core/errors";
+import { AccountBannedError, BadRequestError } from "@core/errors";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { IVerificationTokenRepository } from "@core/ports/repositories/verification-token.repository";
 import type { PasswordPort } from "@core/ports/services/password.port";
@@ -46,6 +46,10 @@ export class ResetPasswordUseCase {
      */
     async execute(input: ResetPasswordInput): Promise<void> {
         const user = await this.userRepository.findByEmail(input.email);
+
+        if (user?.isBanned()) {
+            throw new AccountBannedError();
+        }
 
         if (!user || user.isDeleted()) {
             throw new BadRequestError(this.GENERIC_ERROR);
