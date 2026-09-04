@@ -29,6 +29,43 @@ projects:
       # this quiet that means most visitors wait out a cold start.
       plan: 0.5c-512mb
       envVars:
+      # The morning digest. Everything below has a default in env.schema.ts, so
+      # the service boots without any of them - but it boots with the digest
+      # OFF, which is the intended state until somebody decides otherwise.
+      #
+      # Enabling it is not reversible for the people who receive the first run:
+      # nobody has a delivery record yet, so the first morning mails every
+      # verified, active, subscribed account at once. Count that audience and
+      # check it against the Resend plan before setting ENABLED to true -
+      # docs/daily-digest.md has the query.
+      #
+      # API_URL and FRONTEND_URL below are load-bearing for this feature in a
+      # way they were not before: every link in the email is built from them,
+      # and the unsubscribe link - which mail clients also read out of the
+      # List-Unsubscribe header - comes from API_URL. If either still holds a
+      # localhost value, the emails ship broken links to everybody.
+      - key: DAILY_DIGEST_ENABLED
+        sync: false
+      - key: DAILY_DIGEST_CRON
+        sync: false
+      - key: DAILY_DIGEST_TIMEZONE
+        sync: false
+      - key: DAILY_DIGEST_WINDOW_HOURS
+        sync: false
+      - key: DAILY_DIGEST_MAX_WINDOW_DAYS
+        sync: false
+      - key: DAILY_DIGEST_USER_PAGE_SIZE
+        sync: false
+      - key: DAILY_DIGEST_BATCH_SIZE
+        sync: false
+      - key: DAILY_DIGEST_BATCH_PAUSE_MS
+        sync: false
+      - key: DAILY_DIGEST_MAX_NOTIFICATIONS
+        sync: false
+      - key: DAILY_DIGEST_MAX_POSTS
+        sync: false
+      - key: DAILY_DIGEST_CANDIDATE_POOL_SIZE
+        sync: false
       - key: MEDIA_MODERATION_LEASE_SECONDS
         sync: false
       - key: MEDIA_MODERATION_MAX_ATTEMPTS
