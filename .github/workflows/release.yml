@@ -46,8 +46,17 @@ jobs:
         name: Apply Database Migrations
         runs-on: ubuntu-latest
         needs: release
-        # Only when semantic-release cut a version, and before the image that
-        # expects the new schema becomes pullable.
+        # A backstop, not the mechanism. Ordering against the live deploy is
+        # done by the pre-deploy command in render.yaml, because Render builds
+        # from the commit and is serving new code long before this job is
+        # reached - it waits on CI and then on semantic-release. Keeping it
+        # means a service whose pre-deploy command is missing or misconfigured
+        # still converges; `migrate deploy` is idempotent, so when the
+        # pre-deploy already applied everything this job reports nothing
+        # pending and exits.
+        #
+        # It still gates docker-push, so the image published to GHCR is never
+        # newer than the schema.
         if: ${{ needs.release.outputs.new_release_published == 'true' }}
         # Gives the run a deployment record, and a place to hang required
         # reviewers on if this should ever need approval.
@@ -99,6 +108,7 @@ jobs:
               # deploy, never dev or reset: it only applies migrations that have
               # not run yet, never rewrites or drops anything, and takes an
               # advisory lock so overlapping releases queue instead of racing.
+              # Normally a no-op by the time it runs - see the note on the job.
               env:
                   DATABASE_URL: ${{ secrets.DATABASE_URL }}
               run: pnpm db:deploy

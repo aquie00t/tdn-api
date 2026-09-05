@@ -163,6 +163,8 @@ Purge jobs (`src/infrastructure/jobs/**`, wired by `src/http/plugins/custom/*-pu
 
 Split schema: `prisma/schema.prisma` only holds the generator (output `src/generated/prisma`) and datasource; models live in `prisma/models/*.prisma` — edit those, not the aggregate. The client is created with the `@prisma/adapter-pg` driver adapter in `src/infrastructure/persistence/database/database.client.ts`. Multi-step writes go through `TransactionPort` (`transaction.service.ts`), not raw `prisma.$transaction` inside a use-case.
 
+`schema.prisma` declares **no datasource url** — it comes from `prisma.config.ts`, which is why that file is copied into the runtime image alongside `prisma/`, and why `prisma` and `dotenv` are runtime rather than dev dependencies. Production migrations run as Render's **pre-deploy command** (`preDeployCommand: pnpm db:deploy` in `render.yaml`), not from CI: Render builds from the commit, so anything gated behind CI and semantic-release lands after the deploy it was supposed to precede. The `migrate` job in `release.yml` is a backstop that also keeps the GHCR image from outrunning the schema. A failing pre-deploy cancels the deploy, so the old code keeps serving.
+
 ## Conventions
 
 - TypeScript strict; `@typescript-eslint/no-floating-promises`, `require-await`, and `eqeqeq` are errors — prefix intentional fire-and-forget with `void`. `no-explicit-any`, `no-console`, and explicit return types are warnings but the codebase keeps them clean.

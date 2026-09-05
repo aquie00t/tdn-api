@@ -80,6 +80,9 @@ importers:
       axios:
         specifier: ^1.20.0
         version: 1.20.0
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       fastify:
         specifier: ^5.12.1
         version: 5.12.1
@@ -92,6 +95,9 @@ importers:
       node-cron:
         specifier: ^4.6.0
         version: 4.6.0
+      prisma:
+        specifier: ^7.10.0
+        version: 7.10.0(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@6.0.3)
       resend:
         specifier: ^6.24.0
         version: 6.24.0
@@ -108,9 +114,6 @@ importers:
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
       eslint:
         specifier: ^10.9.1
         version: 10.9.1(jiti@2.7.0)
@@ -135,9 +138,6 @@ importers:
       prettier:
         specifier: 3.9.6
         version: 3.9.6
-      prisma:
-        specifier: ^7.10.0
-        version: 7.10.0(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@6.0.3)
       tsc-alias:
         specifier: ^1.9.2
         version: 1.9.2

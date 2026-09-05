@@ -182,6 +182,23 @@ projects:
       region: frankfurt
       dockerContext: .
       dockerfilePath: ./Dockerfile
+      # Migrations run here, and this is the only place they can run in the
+      # right order. Render builds from the commit (autoDeployTrigger below),
+      # so it ships new code the moment main moves; the migrate job in
+      # release.yml sits behind CI and semantic-release and therefore always
+      # lands after the deploy it was meant to precede. On 2026-09-05 that gap
+      # was three and a half minutes, during which every authenticated feed
+      # read answered 500 against a blocks table that did not exist yet.
+      #
+      # A pre-deploy command runs after the image is built and before the new
+      # instance takes traffic, and a non-zero exit cancels the deploy - so a
+      # migration that cannot be applied keeps the old code serving instead of
+      # promoting code its schema cannot support.
+      #
+      # `prisma migrate deploy` only applies what has not run yet and takes an
+      # advisory lock, so a redeploy with nothing pending is a no-op and two
+      # overlapping deploys queue rather than race.
+      preDeployCommand: pnpm db:deploy
       domains:
       - api.developernetwork.net
       autoDeployTrigger: commit
