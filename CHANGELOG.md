@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/the-developer-network/tdn-api/compare/v1.20.0...v1.21.0) (2026-09-05)
+
+
+### Features
+
+* **message:** make deletion real and expire message history ([#268](https://github.com/the-developer-network/tdn-api/issues/268)) ([de11116](https://github.com/the-developer-network/tdn-api/commit/de111169f68b57de811130d2325352dac6edd2f5))
+
 # [1.20.0](https://github.com/the-developer-network/tdn-api/compare/v1.19.1...v1.20.0) (2026-09-05)
 
 
