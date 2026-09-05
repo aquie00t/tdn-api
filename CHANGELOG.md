@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/the-developer-network/tdn-api/compare/v1.23.0...v1.24.0) (2026-09-05)
+
+
+### Features
+
+* **oauth:** bind a flow to its redirect target and to a state ([#278](https://github.com/the-developer-network/tdn-api/issues/278)) ([9d1f9d4](https://github.com/the-developer-network/tdn-api/commit/9d1f9d4b71158244e925e1e3cb8c53a5c261cf02)), closes [#277](https://github.com/the-developer-network/tdn-api/issues/277)
+
 # [1.23.0](https://github.com/the-developer-network/tdn-api/compare/v1.22.0...v1.23.0) (2026-09-05)
 
 
