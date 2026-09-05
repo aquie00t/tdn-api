@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/the-developer-network/tdn-api/compare/v1.18.0...v1.19.0) (2026-09-05)
+
+
+### Features
+
+* **block:** let users block each other ([#264](https://github.com/the-developer-network/tdn-api/issues/264)) ([ac26893](https://github.com/the-developer-network/tdn-api/commit/ac26893e46ed6b7768d22c4411774020c953f483))
+
 # [1.18.0](https://github.com/the-developer-network/tdn-api/compare/v1.17.0...v1.18.0) (2026-09-04)
 
 
