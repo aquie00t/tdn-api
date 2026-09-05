@@ -1,3 +1,10 @@
+## [1.21.1](https://github.com/the-developer-network/tdn-api/compare/v1.21.0...v1.21.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **deploy:** run migrations over an unpooled connection ([#270](https://github.com/the-developer-network/tdn-api/issues/270)) ([0e80552](https://github.com/the-developer-network/tdn-api/commit/0e80552a4bbd784677055d73f3bed170b5aed3b3))
+
 # [1.21.0](https://github.com/the-developer-network/tdn-api/compare/v1.20.0...v1.21.0) (2026-09-05)
 
 
