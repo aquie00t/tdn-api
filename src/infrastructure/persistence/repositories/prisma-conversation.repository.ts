@@ -120,6 +120,30 @@ export class PrismaConversationRepository implements IConversationRepository {
                             { userBId: input.userId },
                         ],
                     },
+                    // A blocked counterpart is filtered here rather than
+                    // after the read: the page fetches one extra row to detect
+                    // a next page, and removing rows afterwards would break
+                    // both the page size and that signal.
+                    ...(input.excludeUserIds && input.excludeUserIds.length > 0
+                        ? [
+                              {
+                                  NOT: {
+                                      OR: [
+                                          {
+                                              userAId: {
+                                                  in: input.excludeUserIds,
+                                              },
+                                          },
+                                          {
+                                              userBId: {
+                                                  in: input.excludeUserIds,
+                                              },
+                                          },
+                                      ],
+                                  },
+                              },
+                          ]
+                        : []),
                     ...(after
                         ? [
                               {
@@ -247,12 +271,22 @@ export class PrismaConversationRepository implements IConversationRepository {
      * depends on which side of the ordered pair they landed on, and that is
      * not something a single `sum` can express.
      */
-    async getTotalUnreadCount(userId: string): Promise<number> {
+    async getTotalUnreadCount(
+        userId: string,
+        excludeUserIds: string[] = [],
+    ): Promise<number> {
+        // The viewer sits on one side of the pair, so the counterpart to
+        // exclude is always the other column.
+        const hasExclusions = excludeUserIds.length > 0;
+
         const [asA, asB] = await Promise.all([
             this.prisma.conversation.aggregate({
                 where: {
                     userAId: userId,
                     status: ConversationStatus.ACCEPTED,
+                    ...(hasExclusions
+                        ? { userBId: { notIn: excludeUserIds } }
+                        : {}),
                 },
                 _sum: { userAUnread: true },
             }),
@@ -260,6 +294,9 @@ export class PrismaConversationRepository implements IConversationRepository {
                 where: {
                     userBId: userId,
                     status: ConversationStatus.ACCEPTED,
+                    ...(hasExclusions
+                        ? { userAId: { notIn: excludeUserIds } }
+                        : {}),
                 },
                 _sum: { userBUnread: true },
             }),

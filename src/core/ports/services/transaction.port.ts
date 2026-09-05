@@ -11,6 +11,8 @@ import type { IArticleLikeRepository } from "@core/ports/repositories/article-li
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { IMessageRepository } from "@core/ports/repositories/message.repository";
+import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 
 /**
  * Provides transactional access to repositories within a single atomic operation.
@@ -65,6 +67,24 @@ export interface TransactionContext {
 
     /** Repository for direct messages within the transaction. */
     readonly messageRepository: IMessageRepository;
+
+    /**
+     * Repository for blocks within the transaction.
+     *
+     * A block and the follows it tears down are written together: a block
+     * committed while the two accounts still follow each other would leave the
+     * blocked user in a follower list they can no longer be removed from
+     * without blocking again.
+     */
+    readonly blockRepository: IBlockRepository;
+
+    /**
+     * Repository for follow relationships within the transaction.
+     *
+     * Here for the block above, which is the only write that touches follows
+     * alongside anything else.
+     */
+    readonly followUserRepository: IFollowRepository;
 }
 
 /**

@@ -7,6 +7,7 @@ import {
     MessageNotSendableError,
 } from "@core/errors";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
+import { buildBlockRepository } from "../../../helpers/mock-factories";
 
 const INITIATOR = "aaaa-1111";
 const RECIPIENT = "bbbb-2222";
@@ -41,6 +42,7 @@ describe("RespondToRequestUseCase", () => {
 
         useCase = new RespondToRequestUseCase(
             conversationRepo as IConversationRepository,
+            buildBlockRepository(),
         );
     });
 

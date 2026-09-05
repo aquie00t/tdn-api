@@ -17,7 +17,10 @@ import type { IFollowRepository } from "@core/ports/repositories/follow.reposito
 import type { FeedCandidate } from "@core/domain/interfaces/feed-candidate.interface";
 import { UnauthorizedError } from "@core/errors";
 import { PostType } from "@core/domain/enums/post-type.enum";
-import { buildPost } from "../../../helpers/mock-factories";
+import {
+    buildPost,
+    buildBlockRepository,
+} from "../../../helpers/mock-factories";
 
 const WEIGHTS: FeedRankingWeights = {
     language: 3,
@@ -134,7 +137,10 @@ describe("GetPostsUseCase", () => {
         return ids;
     };
 
+    let blockRepository = buildBlockRepository();
+
     beforeEach(() => {
+        blockRepository = buildBlockRepository();
         tokenSequence = 0;
         postRepository = {
             findAll: vi.fn().mockResolvedValue({ posts: [], total: 0 }),
@@ -166,6 +172,7 @@ describe("GetPostsUseCase", () => {
             postRepository as IPostRepository,
             cacheService as unknown as CachePort,
             followUserRepository as IFollowRepository,
+            blockRepository,
             profileRepository as IProfileRepository,
             userInterestRepository as IUserInterestRepository,
             cryptoService as CryptoPort,
@@ -1007,6 +1014,49 @@ describe("GetPostsUseCase", () => {
 
                 expect(postRepository.findFeedCandidates).toHaveBeenCalled();
             }
+        });
+    });
+
+    describe("blocking", () => {
+        it("should exclude blocked authors from the candidate pool and its count", async () => {
+            vi.mocked(blockRepository.getInvisibleUserIds).mockResolvedValue([
+                "blocked-1",
+            ]);
+
+            await useCase.execute({ currentUserId: "viewer-1", limit: 10 });
+
+            expect(postRepository.findFeedCandidates).toHaveBeenCalledWith(
+                expect.objectContaining({ excludeAuthorIds: ["blocked-1"] }),
+            );
+            // The count carries the same exclusion as the pool it describes,
+            // or it promises pages the reader can never reach.
+            expect(postRepository.countAll).toHaveBeenCalledWith(
+                expect.objectContaining({ excludeAuthorIds: ["blocked-1"] }),
+            );
+        });
+
+        it("should apply the exclusion again when hydrating a cached order", async () => {
+            seedPool(5);
+            vi.mocked(blockRepository.getInvisibleUserIds).mockResolvedValue([
+                "blocked-1",
+            ]);
+
+            await useCase.execute({ currentUserId: "viewer-1", limit: 10 });
+
+            // A snapshot outlives a block by up to its own lifetime, so
+            // filtering at hydration is what lets a stale one heal itself
+            // rather than having to be invalidated.
+            expect(postRepository.findByIds).toHaveBeenCalledWith(
+                expect.anything(),
+                "viewer-1",
+                ["blocked-1"],
+            );
+        });
+
+        it("should not ask about blocks for a guest", async () => {
+            await useCase.execute({ limit: 10 });
+
+            expect(blockRepository.getInvisibleUserIds).not.toHaveBeenCalled();
         });
     });
 });

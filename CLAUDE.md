@@ -114,13 +114,28 @@ Chat events are namespaced in `src/core/domain/constants/chat-events.constants.t
 
 `docs/direct-messaging.md` is the client-facing contract for this feature — endpoints, response objects, realtime events and error titles. Keep it in step with the schemas when the surface changes.
 
+### Blocking
+
+`Block` (`prisma/models/block.prisma`) is stored **directionally** — unlike `Conversation`, which orders its pair so `(a,b)` and `(b,a)` collapse into one row. Direction is the question here: a profile has to say whether *you* blocked *them* (`isBlocked`, offers an unblock button) or the reverse (`isBlockedBy`, a wall), and those render differently.
+
+The effect is symmetric anyway, and that is the whole design: **`IBlockRepository.getInvisibleUserIds(viewerId)` unions both directions**, and every listing read takes that one set — feed candidates and their count, `findByIds` hydration, the inbox, the unread badge, a user's timeline. Pairwise gates use `existsBetween` instead. `assertNotBlocked` and `assertConversationVisible` (`src/core/use-cases/shared/blocking/`) hold the two repeated shapes.
+
+Two things are easy to get wrong here:
+
+- **`authorId` collides.** `followingIds`, a pinned `authorId` and the blocked-author exclusion all write the same Prisma key, and the last spread wins. `PrismaPostRepository.authorFilter` merges them into one condition; a `followedOnly` feed is exactly the case a naive spread would silently drop the exclusion in.
+- **The feed's ranked snapshot outlives a block** by up to `SCROLL_SNAPSHOT_TTL_SECONDS`. Rather than invalidate it, `excludeAuthorIds` is applied *again* at `findByIds` hydration, so a stale snapshot heals itself and the short page is filled by the top-up path that already exists.
+
+Blocking is announced where the client needs a screen (`UserBlockedError`, **403**, on follow — a silent no-op reads as a bug) and hidden where announcing it would leak (DM answers `InvalidRecipientError`/`ConversationNotFoundError`, the same shapes those endpoints already use so thread membership cannot be probed). `BlockUserUseCase` writes the block and both unfollows in one transaction — which is why `TransactionContext` carries `followUserRepository` and `blockRepository`. Nothing else is touched: a hidden conversation keeps its status, counters and history, and unblocking restores it whole.
+
+`docs/blocking.md` is the client-facing contract.
+
 ### Mentions
 
 `@handle` in a post, comment or article body resolves to real accounts at **write time** and is stored as a relation, never as the text that was typed — so a rename keeps historical mentions pointing at the right account and the response always serves the current handle. Reads carry `mentions: [{ id, username }]` beside `tags`.
 
 Parsing is a pure helper, `src/core/use-cases/shared/mentions/extract-mentions.ts` — deliberately *not* the pattern post hashtags follow, which are regex-extracted inside `PrismaPostRepository.create` and therefore invisible to the use-case layer. `resolveMentions` (same folder) turns handles into accounts via `IUserRepository.findManyByUsernames`, which tries an index-backed exact `in` first and only falls back to `mode: "insensitive"` for what is left. An unresolvable handle is dropped silently; more than `MAX_MENTIONS` (10) distinct handles in one body is a `MentionLimitExceededError` (400) raised on the *written* handles, before any lookup.
 
-`NotifyMentionedUsersUseCase` (`src/core/use-cases/notification/notify-mentioned-users/`) is the single fan-out, called fire-and-forget after the write commits, the way `NotifyNewPostUseCase` is. It enforces the three suppression rules in one place: never the issuer, once per person, and never for someone in `excludeUserIds` — which each caller fills with whoever that same action already notified (the post author being commented on, the quoted author). `NotifyNewPostUseCase` takes the same `excludeUserIds` field, and `CreatePostUseCase` fills it with the mentioned ids plus the quoted author, so one post is one notification per person: **QUOTE > MENTION > NEW_POST**, more specific wins. Both exclusion inputs are already resolved before either fan-out is dispatched, so neither has to wait on the other. Articles are quiet while they are drafts: `PublishArticleUseCase` notifies everyone the body names, and `UpdateArticleUseCase` notifies only the *newly* named.
+`NotifyMentionedUsersUseCase` (`src/core/use-cases/notification/notify-mentioned-users/`) is the single fan-out, called fire-and-forget after the write commits, the way `NotifyNewPostUseCase` is. It enforces the suppression rules in one place: never the issuer, once per person, never for someone in `excludeUserIds` — which each caller fills with whoever that same action already notified (the post author being commented on, the quoted author) — and never across a block, which it resolves itself because that rule is global rather than per-caller. `NotifyNewPostUseCase` takes the same `excludeUserIds` field, and `CreatePostUseCase` fills it with the mentioned ids plus the quoted author, so one post is one notification per person: **QUOTE > MENTION > NEW_POST**, more specific wins. Both exclusion inputs are already resolved before either fan-out is dispatched, so neither has to wait on the other. Articles are quiet while they are drafts: `PublishArticleUseCase` notifies everyone the body names, and `UpdateArticleUseCase` notifies only the *newly* named.
 
 `docs/mentions.md` is the client-facing contract — handle grammar, the `mentions` object, notification targets and error titles.
 

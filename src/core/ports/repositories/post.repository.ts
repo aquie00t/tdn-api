@@ -37,6 +37,16 @@ export interface GetPostsParams {
      * already served, so paging past the ranked window never repeats a post.
      */
     excludeIds?: string[];
+
+    /**
+     * Authors to leave out entirely - the accounts this viewer has blocked,
+     * and those who blocked them.
+     *
+     * Separate from `excludeIds`, which names individual posts the caller has
+     * already served. This one is about who wrote them, and it applies to
+     * every read a viewer makes.
+     */
+    excludeAuthorIds?: string[];
 }
 
 /**
@@ -52,6 +62,16 @@ export interface CountPostsParams {
     tag?: string;
     categories?: PostCategory[];
     followingIds?: string[];
+
+    /**
+     * Authors to leave out entirely - the accounts this viewer has blocked,
+     * and those who blocked them.
+     *
+     * Separate from `excludeIds`, which names individual posts the caller has
+     * already served. This one is about who wrote them, and it applies to
+     * every read a viewer makes.
+     */
+    excludeAuthorIds?: string[];
 }
 
 export interface FeedCandidateParams {
@@ -65,6 +85,16 @@ export interface FeedCandidateParams {
 
     /** Hard cap on the pool size. */
     limit: number;
+
+    /**
+     * Authors to leave out entirely - the accounts this viewer has blocked,
+     * and those who blocked them.
+     *
+     * Separate from `excludeIds`, which names individual posts the caller has
+     * already served. This one is about who wrote them, and it applies to
+     * every read a viewer makes.
+     */
+    excludeAuthorIds?: string[];
 }
 
 /**
@@ -120,9 +150,17 @@ export interface IPostRepository {
      *
      * @param ids - The post identifiers to load.
      * @param currentUserId - Optional viewer, used to resolve isLiked/isBookmarked.
-     * @returns The posts that still exist.
+     * @param excludeAuthorIds - Authors to drop even though their ids were
+     * asked for. The feed hydrates from a cached ranked order that may predate
+     * a block, so applying the exclusion here is what lets a stale snapshot
+     * heal itself instead of needing to be invalidated.
+     * @returns The posts that still exist and the viewer may see.
      */
-    findByIds(ids: string[], currentUserId?: string): Promise<Post[]>;
+    findByIds(
+        ids: string[],
+        currentUserId?: string,
+        excludeAuthorIds?: string[],
+    ): Promise<Post[]>;
 
     /**
      * Retrieves a post by its unique identifier.
@@ -189,6 +227,7 @@ export interface IPostRepository {
         limit: number,
         type?: string,
         currentUserId?: string,
+        excludeAuthorIds?: string[],
     ): Promise<{ posts: Post[]; total: number }>;
 
     /**

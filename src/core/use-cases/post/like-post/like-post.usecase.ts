@@ -34,6 +34,18 @@ export class LikePostUseCase {
 
             if (!post) throw new NotFoundError("Post not found.");
 
+            // Answered as a missing post, the same way its detail endpoint
+            // hides it. A like is a notification with extra steps, and this is
+            // the last place to stop one.
+            if (post.author.id !== input.userId) {
+                const blocked = await ctx.blockRepository.existsBetween(
+                    input.userId,
+                    post.author.id,
+                );
+
+                if (blocked) throw new NotFoundError("Post not found.");
+            }
+
             const alreadyLiked = await ctx.postLikeRepository.isLiked(
                 input.postId,
                 input.userId,

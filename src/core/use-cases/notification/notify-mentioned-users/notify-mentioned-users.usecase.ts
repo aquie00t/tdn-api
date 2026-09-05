@@ -1,16 +1,18 @@
 import { Notification } from "@core/domain/entities/notification.entity";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
 import type { NotifyMentionedUsersInput } from "./notify-mentioned-users.input";
 
 /**
  * Use case for notifying the users named with an @handle in a body.
  *
- * Shared by posts, comments and articles so the three suppression rules the
- * feature promises - never yourself, never twice for the same handle, never
- * alongside a notification the same action already sent - are decided in one
- * place rather than re-derived at each call site.
+ * Shared by posts, comments and articles so the suppression rules the feature
+ * promises - never yourself, never twice for the same handle, never alongside
+ * a notification the same action already sent, and never towards or from a
+ * blocked account - are decided in one place rather than re-derived at each
+ * call site.
  */
 export class NotifyMentionedUsersUseCase {
     /**
@@ -18,10 +20,12 @@ export class NotifyMentionedUsersUseCase {
      *
      * @param notificationRepository - Repository for persisting notifications
      * @param realtimeService - Service for pushing the notifications live
+     * @param blockRepository - Repository used to drop blocked recipients
      */
     constructor(
         private readonly notificationRepository: INotificationRepository,
         private readonly realtimeService: RealtimePort,
+        private readonly blockRepository: IBlockRepository,
     ) {}
 
     /**
@@ -38,6 +42,15 @@ export class NotifyMentionedUsersUseCase {
     async execute(input: NotifyMentionedUsersInput): Promise<number> {
         const excluded = new Set(input.excludeUserIds ?? []);
         excluded.add(input.issuerId);
+
+        // Writing somebody\'s handle is not a way around a block. The mention
+        // is still stored - the relation is a fact about the text - it simply
+        // does not reach them.
+        for (const id of await this.blockRepository.getInvisibleUserIds(
+            input.issuerId,
+        )) {
+            excluded.add(id);
+        }
 
         const recipientIds = [...new Set(input.mentionedUserIds)].filter(
             (id) => !excluded.has(id),

@@ -5,6 +5,7 @@ import { PrismaVerificationTokenRepository } from "@infrastructure/persistence/r
 import { PrismaOAuthAccountRepository } from "@infrastructure/persistence/repositories/prisma-oauth-account.repository";
 import { PrismaProfileRepository } from "@infrastructure/persistence/repositories/prisma-profile.repository";
 import { PrismaFollowUserRepository } from "@infrastructure/persistence/repositories/prisma-follow.repository";
+import { PrismaBlockRepository } from "@infrastructure/persistence/repositories/prisma-block.repository";
 import { PrismaNotificationRepository } from "@infrastructure/persistence/repositories/prisma-notification.repository";
 import { PrismaDigestDeliveryRepository } from "@infrastructure/persistence/repositories/prisma-digest-delivery.repository";
 import { PrismaUserInterestRepository } from "@infrastructure/persistence/repositories/prisma-user-interest.repository";
@@ -79,6 +80,11 @@ export const persistenceModule = {
      * Follow user repository for managing user follow relationships
      */
     followUserRepository: asClass(PrismaFollowUserRepository).singleton(),
+
+    /**
+     * Block repository backing the symmetric invisibility every read applies
+     */
+    blockRepository: asClass(PrismaBlockRepository).singleton(),
 
     /**
      * Notification repository for managing user notifications

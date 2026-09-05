@@ -4,6 +4,7 @@ import type { Notification } from "@core/domain/entities/notification.entity";
 import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
+import { buildBlockRepository } from "../../../helpers/mock-factories";
 
 describe("NotifyMentionedUsersUseCase", () => {
     let useCase: NotifyMentionedUsersUseCase;
@@ -30,6 +31,7 @@ describe("NotifyMentionedUsersUseCase", () => {
         useCase = new NotifyMentionedUsersUseCase(
             notificationRepository as INotificationRepository,
             realtimeService,
+            buildBlockRepository(),
         );
     });
 

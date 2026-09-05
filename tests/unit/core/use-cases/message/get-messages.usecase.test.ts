@@ -7,6 +7,8 @@ import { ConversationNotFoundError } from "@core/errors";
 import { decodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { IMessageRepository } from "@core/ports/repositories/message.repository";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
+import { buildBlockRepository } from "../../../helpers/mock-factories";
 
 const READER = "aaaa-1111";
 const OTHER = "bbbb-2222";
@@ -28,6 +30,7 @@ describe("GetMessagesUseCase", () => {
     let useCase: GetMessagesUseCase;
     let conversationRepo: Pick<IConversationRepository, "findById">;
     let messageRepo: Pick<IMessageRepository, "listByConversation">;
+    let blockRepo: IBlockRepository;
 
     beforeEach(() => {
         conversationRepo = {
@@ -44,10 +47,12 @@ describe("GetMessagesUseCase", () => {
             ),
         };
         messageRepo = { listByConversation: vi.fn().mockResolvedValue([]) };
+        blockRepo = buildBlockRepository();
 
         useCase = new GetMessagesUseCase(
             conversationRepo as IConversationRepository,
             messageRepo as IMessageRepository,
+            blockRepo,
         );
     });
 
@@ -149,5 +154,35 @@ describe("GetMessagesUseCase", () => {
                 limit: 10,
             }),
         ).rejects.toThrow(ConversationNotFoundError);
+    });
+
+    describe("blocking", () => {
+        it("should hide the thread as if it did not exist", async () => {
+            vi.mocked(blockRepo.existsBetween).mockResolvedValue(true);
+
+            // Not a distinct error: these endpoints already collapse every
+            // rejection into one shape so they cannot confirm that two
+            // particular people are talking, and a block that announced itself
+            // would reopen exactly that.
+            await expect(
+                useCase.execute({
+                    conversationId: "conv-1",
+                    userId: READER,
+                    limit: 10,
+                }),
+            ).rejects.toThrow(ConversationNotFoundError);
+
+            expect(messageRepo.listByConversation).not.toHaveBeenCalled();
+        });
+
+        it("should ask about the other participant, not the reader", async () => {
+            await useCase.execute({
+                conversationId: "conv-1",
+                userId: READER,
+                limit: 10,
+            });
+
+            expect(blockRepo.existsBetween).toHaveBeenCalledWith(READER, OTHER);
+        });
     });
 });

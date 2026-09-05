@@ -21,6 +21,8 @@ export const ProfileItemSchema = FBType.Object({
     articleCount: FBType.Number(),
     isMe: FBType.Boolean(),
     isFollowing: FBType.Boolean(),
+    isBlocked: FBType.Boolean(),
+    isBlockedBy: FBType.Boolean(),
 });
 
 export type ProfileItem = Static<typeof ProfileItemSchema>;

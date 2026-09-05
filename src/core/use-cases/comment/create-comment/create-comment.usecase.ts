@@ -56,6 +56,10 @@ export class CreateCommentUseCase {
      * see their own draft, is told that the article is simply not published
      * yet.
      *
+     * A blocked author\'s content answers 404 too, for the same reason it does
+     * on the detail endpoint: an error that named the block would let anyone
+     * test for one by replying to a link.
+     *
      * @param ctx - The transactional repositories
      * @param target - What is being commented on
      * @param commenterId - The user attempting to comment
@@ -71,6 +75,14 @@ export class CreateCommentUseCase {
         if (target.type === "POST") {
             const post = await ctx.postRepository.findById(target.id);
             if (!post) throw new NotFoundError("Post not found.");
+
+            await this.assertAuthorVisible(
+                ctx,
+                post.author.id,
+                commenterId,
+                "Post not found.",
+            );
+
             return { authorId: post.author.id };
         }
 
@@ -80,6 +92,13 @@ export class CreateCommentUseCase {
             throw new NotFoundError("Article not found.");
         }
 
+        await this.assertAuthorVisible(
+            ctx,
+            article.author.id,
+            commenterId,
+            "Article not found.",
+        );
+
         if (!article.isPublished()) {
             throw new ArticleNotPublishedError(
                 "You cannot comment on an article that is not published.",
@@ -87,6 +106,31 @@ export class CreateCommentUseCase {
         }
 
         return { authorId: article.author.id, slug: article.slug };
+    }
+
+    /**
+     * Hides content whose author is blocked, in either direction.
+     *
+     * @param ctx - The transactional repositories
+     * @param authorId - Who wrote the thing being commented on
+     * @param commenterId - The user attempting to comment
+     * @param message - The not-found message for this kind of target
+     * @throws NotFoundError - When a block stands between the two
+     */
+    private async assertAuthorVisible(
+        ctx: TransactionContext,
+        authorId: string,
+        commenterId: string,
+        message: string,
+    ): Promise<void> {
+        if (authorId === commenterId) return;
+
+        const blocked = await ctx.blockRepository.existsBetween(
+            commenterId,
+            authorId,
+        );
+
+        if (blocked) throw new NotFoundError(message);
     }
 
     /**

@@ -1,5 +1,6 @@
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { IUserInterestRepository } from "@core/ports/repositories/user-interest.repository";
 import type { CachePort } from "@core/ports/services/cache.port";
@@ -103,6 +104,7 @@ export class GetPostsUseCase {
      * @param postRepository - Repository for reading posts and feed candidates
      * @param cacheService - Cache holding ranked orders and scroll snapshots
      * @param followUserRepository - Repository used to resolve who the viewer follows
+     * @param blockRepository - Repository used to resolve who the viewer cannot see
      * @param profileRepository - Repository used to read the viewer's feed languages
      * @param userInterestRepository - Repository holding each viewer's interest profile
      * @param cryptoService - Source of the random tokens that address snapshots
@@ -117,6 +119,7 @@ export class GetPostsUseCase {
         private readonly postRepository: IPostRepository,
         private readonly cacheService: CachePort,
         private readonly followUserRepository: IFollowRepository,
+        private readonly blockRepository: IBlockRepository,
         private readonly profileRepository: IProfileRepository,
         private readonly userInterestRepository: IUserInterestRepository,
         private readonly cryptoService: CryptoPort,
@@ -168,14 +171,28 @@ export class GetPostsUseCase {
             );
         }
 
+        // Resolved once per request and threaded through every path below.
+        // A guest has nobody hidden from them, so the query is skipped.
+        const excludeAuthorIds = input.currentUserId
+            ? await this.blockRepository.getInvisibleUserIds(
+                  input.currentUserId,
+              )
+            : [];
+
         if (!this.isRankable(input.type)) {
-            return this.chronologicalPage(input, input.page || 1, limit);
+            return this.chronologicalPage(
+                input,
+                input.page || 1,
+                limit,
+                excludeAuthorIds,
+            );
         }
 
         const { snapshot, token, offset } = await this.resolveScrollPosition(
             input,
             limit,
             followedOnly,
+            excludeAuthorIds,
         );
 
         if (offset >= snapshot.ids.length) {
@@ -186,13 +203,20 @@ export class GetPostsUseCase {
                 snapshot,
                 token,
                 offset,
+                excludeAuthorIds,
             );
         }
 
         const pageIds = snapshot.ids.slice(offset, offset + limit);
+        // Applied again at hydration, not only when the order was built: a
+        // snapshot outlives a block by up to its own lifetime, and filtering
+        // here is what lets a stale one heal instead of having to be
+        // invalidated. The page comes back short, and the top-up below - which
+        // exists for the same shape of problem - fills it.
         const hydrated = await this.postRepository.findByIds(
             pageIds,
             input.currentUserId,
+            excludeAuthorIds,
         );
         const ranked = this.reorder(hydrated, pageIds);
 
@@ -209,6 +233,7 @@ export class GetPostsUseCase {
                       0,
                       limit - pageIds.length,
                       snapshot,
+                      excludeAuthorIds,
                   )
                 : [];
 
@@ -251,12 +276,14 @@ export class GetPostsUseCase {
      * @param input - The feed request.
      * @param limit - Page size, used to translate a page number into a depth.
      * @param followedOnly - Whether the pool is restricted to followed accounts.
+     * @param excludeAuthorIds - Authors invisible to the viewer.
      * @returns The snapshot, its token, and the offset to read from.
      */
     private async resolveScrollPosition(
         input: GetPostsInput,
         limit: number,
         followedOnly: boolean,
+        excludeAuthorIds: string[],
     ): Promise<ScrollPosition> {
         const cursor = input.cursor ? decodeFeedCursor(input.cursor) : null;
 
@@ -274,6 +301,7 @@ export class GetPostsUseCase {
             input,
             limit,
             followedOnly,
+            excludeAuthorIds,
         );
 
         return {
@@ -295,12 +323,14 @@ export class GetPostsUseCase {
      * @param input - The feed request.
      * @param limit - The page size the reader asked for.
      * @param followedOnly - Whether the pool is restricted to followed accounts.
+     * @param excludeAuthorIds - Authors invisible to the viewer.
      * @returns The snapshot and the token addressing it.
      */
     private async currentRankedOrder(
         input: GetPostsInput,
         limit: number,
         followedOnly: boolean,
+        excludeAuthorIds: string[],
     ): Promise<{ snapshot: RankedSnapshot; token: string }> {
         const languages = await this.resolveViewerLanguages(input);
         const pointerKey = this.rankedPointerKey(
@@ -320,6 +350,7 @@ export class GetPostsUseCase {
             languages,
             limit,
             followedOnly,
+            excludeAuthorIds,
         );
         const token = this.cryptoService.generateRandomHex(SCROLL_TOKEN_BYTES);
 
@@ -370,6 +401,7 @@ export class GetPostsUseCase {
         languages: string[],
         limit: number,
         followedOnly: boolean,
+        excludeAuthorIds: string[],
     ): Promise<RankedSnapshot> {
         // A signed-in viewer's follow graph and interest profile are both
         // reads that only the ranker needs, so they go out together rather
@@ -396,14 +428,19 @@ export class GetPostsUseCase {
                 tag: input.tag,
                 categories: input.categories,
                 followingIds: scopedFollowingIds,
+                excludeAuthorIds,
                 since,
                 limit: this.feedCandidatePoolSize,
             }),
+            // The count carries the same exclusion as the pool it describes.
+            // A total that included blocked authors would promise pages the
+            // reader can never reach.
             this.postRepository.countAll({
                 type: input.type,
                 tag: input.tag,
                 categories: input.categories,
                 followingIds: scopedFollowingIds,
+                excludeAuthorIds,
             }),
         ]);
 
@@ -609,6 +646,7 @@ export class GetPostsUseCase {
      * @param skip - How many tail rows have already been served this scroll.
      * @param limit - How many rows to read.
      * @param snapshot - The snapshot whose ids the tail must not repeat.
+     * @param excludeAuthorIds - Authors invisible to the viewer.
      * @returns The posts, at most `limit` of them.
      */
     private async tailPosts(
@@ -616,6 +654,7 @@ export class GetPostsUseCase {
         skip: number,
         limit: number,
         snapshot: RankedSnapshot,
+        excludeAuthorIds: string[],
     ): Promise<Post[]> {
         if (limit <= 0) return [];
 
@@ -628,6 +667,7 @@ export class GetPostsUseCase {
             tag: input.tag,
             categories: input.categories,
             excludeIds: snapshot.ids,
+            excludeAuthorIds,
             ...(input.followedOnly && input.currentUserId
                 ? {
                       followingIds:
@@ -650,6 +690,7 @@ export class GetPostsUseCase {
      * @param snapshot - The snapshot, whose ids this page must not repeat.
      * @param token - The token the returned cursor keeps pointing at.
      * @param offset - Where this page started, in snapshot coordinates.
+     * @param excludeAuthorIds - Authors invisible to the viewer.
      * @returns The page of posts, the unchanged total, and the next cursor.
      */
     private async chronologicalTail(
@@ -659,8 +700,15 @@ export class GetPostsUseCase {
         snapshot: RankedSnapshot,
         token: string,
         offset: number,
+        excludeAuthorIds: string[],
     ): Promise<GetPostsOutput> {
-        const posts = await this.tailPosts(input, skip, limit, snapshot);
+        const posts = await this.tailPosts(
+            input,
+            skip,
+            limit,
+            snapshot,
+            excludeAuthorIds,
+        );
 
         await this.recordSeen(
             input.currentUserId,
@@ -690,12 +738,14 @@ export class GetPostsUseCase {
      * @param input - The feed request.
      * @param page - The requested page.
      * @param limit - Page size.
+     * @param excludeAuthorIds - Authors invisible to the viewer.
      * @returns The page of posts and the total matching the filters.
      */
     private async chronologicalPage(
         input: GetPostsInput,
         page: number,
         limit: number,
+        excludeAuthorIds: string[],
     ): Promise<GetPostsOutput> {
         const { posts, total } = await this.postRepository.findAll({
             page,
@@ -704,6 +754,7 @@ export class GetPostsUseCase {
             currentUserId: input.currentUserId,
             tag: input.tag,
             categories: input.categories,
+            excludeAuthorIds,
             ...(input.followedOnly && input.currentUserId
                 ? {
                       followingIds:

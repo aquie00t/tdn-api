@@ -24,6 +24,7 @@ import type {
     TransactionPort,
 } from "@core/ports/services/transaction.port";
 import type { MediaAsset } from "@core/domain/entities/media-asset.entity";
+import { buildBlockRepository } from "../../../helpers/mock-factories";
 
 const CDN_URL = "https://cdn.example.com";
 const SENDER = "aaaa-1111";
@@ -127,6 +128,7 @@ describe("SendMessageUseCase", () => {
             transactionSvc as TransactionPort,
             conversationRepo as IConversationRepository,
             mediaAssetRepo as IMediaAssetRepository,
+            buildBlockRepository(),
             realtimeSvc as RealtimePort,
             CDN_URL,
         );

@@ -11,7 +11,10 @@ import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
 import type { Comment } from "@core/domain/entities/comment.entity";
 import type { Post } from "@core/domain/entities/post.entity";
-import { buildComment } from "../../../helpers/mock-factories";
+import {
+    buildComment,
+    buildBlockRepository,
+} from "../../../helpers/mock-factories";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { LoggerPort } from "@core/ports/services/logger.port";
@@ -56,6 +59,7 @@ describe("CreateCommentUseCase", () => {
             notificationRepository:
                 txNotificationRepo as INotificationRepository,
             mediaAssetRepository: mediaAssetRepo as IMediaAssetRepository,
+            blockRepository: buildBlockRepository(),
         }) as TransactionContext;
 
     beforeEach(() => {

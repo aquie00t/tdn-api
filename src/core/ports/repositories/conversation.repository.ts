@@ -26,6 +26,18 @@ export interface ListConversationsInput {
      * the sort key. A cursor that cannot be decoded is treated as absent.
      */
     cursor?: string;
+
+    /**
+     * Participants whose threads must not appear - the accounts this viewer
+     * has blocked, and those who blocked them.
+     *
+     * Applied in the query rather than by the caller filtering the result.
+     * The inbox pages by fetching one row more than it needs and using the
+     * overflow to decide whether there is a next page; dropping rows after
+     * that read would return short pages and report `hasMore` against a count
+     * that no longer describes them.
+     */
+    excludeUserIds?: string[];
 }
 
 /**
@@ -151,7 +163,13 @@ export interface IConversationRepository {
      * attention from a stranger.
      *
      * @param userId - The user whose badge is being read
+     * @param excludeUserIds - Participants whose threads must not be counted,
+     * so a blocked thread stops raising the badge it can no longer be opened
+     * from
      * @returns The total number of unread messages
      */
-    getTotalUnreadCount(userId: string): Promise<number>;
+    getTotalUnreadCount(
+        userId: string,
+        excludeUserIds?: string[],
+    ): Promise<number>;
 }

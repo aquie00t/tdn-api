@@ -10,6 +10,7 @@ read path.
 ## Contents
 
 - [Conversation lifecycle](#conversation-lifecycle)
+- [Blocked participants](#blocked-participants)
 - [Endpoints](#endpoints)
 - [Objects](#objects)
 - [Pagination](#pagination)
@@ -67,6 +68,35 @@ for the same pair returns the declined conversation unchanged, with
 Every conversation object carries `isRequest` and `canSend`, already resolved
 for the authenticated reader. Clients should render from those fields rather
 than re-deriving the rules above.
+
+---
+
+## Blocked participants
+
+A block between the two participants takes the conversation **out of both
+inboxes**, in whichever direction the block was written. See
+[blocking.md](./blocking.md) for the feature itself.
+
+| Action | Answer while blocked |
+| --- | --- |
+| `POST /conversations` | `400 InvalidRecipientError` |
+| `GET /conversations` | The thread is absent, from both sides |
+| `GET /conversations/:id/messages` | `404 ConversationNotFoundError` |
+| `POST /conversations/:id/messages` | `404 ConversationNotFoundError` |
+| `PATCH /conversations/:id/read` | `404 ConversationNotFoundError` |
+| `PATCH /conversations/:id/accept`, `/decline` | `404 ConversationNotFoundError` |
+| `GET /conversations/unread-count` | The thread is not counted |
+
+`404`, not `403`, and `InvalidRecipientError` rather than a block-specific
+error. These endpoints already answer every rejection with one shape so thread
+membership cannot be probed; an error naming the block would undo that, and
+would also tell the blocked user exactly which of their threads went quiet.
+
+Nothing is deleted. The row, its status, its read counters and every message
+survive, and lifting the block restores the thread with its full history.
+
+Blocking does **not** move the conversation to `DECLINED`. Declining is a
+decision about one request; blocking is about the account, and it is reversible.
 
 ---
 
@@ -355,12 +385,13 @@ is English prose and subject to change.
 | `404` | `ConversationNotFoundError` | No such conversation, **or** the caller is not a participant |
 | `403` | `MessageNotSendableError` | Declined conversation, or a request the caller has not accepted |
 | `400` | `EmptyMessageError` | Neither text nor media |
-| `400` | `InvalidRecipientError` | Recipient is the caller, a bot, or pending deletion |
+| `400` | `InvalidRecipientError` | Recipient is the caller, a bot, pending deletion, or blocked in either direction |
 | `400` | `MediaNotOwnedError` | Media not uploaded by the caller, from the wrong channel, or already claimed |
 | `429` | `TooManyRequestsError` | Rate limit exceeded |
 
 A conversation the caller does not participate in returns `404` rather than
-`403`, so that thread membership cannot be probed.
+`403`, so that thread membership cannot be probed. A conversation hidden by a
+block answers the same way, for the same reason.
 
 ---
 
@@ -378,7 +409,6 @@ A conversation the caller does not participate in returns `404` rather than
 Deliberately out of scope in this version:
 
 - Group conversations
-- User block lists — declining a request is the available mechanism
 - Message editing
 - Typing indicators
 - End-to-end encryption

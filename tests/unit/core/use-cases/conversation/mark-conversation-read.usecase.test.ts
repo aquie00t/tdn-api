@@ -6,6 +6,7 @@ import { ConversationStatus } from "@core/domain/enums";
 import { ConversationNotFoundError } from "@core/errors";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
+import { buildBlockRepository } from "../../../helpers/mock-factories";
 
 const INITIATOR = "aaaa-1111";
 const RECIPIENT = "bbbb-2222";
@@ -43,6 +44,7 @@ describe("MarkConversationReadUseCase", () => {
         useCase = new MarkConversationReadUseCase(
             conversationRepo as IConversationRepository,
             realtimeSvc as RealtimePort,
+            buildBlockRepository(),
         );
     });
 

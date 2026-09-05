@@ -1,6 +1,7 @@
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { Post } from "@core/domain/entities/post.entity";
 import { NotFoundError } from "@core/errors";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 import type { GetPostDetailUseCaseInput } from "./get-post-detail-usecase.input";
 
 /**
@@ -9,8 +10,12 @@ import type { GetPostDetailUseCaseInput } from "./get-post-detail-usecase.input"
 export class GetPostDetailUseCase {
     /**
      * @param postRepository - An instance of IPostRepository to interact with the data layer for posts.
+     * @param blockRepository - Repository used to hide a blocked author\'s post.
      */
-    constructor(private readonly postRepository: IPostRepository) {}
+    constructor(
+        private readonly postRepository: IPostRepository,
+        private readonly blockRepository: IBlockRepository,
+    ) {}
 
     /**
      * Executes the use case to get the details of a post by its ID. If the post is not found, it throws a NotFoundError.
@@ -25,6 +30,19 @@ export class GetPostDetailUseCase {
 
         if (!post) {
             throw new NotFoundError("Post not found");
+        }
+
+        // The same error a missing post gets. A distinct one would let anyone
+        // check whether a particular account has blocked them by opening a
+        // link, which the profile already answers deliberately and this
+        // endpoint has no reason to answer twice.
+        if (userId && post.author.id !== userId) {
+            const blocked = await this.blockRepository.existsBetween(
+                userId,
+                post.author.id,
+            );
+
+            if (blocked) throw new NotFoundError("Post not found");
         }
 
         return post;

@@ -1,0 +1,28 @@
+/// One user's decision to stop seeing, and stop being seen by, another.
+///
+/// Stored directionally, unlike a conversation's participant pair. That pair
+/// is ordered so `(a,b)` and `(b,a)` collapse into one row and its unique
+/// constraint means something; here the direction is the question being
+/// answered - a profile has to say whether you blocked them or they blocked
+/// you, and those render as different screens.
+///
+/// The effect, though, is symmetric: every read that resolves "who can this
+/// viewer not see" takes the union of both directions, so one row hides two
+/// people from each other. Two rows exist only when both sides blocked
+/// independently, and unblocking then leaves the other one standing.
+model Block {
+  blockerId String
+  blockedId String
+
+  createdAt DateTime @default(now())
+
+  blocker User @relation("UserBlocking", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("UserBlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  // Both directions are queried on their own - the union that hides people
+  // from a feed reads them separately - so both columns carry an index.
+  @@id([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("blocks")
+}

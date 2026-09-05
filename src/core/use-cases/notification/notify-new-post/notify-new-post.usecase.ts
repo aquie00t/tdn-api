@@ -3,6 +3,7 @@ import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import { PostType } from "@core/domain/enums/post-type.enum";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
 import type { NotifyNewPostInput } from "./notify-new-post.input";
 
@@ -33,11 +34,13 @@ export class NotifyNewPostUseCase {
      * @param followUserRepository - Repository used to resolve the follower list
      * @param notificationRepository - Repository for persisting notifications
      * @param realtimeService - Service for pushing the notification live
+     * @param blockRepository - Repository used to drop blocked recipients
      */
     constructor(
         private readonly followUserRepository: IFollowRepository,
         private readonly notificationRepository: INotificationRepository,
         private readonly realtimeService: RealtimePort,
+        private readonly blockRepository: IBlockRepository,
     ) {}
 
     /**
@@ -58,6 +61,13 @@ export class NotifyNewPostUseCase {
      * broadcast does not. The caller knows both the mentioned users and the
      * quoted author before either fan-out starts, so nothing here has to wait
      * on the other.
+     *
+     * Blocked recipients are dropped here rather than left to the caller. The
+     * rule is global - nobody hears from an account they blocked, or that
+     * blocked them - so it belongs beside the other suppression rules instead
+     * of being re-derived at each call site. A block also tears down the
+     * follow that would have put them in this list, so in practice this
+     * catches the narrow window where the two overlap.
      */
     async execute(input: NotifyNewPostInput): Promise<number> {
         if (!NOTIFYING_POST_TYPES.includes(input.postType)) return 0;
@@ -68,6 +78,12 @@ export class NotifyNewPostUseCase {
 
         const excluded = new Set(input.excludeUserIds ?? []);
         excluded.add(input.authorId);
+
+        for (const id of await this.blockRepository.getInvisibleUserIds(
+            input.authorId,
+        )) {
+            excluded.add(id);
+        }
 
         const recipientIds = followerIds.filter((id) => !excluded.has(id));
         if (recipientIds.length === 0) return 0;

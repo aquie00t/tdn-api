@@ -1,4 +1,5 @@
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 import { encodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
 import type { ListConversationsUseCaseInput } from "./list-conversations-usecase.input";
 import type { ListConversationsUseCaseOutput } from "./list-conversations-usecase.output";
@@ -15,9 +16,11 @@ export class ListConversationsUseCase {
      * Creates a new ListConversationsUseCase instance.
      *
      * @param conversationRepository - Repository the inbox is read from
+     * @param blockRepository - Repository the hidden participants come from
      */
     constructor(
         private readonly conversationRepository: IConversationRepository,
+        private readonly blockRepository: IBlockRepository,
     ) {}
 
     /**
@@ -33,11 +36,20 @@ export class ListConversationsUseCase {
     async execute(
         input: ListConversationsUseCaseInput,
     ): Promise<ListConversationsUseCaseOutput> {
+        // Handed to the query, not applied to its result. The extra row this
+        // page fetches is what decides whether there is a next one, and
+        // filtering afterwards would shrink the page and answer that question
+        // against rows the reader never gets.
+        const excludeUserIds = await this.blockRepository.getInvisibleUserIds(
+            input.userId,
+        );
+
         const page = await this.conversationRepository.listForUser({
             userId: input.userId,
             status: input.status,
             limit: input.limit + 1,
             cursor: input.cursor,
+            excludeUserIds,
         });
 
         const hasMore = page.length > input.limit;

@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FollowUserUseCase } from "@core/use-cases/follow-user/follow-user/follow-user.usecase";
-import { BadRequestError, NotFoundError } from "@core/errors";
+import { BadRequestError, NotFoundError, UserBlockedError } from "@core/errors";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
-import { buildProfile } from "../../../helpers/mock-factories";
+import {
+    buildProfile,
+    buildBlockRepository,
+} from "../../../helpers/mock-factories";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 
 describe("FollowUserUseCase", () => {
     let useCase: FollowUserUseCase;
@@ -13,6 +17,7 @@ describe("FollowUserUseCase", () => {
     let notificationRepo: Pick<INotificationRepository, "create">;
     let realtimeSvc: Pick<RealtimePort, "emitToUser">;
     let profileRepo: Pick<IProfileRepository, "findByUserId">;
+    let blockRepo: IBlockRepository;
 
     beforeEach(() => {
         followRepo = {
@@ -27,11 +32,14 @@ describe("FollowUserUseCase", () => {
                 .mockResolvedValue(buildProfile({ userId: "user-2" })),
         };
 
+        blockRepo = buildBlockRepository();
+
         useCase = new FollowUserUseCase(
             followRepo as IFollowRepository,
             notificationRepo as INotificationRepository,
             realtimeSvc as RealtimePort,
             profileRepo as IProfileRepository,
+            blockRepo,
         );
     });
 
@@ -114,5 +122,47 @@ describe("FollowUserUseCase", () => {
 
         expect(followRepo.getFollowersCount).toHaveBeenCalledWith("user-2");
         expect(result.followersCount).toBe(100);
+    });
+
+    describe("blocking", () => {
+        it("should refuse the follow when a block stands either way", async () => {
+            vi.mocked(blockRepo.existsBetween).mockResolvedValue(true);
+
+            await expect(
+                useCase.execute({
+                    currentUserId: "user-1",
+                    targetId: "user-2",
+                }),
+            ).rejects.toThrow(UserBlockedError);
+
+            expect(followRepo.followUser).not.toHaveBeenCalled();
+        });
+
+        it("should announce the block rather than failing silently", async () => {
+            vi.mocked(blockRepo.existsBetween).mockResolvedValue(true);
+
+            // A follow that quietly does nothing reads as a bug and leaves the
+            // blocked user tapping the button again; the client has a screen
+            // for a 403 carrying this title.
+            await expect(
+                useCase.execute({
+                    currentUserId: "user-1",
+                    targetId: "user-2",
+                }),
+            ).rejects.toMatchObject({ statusCode: 403 });
+        });
+
+        it("should not ask about blocks before the target is known to exist", async () => {
+            vi.mocked(profileRepo.findByUserId).mockResolvedValue(null);
+
+            await expect(
+                useCase.execute({
+                    currentUserId: "user-1",
+                    targetId: "user-2",
+                }),
+            ).rejects.toThrow(NotFoundError);
+
+            expect(blockRepo.existsBetween).not.toHaveBeenCalled();
+        });
     });
 });
