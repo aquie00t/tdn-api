@@ -5,12 +5,60 @@ import { defineConfig } from "prisma/config";
 
 config({ path: `.env.${process.env.NODE_ENV || "development"}` });
 
+/**
+ * Rewrites a Neon connection string onto its unpooled endpoint - the same
+ * host with `-pooler` removed - leaving everything else untouched.
+ *
+ * A no-op for a url that is already unpooled and for any host that is not
+ * Neon's, so local and CI databases pass straight through. Only the hostname
+ * is touched, which is why this parses the url instead of running a replace
+ * over the whole string: `-pooler` can legitimately occur in a password.
+ *
+ * @param url The connection string to rewrite, if there is one.
+ * @returns The unpooled url, or the input unchanged when it is absent or not
+ * parseable.
+ */
+function toUnpooled(url: string | undefined): string | undefined {
+    if (!url) return url;
+
+    try {
+        const parsed = new URL(url);
+        parsed.hostname = parsed.hostname.replace("-pooler", "");
+        return parsed.toString();
+    } catch {
+        return url;
+    }
+}
+
+/**
+ * The url every Prisma CLI command uses - `migrate deploy` in the Render
+ * pre-deploy and in release.yml, plus `generate`, `validate` and `studio`.
+ *
+ * Deliberately not the url the running service uses. The application connects
+ * through Neon's pooled endpoint, which is the right choice for a
+ * request-per-connection API - the compute's `max_connections` is far below
+ * what one would otherwise open - but the wrong one for migrations:
+ * `migrate deploy` guards itself with `pg_advisory_lock`, a *session*-scoped
+ * lock, and a transaction-mode pooler can hand the next statement to a
+ * different backend than the one holding it. An interrupted migration then
+ * strands the lock on a server connection the pooler keeps alive, and every
+ * later deploy fails the same way - P1002, "Timed out trying to acquire a
+ * postgres advisory lock", ten seconds at a time - until the compute
+ * restarts. That is what cancelled the 2026-09-05 deploy.
+ *
+ * Derived rather than configured: a second environment variable would have to
+ * be set on the Render service and in the release workflow's secrets, and the
+ * failure mode of forgetting either is this file silently going back to the
+ * pooled url.
+ */
+const migrationUrl = toUnpooled(process.env["DATABASE_URL"]);
+
 export default defineConfig({
     schema: "prisma/",
     migrations: {
         path: "prisma/migrations",
     },
     datasource: {
-        url: process.env["DATABASE_URL"],
+        url: migrationUrl,
     },
 });
