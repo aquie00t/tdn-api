@@ -12,6 +12,10 @@ import {
     OAuthExchangeResponseSchema,
     type OAuthExchangeBody,
 } from "@typings/schemas/oauth/oauth-exchange.schema";
+import {
+    OAuthStartQuerySchema,
+    type OAuthStartQuery,
+} from "@typings/schemas/oauth/oauth-start.schema";
 
 /**
  * Sets up OAuth routes on the Fastify instance
@@ -22,18 +26,21 @@ import {
 export function oauthRoutes(fastify: FastifyInstance): void {
     const oauthController = fastify.diContainer.cradle.oauthController;
 
-    fastify.get(
+    fastify.get<{ Querystring: OAuthStartQuery }>(
         "/github",
         {
             config: { rateLimit: RateLimitPolicies.STANDARD },
             schema: {
+                querystring: OAuthStartQuerySchema,
                 tags: ["OAuth"],
             },
         },
         oauthController.github.bind(oauthController),
     );
 
-    fastify.get<{ Querystring: { code?: string; error?: string } }>(
+    fastify.get<{
+        Querystring: { code?: string; error?: string; state?: string };
+    }>(
         "/github/callback",
         {
             config: { rateLimit: RateLimitPolicies.STRICT },
@@ -44,18 +51,21 @@ export function oauthRoutes(fastify: FastifyInstance): void {
         oauthController.githubCallback.bind(oauthController),
     );
 
-    fastify.get(
+    fastify.get<{ Querystring: OAuthStartQuery }>(
         "/google",
         {
             config: { rateLimit: RateLimitPolicies.STANDARD },
             schema: {
+                querystring: OAuthStartQuerySchema,
                 tags: ["OAuth"],
             },
         },
         oauthController.google.bind(oauthController),
     );
 
-    fastify.get<{ Querystring: { code?: string; error?: string } }>(
+    fastify.get<{
+        Querystring: { code?: string; error?: string; state?: string };
+    }>(
         "/google/callback",
         {
             config: { rateLimit: RateLimitPolicies.STRICT },

@@ -31,13 +31,14 @@ export class GithubAuthService implements GithubAuthPort {
         return s.slice(0, maxLen).replace(/_+$/g, "");
     }
 
-    getAuthorizationUrl(): string {
+    getAuthorizationUrl(state: string): string {
         const rootUrl = "https://github.com/login/oauth/authorize";
 
         const options = {
             client_id: this.config.clientId,
             redirect_uri: this.config.callbackUrl,
             scope: "user:email",
+            state,
         };
 
         const qs = new URLSearchParams(options);

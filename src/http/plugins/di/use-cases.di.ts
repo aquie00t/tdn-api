@@ -13,6 +13,10 @@ import { ResetPasswordUseCase } from "@core/use-cases/auth/reset-password";
 import { RecoverAccountUseCase } from "@core/use-cases/auth/recover-account";
 import { GoogleLoginUseCase } from "@core/use-cases/oauth/oauth-google";
 import { OAuthExchangeUseCase } from "@core/use-cases/oauth/oauth-exchange";
+import {
+    BeginOAuthUseCase,
+    ConsumeOAuthStateUseCase,
+} from "@core/use-cases/oauth/oauth-state";
 import { PurgeExpiredUsersUseCase } from "@core/use-cases/user/purge-expired-users";
 import { PurgeExpiredTokensUseCase } from "@core/use-cases/auth/purge-expired-tokens";
 import { GetMeUserUseCase } from "@core/use-cases/user/get-me";
@@ -109,6 +113,22 @@ import {
  *
  * shared dependencies across the application.
  */
+/**
+ * Splits a comma-separated environment list, dropping blanks.
+ *
+ * An empty variable must produce no entries rather than one empty string,
+ * which would otherwise allow-list the empty redirect.
+ *
+ * @param value - The raw environment value
+ * @returns The trimmed, non-empty entries
+ */
+function splitList(value: string): string[] {
+    return value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+}
+
 export const useCasesModule = {
     /**
      * Use case for the morning digest email
@@ -148,6 +168,43 @@ export const useCasesModule = {
                 logger,
             ),
     ).singleton(),
+
+    /**
+     * Use case that starts an OAuth flow and records what it is for
+     */
+    beginOAuthUseCase: asFunction(
+        (
+            githubAuthService,
+            googleAuthService,
+            cryptoService,
+            cacheService,
+            oauthRedirectConfig,
+        ) =>
+            new BeginOAuthUseCase(
+                githubAuthService,
+                googleAuthService,
+                cryptoService,
+                cacheService,
+                oauthRedirectConfig,
+            ),
+    ).singleton(),
+
+    /**
+     * Use case that reads back, and spends, an OAuth flow's state
+     */
+    consumeOAuthStateUseCase: asFunction(
+        (cacheService, oauthRedirectConfig) =>
+            new ConsumeOAuthStateUseCase(cacheService, oauthRedirectConfig),
+    ).singleton(),
+
+    /**
+     * The redirect targets an OAuth flow may be returned to
+     */
+    oauthRedirectConfig: asFunction((config) => ({
+        frontendUrl: config.FRONTEND_URL,
+        webAllowList: splitList(config.OAUTH_REDIRECT_ALLOWLIST),
+        nativeAllowList: splitList(config.OAUTH_NATIVE_REDIRECT_ALLOWLIST),
+    })).singleton(),
 
     /**
      * Use case for reporting a post or a comment

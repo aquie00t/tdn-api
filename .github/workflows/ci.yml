@@ -28,6 +28,9 @@ env:
     GITHUB_CLIENT_SECRET: dummy_github_secret
     GOOGLE_CLIENT_ID: dummy_google_id
     GOOGLE_CLIENT_SECRET: dummy_google_secret
+    # The app target the OAuth e2e cases start a flow for. Any value works as
+    # long as the tests use the same one; it is never dialled.
+    OAUTH_NATIVE_REDIRECT_ALLOWLIST: tdn://oauth-success
     DISABLE_RATE_LIMIT: true
     HUSKY: "0"
 

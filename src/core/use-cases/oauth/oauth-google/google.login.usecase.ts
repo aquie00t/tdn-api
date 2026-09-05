@@ -62,6 +62,7 @@ export class GoogleLoginUseCase {
             userId: user.id,
             username: user.username,
             isEmailVerified: user.isEmailVerified,
+            delivery: input.delivery,
         };
 
         await this.cacheService.set(

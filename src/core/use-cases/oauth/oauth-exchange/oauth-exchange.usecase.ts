@@ -8,11 +8,21 @@ import type { LoginOutput } from "@core/use-cases/auth/login/login.output";
 import { UnauthorizedError } from "@core/errors";
 import { AuthMapper } from "../../auth/auth.mapper";
 import type { OAuthExchangeInput } from "./oauth-exchange.input";
+import type { OAuthDelivery } from "../oauth-state";
 
 export interface OAuthExchangePayload {
     userId: string;
     username: string;
     isEmailVerified: boolean;
+
+    /**
+     * Which channel the session belongs on, decided when the flow started.
+     *
+     * Carried on the code rather than asked of the caller: whoever holds the
+     * code decides nothing here, because a browser holding one could otherwise
+     * ask for the body channel and read out a thirty-day refresh token.
+     */
+    delivery?: OAuthDelivery;
 }
 
 export class OAuthExchangeUseCase {
@@ -22,7 +32,9 @@ export class OAuthExchangeUseCase {
         private readonly refreshTokenRepository: IRefreshTokenRepository,
     ) {}
 
-    async execute(input: OAuthExchangeInput): Promise<LoginOutput> {
+    async execute(
+        input: OAuthExchangeInput,
+    ): Promise<LoginOutput & { delivery: OAuthDelivery }> {
         const cacheKey = `oauth:exchange:${input.code}`;
 
         const raw = await this.cacheService.get(cacheKey);
@@ -55,6 +67,10 @@ export class OAuthExchangeUseCase {
         });
 
         return {
+            // Absent on a code minted before this field existed, which can
+            // only be one already in flight: the cookie is what those flows
+            // expected.
+            delivery: payload.delivery ?? "cookie",
             user: {
                 ...AuthMapper.toUserOutput(userPayload),
                 isEmailVerified: payload.isEmailVerified,
