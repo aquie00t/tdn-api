@@ -20,6 +20,9 @@ env:
     DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/tdn_test
     REDIS_URL: redis://localhost:6379
     ACCESS_TOKEN_SECRET_KEY: test_secret_token_123
+    # Fixed and obviously fake: CI encrypts throwaway rows in a database it
+    # drops afterwards. 32 bytes, base64, which the service checks at boot.
+    MESSAGE_ENCRYPTION_KEY: dGRuLWNpLXRlc3Qta2V5LW5vdC1hLXNlY3JldC0zMmI=
     COOKIE_SECRET: test_cookie_secret_123
     GITHUB_CLIENT_ID: dummy_github_id
     GITHUB_CLIENT_SECRET: dummy_github_secret

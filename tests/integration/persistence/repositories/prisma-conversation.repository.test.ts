@@ -5,7 +5,10 @@ import { PrismaConversationRepository } from "../../../../src/infrastructure/per
 import { Conversation } from "../../../../src/core/domain/entities/conversation.entity";
 import { ConversationStatus } from "../../../../src/core/domain/enums";
 import { encodeKeysetCursor } from "../../../../src/core/use-cases/shared/pagination/keyset-cursor";
-import { createPrismaClient } from "../../helpers/setup";
+import {
+    createEncryptionService,
+    createPrismaClient,
+} from "../../helpers/setup";
 
 const EMAIL_DOMAIN = "@conversation-test.com";
 
@@ -48,7 +51,10 @@ describe("PrismaConversationRepository (integration)", () => {
 
         [alice, bob, carol] = created.map((user) => user.id);
 
-        repository = new PrismaConversationRepository(prisma);
+        repository = new PrismaConversationRepository(
+            prisma,
+            createEncryptionService(),
+        );
     });
 
     beforeEach(async () => {

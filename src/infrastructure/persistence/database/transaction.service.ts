@@ -6,6 +6,7 @@ import type {
 import { PrismaUserRepository } from "../repositories/prisma-user.repository";
 import { PrismaRefreshTokenRepository } from "../repositories/prisma-refresh-token.repository";
 import type { FastifyInstance } from "fastify";
+import type { EncryptionPort } from "@core/ports/services/encryption.port";
 import { PrismaCommentRepository } from "../repositories/prisma-comment.repository";
 import { PrismaPostRepository } from "../repositories/prisma-post.repository";
 import { PrismaNotificationRepository } from "../repositories/prisma-notification.repository";
@@ -29,10 +30,13 @@ export class TransactionService implements TransactionPort {
      * Creates a new TransactionService instance
      * @param prisma - The Prisma client instance
      * @param config - Fastify configuration containing grace period settings
+     * @param messageEncryptionService - Cipher the message and conversation
+     * repositories need to read and write encrypted columns
      */
     constructor(
         private readonly prisma: PrismaClient,
         private readonly config: FastifyInstance["config"],
+        private readonly messageEncryptionService: EncryptionPort,
     ) {}
 
     /**
@@ -63,8 +67,14 @@ export class TransactionService implements TransactionPort {
                 articleRepository: new PrismaArticleRepository(tx),
                 articleLikeRepository: new PrismaArticleLikeRepository(tx),
                 mediaAssetRepository: new PrismaMediaAssetRepository(tx),
-                conversationRepository: new PrismaConversationRepository(tx),
-                messageRepository: new PrismaMessageRepository(tx),
+                conversationRepository: new PrismaConversationRepository(
+                    tx,
+                    this.messageEncryptionService,
+                ),
+                messageRepository: new PrismaMessageRepository(
+                    tx,
+                    this.messageEncryptionService,
+                ),
                 blockRepository: new PrismaBlockRepository(tx),
                 followUserRepository: new PrismaFollowUserRepository(tx),
             };

@@ -12,6 +12,11 @@ import {
 } from "@infrastructure/persistence/mappers/conversation-prisma.mapper";
 import type { ConversationStatus as PrismaConversationStatus } from "@generated/prisma/client";
 import { decodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
+import type { EncryptionPort } from "@core/ports/services/encryption.port";
+import {
+    decryptNullableColumn,
+    encryptColumn,
+} from "@infrastructure/persistence/encryption/encrypted-column";
 
 /**
  * Prisma-backed implementation of {@link IConversationRepository}.
@@ -29,7 +34,36 @@ export class PrismaConversationRepository implements IConversationRepository {
         userB: { select: conversationParticipantSelect },
     };
 
-    constructor(private readonly prisma: PrismaTransactionalClient) {}
+    /**
+     * Creates a new PrismaConversationRepository instance.
+     *
+     * @param prisma - The Prisma client, or a transaction-scoped client.
+     * @param messageEncryptionService - Cipher for the denormalised preview,
+     * which is a copy of message text and so is held the same way.
+     */
+    constructor(
+        private readonly prisma: PrismaTransactionalClient,
+        private readonly messageEncryptionService: EncryptionPort,
+    ) {}
+
+    /**
+     * Rebuilds the entity from a row, decrypting the preview as it goes.
+     *
+     * @param record - The stored row, with both participants loaded.
+     * @returns The domain entity, holding a plaintext preview.
+     */
+    private toDomain(
+        record: Parameters<typeof ConversationPrismaMapper.toDomain>[0],
+    ): Conversation {
+        return ConversationPrismaMapper.toDomain({
+            ...record,
+            lastMessagePreview: decryptNullableColumn(
+                this.messageEncryptionService,
+                record.lastMessagePreview,
+                record.previewEncVersion,
+            ),
+        });
+    }
 
     async findById(id: string): Promise<Conversation | null> {
         const record = await this.prisma.conversation.findUnique({
@@ -37,7 +71,7 @@ export class PrismaConversationRepository implements IConversationRepository {
             include: this.include,
         });
 
-        return record ? ConversationPrismaMapper.toDomain(record) : null;
+        return record ? this.toDomain(record) : null;
     }
 
     async findBetween(
@@ -54,7 +88,7 @@ export class PrismaConversationRepository implements IConversationRepository {
             include: this.include,
         });
 
-        return record ? ConversationPrismaMapper.toDomain(record) : null;
+        return record ? this.toDomain(record) : null;
     }
 
     /**
@@ -82,7 +116,7 @@ export class PrismaConversationRepository implements IConversationRepository {
             include: this.include,
         });
 
-        return ConversationPrismaMapper.toDomain(record);
+        return this.toDomain(record);
     }
 
     /**
@@ -168,9 +202,7 @@ export class PrismaConversationRepository implements IConversationRepository {
             include: this.include,
         });
 
-        return records.map((record) =>
-            ConversationPrismaMapper.toDomain(record),
-        );
+        return records.map((record) => this.toDomain(record));
     }
 
     async updateStatus(id: string, status: ConversationStatus): Promise<void> {
@@ -200,12 +232,22 @@ export class PrismaConversationRepository implements IConversationRepository {
 
         const recipientIsA = conversation.userAId === input.recipientId;
 
+        // The preview is a copy of the message text, so it is protected the
+        // same way. Leaving it in the clear would hand a reader of this table
+        // the first 140 characters of every conversation on the platform,
+        // which is most of what encrypting the messages was for.
+        const preview = encryptColumn(
+            this.messageEncryptionService,
+            input.preview,
+        );
+
         await this.prisma.conversation.update({
             where: { id },
             data: {
                 lastActivityAt: input.sentAt,
                 lastMessageAt: input.sentAt,
-                lastMessagePreview: input.preview,
+                lastMessagePreview: preview.value,
+                previewEncVersion: preview.encVersion,
                 ...(recipientIsA
                     ? { userAUnread: { increment: 1 } }
                     : { userBUnread: { increment: 1 } }),

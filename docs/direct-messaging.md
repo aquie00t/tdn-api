@@ -11,6 +11,7 @@ read path.
 
 - [Conversation lifecycle](#conversation-lifecycle)
 - [Blocked participants](#blocked-participants)
+- [Encryption](#encryption)
 - [Endpoints](#endpoints)
 - [Objects](#objects)
 - [Pagination](#pagination)
@@ -97,6 +98,29 @@ survive, and lifting the block restores the thread with its full history.
 
 Blocking does **not** move the conversation to `DECLINED`. Declining is a
 decision about one request; blocking is about the account, and it is reversible.
+
+---
+
+## Encryption
+
+Message text is encrypted at rest. `messages.content` and the denormalised
+`conversations.last_message_preview` hold AES-256-GCM ciphertext; the API
+encrypts on the way in and decrypts on the way out, so **none of this is
+visible in the API contract** — clients send and receive plain text exactly as
+before.
+
+What that protects: a database dump, a backup file, somebody browsing rows
+through a console, a leaked connection string.
+
+What it does not protect: anyone who reaches the running service, because the
+key is there with it. The server can read every message, and does so on every
+read.
+
+**This is not end-to-end encryption**, which is still out of scope — see
+[Not supported](#not-supported). The rows carry an `enc_version` so both can
+exist side by side later: `0` plaintext, written before this shipped, `1`
+server-key, `2` reserved for client-encrypted text the server passes through
+untouched.
 
 ---
 
@@ -409,6 +433,8 @@ block answers the same way, for the same reason.
 Deliberately out of scope in this version:
 
 - Group conversations
+- End-to-end encryption — message text is encrypted at rest, but the server
+  holds the key and can read it. See [Encryption](#encryption).
 - Message editing
 - Typing indicators
 - End-to-end encryption

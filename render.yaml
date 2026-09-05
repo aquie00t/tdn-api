@@ -177,6 +177,17 @@ projects:
         sync: false
       - key: ACCESS_TOKEN_SECRET_KEY
         sync: false
+      # Encrypts message text at rest. 32 bytes, base64.
+      #
+      # Must exist on the service BEFORE the deploy that first needs it: the
+      # env schema declares it without a default, so an instance without it
+      # fails to boot rather than starting and writing rows nothing can read.
+      #
+      # Never rotate this casually. Every message and inbox preview written
+      # under the old key becomes unreadable - a rotation needs a re-encrypting
+      # backfill first, which does not exist yet.
+      - key: MESSAGE_ENCRYPTION_KEY
+        sync: false
       - key: ACCESS_TOKEN_EXPIRES_IN
         sync: false
       region: frankfurt
