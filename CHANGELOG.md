@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/the-developer-network/tdn-api/compare/v1.19.1...v1.20.0) (2026-09-05)
+
+
+### Features
+
+* **message:** encrypt message text at rest ([#266](https://github.com/the-developer-network/tdn-api/issues/266)) ([a8a8e0f](https://github.com/the-developer-network/tdn-api/commit/a8a8e0ff2eae5145a6d70a5a8f4ed643e9c28ed2))
+
 ## [1.19.1](https://github.com/the-developer-network/tdn-api/compare/v1.19.0...v1.19.1) (2026-09-05)
 
 
