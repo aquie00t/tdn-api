@@ -4,6 +4,7 @@ import { Conversation } from "@core/domain/entities/conversation.entity";
 import { ConversationStatus } from "@core/domain/enums";
 import { decodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
+import { buildBlockRepository } from "../../../helpers/mock-factories";
 
 const VIEWER = "aaaa-1111";
 
@@ -33,6 +34,7 @@ describe("ListConversationsUseCase", () => {
 
         useCase = new ListConversationsUseCase(
             conversationRepo as IConversationRepository,
+            buildBlockRepository(),
         );
     });
 

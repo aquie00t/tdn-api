@@ -20,6 +20,7 @@ import refreshTokenPurgePlugin from "@plugins/custom/refresh-token-purge.plugin"
 import multipartPlugin from "@plugins/multipart.plugin";
 import profileRoutes from "@routes/profile/profile.routes";
 import followRoutes from "@routes/profile/follow.routes";
+import blockRoutes from "@routes/profile/block.routes";
 import websocketPlugin from "./http/plugins/websocket.plugin";
 import realtimeRoutes from "@routes/realtime.routes";
 import notificationRoutes from "@routes/notification.routes";
@@ -139,6 +140,8 @@ export class App {
         this.server.register(profileRoutes, { prefix: "/api/v1/profiles" });
 
         this.server.register(followRoutes, { prefix: "/api/v1" });
+
+        this.server.register(blockRoutes, { prefix: "/api/v1" });
 
         this.server.register(realtimeRoutes, { prefix: "/api/v1/realtime" });
 

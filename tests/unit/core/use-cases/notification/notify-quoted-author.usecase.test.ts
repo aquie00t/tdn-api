@@ -4,7 +4,10 @@ import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
-import { buildPost } from "../../../helpers/mock-factories";
+import {
+    buildPost,
+    buildBlockRepository,
+} from "../../../helpers/mock-factories";
 
 describe("NotifyQuotedAuthorUseCase", () => {
     let useCase: NotifyQuotedAuthorUseCase;
@@ -34,6 +37,7 @@ describe("NotifyQuotedAuthorUseCase", () => {
             postRepository as IPostRepository,
             notificationRepository as INotificationRepository,
             realtimeService,
+            buildBlockRepository(),
         );
     });
 

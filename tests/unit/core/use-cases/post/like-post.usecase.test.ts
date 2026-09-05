@@ -7,7 +7,10 @@ import type {
 import type { RealtimePort } from "@core/ports/services/realtime.port";
 import { NotFoundError } from "@core/errors";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
-import { buildPost } from "../../../helpers/mock-factories";
+import {
+    buildPost,
+    buildBlockRepository,
+} from "../../../helpers/mock-factories";
 
 describe("LikePostUseCase", () => {
     let useCase: LikePostUseCase;
@@ -15,7 +18,10 @@ describe("LikePostUseCase", () => {
     let realtimeService: Pick<RealtimePort, "emitToUser">;
     let mockCtx: Pick<
         TransactionContext,
-        "postRepository" | "postLikeRepository" | "notificationRepository"
+        | "postRepository"
+        | "postLikeRepository"
+        | "notificationRepository"
+        | "blockRepository"
     >;
 
     beforeEach(() => {
@@ -31,6 +37,7 @@ describe("LikePostUseCase", () => {
             notificationRepository: {
                 create: vi.fn().mockResolvedValue(undefined),
             } as unknown as TransactionContext["notificationRepository"],
+            blockRepository: buildBlockRepository(),
         };
         transactionService = {
             runInTransaction: vi

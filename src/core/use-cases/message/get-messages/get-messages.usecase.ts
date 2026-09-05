@@ -2,6 +2,8 @@ import { ConversationNotFoundError } from "@core/errors";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { IMessageRepository } from "@core/ports/repositories/message.repository";
 import { encodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
+import { assertConversationVisible } from "@core/use-cases/shared/blocking/assert-conversation-visible";
 import type { GetMessagesUseCaseInput } from "./get-messages-usecase.input";
 import type { GetMessagesUseCaseOutput } from "./get-messages-usecase.output";
 
@@ -14,10 +16,12 @@ export class GetMessagesUseCase {
      *
      * @param conversationRepository - Repository the conversation is read from
      * @param messageRepository - Repository the messages are read from
+     * @param blockRepository - Repository used to hide a blocked thread
      */
     constructor(
         private readonly conversationRepository: IConversationRepository,
         private readonly messageRepository: IMessageRepository,
+        private readonly blockRepository: IBlockRepository,
     ) {}
 
     /**
@@ -31,8 +35,8 @@ export class GetMessagesUseCase {
      * @param input - The conversation, the reader, and where to resume
      * @returns The conversation, the page, and the cursor for the next one
      *
-     * @throws ConversationNotFoundError - When it does not exist, or the
-     * reader is not a participant
+     * @throws ConversationNotFoundError - When it does not exist, the reader
+     * is not a participant, or a block stands between the two
      */
     async execute(
         input: GetMessagesUseCaseInput,
@@ -44,6 +48,12 @@ export class GetMessagesUseCase {
         if (!conversation || !conversation.includes(input.userId)) {
             throw new ConversationNotFoundError();
         }
+
+        await assertConversationVisible({
+            blockRepository: this.blockRepository,
+            conversation,
+            viewerId: input.userId,
+        });
 
         const page = await this.messageRepository.listByConversation({
             conversationId: conversation.id,

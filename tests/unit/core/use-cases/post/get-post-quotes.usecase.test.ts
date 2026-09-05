@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GetPostQuotesUseCase } from "@core/use-cases/post/get-post-quotes";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import { NotFoundError } from "@core/errors";
-import { buildPost } from "../../../helpers/mock-factories";
+import {
+    buildPost,
+    buildBlockRepository,
+} from "../../../helpers/mock-factories";
 
 describe("GetPostQuotesUseCase", () => {
     let useCase: GetPostQuotesUseCase;
@@ -13,7 +16,10 @@ describe("GetPostQuotesUseCase", () => {
             findById: vi.fn().mockResolvedValue(buildPost({ id: "post-0" })),
             findAll: vi.fn().mockResolvedValue({ posts: [], total: 0 }),
         };
-        useCase = new GetPostQuotesUseCase(postRepository as IPostRepository);
+        useCase = new GetPostQuotesUseCase(
+            postRepository as IPostRepository,
+            buildBlockRepository(),
+        );
     });
 
     it("should ask the repository for the posts quoting this one", async () => {
@@ -35,6 +41,7 @@ describe("GetPostQuotesUseCase", () => {
             limit: 20,
             quotedPostId: "post-0",
             currentUserId: "user-9",
+            excludeAuthorIds: [],
         });
         expect(result).toEqual({ posts: quotes, total: 1 });
     });

@@ -4,6 +4,7 @@ import { InvalidRecipientError } from "@core/errors";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 import type { StartConversationUseCaseInput } from "./start-conversation-usecase.input";
 import type { StartConversationUseCaseOutput } from "./start-conversation-usecase.output";
 
@@ -21,11 +22,13 @@ export class StartConversationUseCase {
      * @param conversationRepository - Repository conversations are read from and written to
      * @param userRepository - Repository used to check the recipient can be written to
      * @param followUserRepository - Repository used to decide whether this is a request
+     * @param blockRepository - Repository used to refuse a blocked recipient
      */
     constructor(
         private readonly conversationRepository: IConversationRepository,
         private readonly userRepository: IUserRepository,
         private readonly followUserRepository: IFollowRepository,
+        private readonly blockRepository: IBlockRepository,
     ) {}
 
     /**
@@ -40,7 +43,7 @@ export class StartConversationUseCase {
      * @returns The conversation, and whether this call created it
      *
      * @throws InvalidRecipientError - When the recipient is the initiator, a
-     * bot, or an account being deleted
+     * bot, an account being deleted, or blocked in either direction
      */
     async execute(
         input: StartConversationUseCaseInput,
@@ -52,6 +55,16 @@ export class StartConversationUseCase {
                 "You cannot start a conversation with yourself.",
             );
         }
+
+        // Ahead of the lookup below, not after it. A thread these two already
+        // have is returned as it stands, so checking afterwards would hand a
+        // blocked account the conversation it is supposed to have lost.
+        const blocked = await this.blockRepository.existsBetween(
+            initiatorId,
+            recipientId,
+        );
+
+        if (blocked) throw new InvalidRecipientError();
 
         const existing = await this.conversationRepository.findBetween(
             initiatorId,
@@ -65,9 +78,10 @@ export class StartConversationUseCase {
 
         const recipient = await this.userRepository.findById(recipientId);
 
-        // The three rejections share one error on purpose. Distinguishing a
-        // bot from a deleted account from one that never existed would turn
-        // this endpoint into a way to probe the user table.
+        // The rejections share one error on purpose. Distinguishing a bot from
+        // a deleted account from one that never existed - or from one that
+        // blocked you - would turn this endpoint into a way to probe the user
+        // table.
         if (!recipient || recipient.isBot || recipient.deletedAt !== null) {
             throw new InvalidRecipientError();
         }

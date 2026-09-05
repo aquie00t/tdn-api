@@ -5,6 +5,7 @@ import type { INotificationRepository } from "@core/ports/repositories/notificat
 import type { RealtimePort } from "@core/ports/services/realtime.port";
 import { PostType } from "@core/domain/enums/post-type.enum";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
+import { buildBlockRepository } from "../../../helpers/mock-factories";
 
 describe("NotifyNewPostUseCase", () => {
     let useCase: NotifyNewPostUseCase;
@@ -30,6 +31,7 @@ describe("NotifyNewPostUseCase", () => {
             followUserRepository as IFollowRepository,
             notificationRepository as INotificationRepository,
             realtimeService,
+            buildBlockRepository(),
         );
     });
 

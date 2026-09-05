@@ -184,16 +184,13 @@ export class PrismaPostRepository implements IPostRepository {
             followingIds,
             quotedPostId,
             excludeIds,
+            excludeAuthorIds,
             categories,
         } = params;
 
         return {
             ...(type ? { type } : {}),
-            ...(followingIds
-                ? { authorId: { in: followingIds } }
-                : authorId
-                  ? { authorId }
-                  : {}),
+            ...this.authorFilter(authorId, followingIds, excludeAuthorIds),
             ...(savedByUserId
                 ? { bookmarks: { some: { userId: savedByUserId } } }
                 : {}),
@@ -206,6 +203,47 @@ export class PrismaPostRepository implements IPostRepository {
                 ? { category: { hasSome: categories } }
                 : {}),
         };
+    }
+
+    /**
+     * Builds the single `authorId` condition the three author filters share.
+     *
+     * They cannot be spread side by side: `followingIds`, a lone `authorId`
+     * and the blocked-author exclusion all write the same key, and the last
+     * one in an object literal silently wins. Blocking is the reason this
+     * matters - the exclusion has to survive alongside a `followedOnly` feed,
+     * which is exactly the case where the collision would have dropped it.
+     *
+     * @param authorId - A single author the caller pinned, if any.
+     * @param followingIds - The accounts a followed-only feed is scoped to.
+     * @param excludeAuthorIds - Authors invisible to the viewer.
+     * @returns The `authorId` fragment, or nothing when no filter applies.
+     */
+    private authorFilter(
+        authorId: string | undefined,
+        followingIds: string[] | undefined,
+        excludeAuthorIds: string[] | undefined,
+    ): Prisma.PostWhereInput {
+        const notIn =
+            excludeAuthorIds && excludeAuthorIds.length > 0
+                ? excludeAuthorIds
+                : undefined;
+
+        if (followingIds) {
+            return {
+                authorId: { in: followingIds, ...(notIn ? { notIn } : {}) },
+            };
+        }
+
+        if (authorId) {
+            // A pinned author who is blocked matches nothing, which is the
+            // intended answer: the profile they were pinned from is a wall.
+            return notIn && notIn.includes(authorId)
+                ? { authorId: { in: [] } }
+                : { authorId };
+        }
+
+        return notIn ? { authorId: { notIn } } : {};
     }
 
     /**
@@ -229,7 +267,11 @@ export class PrismaPostRepository implements IPostRepository {
             where: {
                 createdAt: { gte: since },
                 ...(type ? { type } : {}),
-                ...(followingIds ? { authorId: { in: followingIds } } : {}),
+                ...this.authorFilter(
+                    undefined,
+                    followingIds,
+                    params.excludeAuthorIds,
+                ),
                 ...(tag ? { tags: { some: { name: tag.toLowerCase() } } } : {}),
                 ...(categories && categories.length > 0
                     ? { category: { hasSome: categories } }
@@ -275,13 +317,26 @@ export class PrismaPostRepository implements IPostRepository {
      *
      * @param ids - The post identifiers to load.
      * @param currentUserId - Optional viewer, used to resolve isLiked/isBookmarked.
-     * @returns The posts that still exist.
+     * @param excludeAuthorIds - Authors to drop even though their ids were
+     * asked for. The feed hydrates from a ranked order it cached earlier, and
+     * that order can predate a block by up to the snapshot's lifetime;
+     * filtering here lets a stale snapshot heal itself, so blocking needs no
+     * cache invalidation and the reader simply gets a shorter page that the
+     * feed's existing top-up then fills.
+     * @returns The posts that still exist and the viewer may see.
      */
-    async findByIds(ids: string[], currentUserId?: string): Promise<Post[]> {
+    async findByIds(
+        ids: string[],
+        currentUserId?: string,
+        excludeAuthorIds?: string[],
+    ): Promise<Post[]> {
         if (ids.length === 0) return [];
 
         const rawPosts = await this.prisma.post.findMany({
-            where: { id: { in: ids } },
+            where: {
+                id: { in: ids },
+                ...this.authorFilter(undefined, undefined, excludeAuthorIds),
+            },
             include: {
                 author: POST_AUTHOR_SELECT,
                 tags: true,
@@ -424,6 +479,7 @@ export class PrismaPostRepository implements IPostRepository {
         limit: number,
         type?: string,
         currentUserId?: string,
+        excludeAuthorIds?: string[],
     ): Promise<{ posts: Post[]; total: number }> {
         const skip = (page - 1) * limit;
 
@@ -431,6 +487,11 @@ export class PrismaPostRepository implements IPostRepository {
             author: {
                 username: username,
             },
+            // A blocked author matches nothing here, so the profile answers
+            // with an empty timeline rather than a 404. That is the shape the
+            // client wants: the profile itself still renders, saying who
+            // blocked whom, with nothing under it.
+            ...this.authorFilter(undefined, undefined, excludeAuthorIds),
         };
 
         if (type) {

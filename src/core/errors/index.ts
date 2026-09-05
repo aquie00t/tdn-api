@@ -19,6 +19,7 @@ export * from "./auth/unauthorized.error";
 export * from "./user/too-many-requests.error";
 export * from "./user/unauthorized-action.error";
 export * from "./user/user-already-exists.error";
+export * from "./user/user-blocked.error";
 
 // Post and media errors
 export * from "./post/invalid-file-type.error";

@@ -5,6 +5,8 @@ import type { IProfileRepository } from "@core/ports/repositories/profile.reposi
 import { Notification } from "@core/domain/entities/notification.entity";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
+import { assertNotBlocked } from "@core/use-cases/shared/blocking/assert-not-blocked";
 import type { FollowUserUseCaseInput } from "./follow-user-usecase.input";
 import type { FollowUserUseCaseOutput } from "./follow-user-usecase.output";
 
@@ -21,12 +23,15 @@ export class FollowUserUseCase {
      * @param followUserRepository - Repository for managing follow relationships
      * @param notificationRepository - Repository for managing notifications
      * @param realtimeService - Service for real-time communication
+     * @param profileRepository - Repository used to check the target exists
+     * @param blockRepository - Repository used to refuse a blocked pairing
      */
     constructor(
         private readonly followUserRepository: IFollowRepository,
         private readonly notificationRepository: INotificationRepository,
         private readonly realtimeService: RealtimePort,
         private readonly profileRepository: IProfileRepository,
+        private readonly blockRepository: IBlockRepository,
     ) {}
 
     /**
@@ -34,6 +39,8 @@ export class FollowUserUseCase {
      * @param input - The input data for the use case, including the current user's ID and the target user's ID.
      * @returns A promise that resolves to the output of the use case, which includes the updated followers count for the target user.
      * @throws {BadRequestError} If the current user tries to follow themselves.
+     * @throws {NotFoundError} If the target user does not exist.
+     * @throws {UserBlockedError} If either user has blocked the other.
      * @throws {Error} If any other error occurs during the follow operation.
      */
     async execute(
@@ -47,6 +54,15 @@ export class FollowUserUseCase {
         const targetProfile =
             await this.profileRepository.findByUserId(targetId);
         if (!targetProfile) throw new NotFoundError("User not found.");
+
+        // Announced rather than swallowed. A follow that silently fails reads
+        // as a bug and leaves the blocked user tapping the button again; the
+        // client has a screen for this answer.
+        await assertNotBlocked({
+            blockRepository: this.blockRepository,
+            userId: currentUserId,
+            targetId,
+        });
 
         // The write decides, not a preceding read: asking first and inserting
         // afterwards let two overlapping requests both find nothing and both

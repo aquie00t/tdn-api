@@ -3,6 +3,8 @@ import { ConversationStatus } from "@core/domain/enums";
 import { ConversationNotFoundError } from "@core/errors";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
+import { assertConversationVisible } from "@core/use-cases/shared/blocking/assert-conversation-visible";
 import type { MarkConversationReadUseCaseInput } from "./mark-conversation-read-usecase.input";
 
 /**
@@ -14,10 +16,12 @@ export class MarkConversationReadUseCase {
      *
      * @param conversationRepository - Repository the read watermark is written to
      * @param realtimeService - Service used to deliver the read receipt
+     * @param blockRepository - Repository used to hide a blocked thread
      */
     constructor(
         private readonly conversationRepository: IConversationRepository,
         private readonly realtimeService: RealtimePort,
+        private readonly blockRepository: IBlockRepository,
     ) {}
 
     /**
@@ -30,8 +34,8 @@ export class MarkConversationReadUseCase {
      *
      * @param input - The conversation and the participant who read it
      *
-     * @throws ConversationNotFoundError - When it does not exist, or the user
-     * is not a participant
+     * @throws ConversationNotFoundError - When it does not exist, the user is
+     * not a participant, or a block stands between the two
      */
     async execute(input: MarkConversationReadUseCaseInput): Promise<void> {
         const conversation = await this.conversationRepository.findById(
@@ -41,6 +45,15 @@ export class MarkConversationReadUseCase {
         if (!conversation || !conversation.includes(input.userId)) {
             throw new ConversationNotFoundError();
         }
+
+        // Before the write, not only before the receipt: marking a hidden
+        // thread read would clear a badge the viewer cannot see the source of,
+        // and unblocking would then hand back a thread that looks answered.
+        await assertConversationVisible({
+            blockRepository: this.blockRepository,
+            conversation,
+            viewerId: input.userId,
+        });
 
         const readAt = new Date();
 

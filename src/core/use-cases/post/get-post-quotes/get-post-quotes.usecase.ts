@@ -1,6 +1,7 @@
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { Post } from "@core/domain/entities/post.entity";
 import { NotFoundError } from "@core/errors";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 import type { GetPostQuotesInput } from "./get-post-quotes-usecase.input";
 
 /**
@@ -12,8 +13,12 @@ import type { GetPostQuotesInput } from "./get-post-quotes-usecase.input";
 export class GetPostQuotesUseCase {
     /**
      * @param postRepository - Repository for reading posts.
+     * @param blockRepository - Repository used to resolve who the viewer cannot see.
      */
-    constructor(private readonly postRepository: IPostRepository) {}
+    constructor(
+        private readonly postRepository: IPostRepository,
+        private readonly blockRepository: IBlockRepository,
+    ) {}
 
     /**
      * Retrieves one page of the quotes of a post.
@@ -37,11 +42,24 @@ export class GetPostQuotesUseCase {
             throw new NotFoundError("Post not found");
         }
 
+        const excludeAuthorIds = input.currentUserId
+            ? await this.blockRepository.getInvisibleUserIds(
+                  input.currentUserId,
+              )
+            : [];
+
+        // The quoted post itself is hidden the way its detail page is, and the
+        // quotes of a visible post drop the ones written by blocked accounts.
+        if (excludeAuthorIds.includes(post.author.id)) {
+            throw new NotFoundError("Post not found");
+        }
+
         return await this.postRepository.findAll({
             page: input.page,
             limit: input.limit,
             quotedPostId: input.postId,
             currentUserId: input.currentUserId,
+            excludeAuthorIds,
         });
     }
 }

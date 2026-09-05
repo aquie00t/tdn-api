@@ -1,8 +1,8 @@
-import type { PrismaClient } from "@generated/prisma/client";
+import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 
 export class PrismaFollowUserRepository implements IFollowRepository {
-    constructor(private readonly prisma: PrismaClient) {}
+    constructor(private readonly prisma: PrismaTransactionalClient) {}
 
     async checkIsFollowing(
         followerId: string,

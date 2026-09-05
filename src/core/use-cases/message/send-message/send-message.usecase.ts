@@ -14,6 +14,8 @@ import {
 } from "@core/errors";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
+import { assertConversationVisible } from "@core/use-cases/shared/blocking/assert-conversation-visible";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
 import type { TransactionPort } from "@core/ports/services/transaction.port";
 import { resolveAttachableMedia } from "@core/use-cases/shared/media/resolve-attachable-media";
@@ -35,6 +37,7 @@ export class SendMessageUseCase {
      * @param transactionService - Service for handling database transactions
      * @param conversationRepository - Repository the conversation is read from
      * @param mediaAssetRepository - Repository the submitted media keys are checked against
+     * @param blockRepository - Repository used to hide a blocked thread
      * @param realtimeService - Service for delivering the message live
      * @param r2PublicUrl - CDN origin media URLs are served from, used to
      * recover the storage key behind a submitted URL
@@ -43,6 +46,7 @@ export class SendMessageUseCase {
         private readonly transactionService: TransactionPort,
         private readonly conversationRepository: IConversationRepository,
         private readonly mediaAssetRepository: IMediaAssetRepository,
+        private readonly blockRepository: IBlockRepository,
         private readonly realtimeService: RealtimePort,
         private readonly r2PublicUrl: string,
     ) {}
@@ -54,7 +58,8 @@ export class SendMessageUseCase {
      * @returns The stored message
      *
      * @throws ConversationNotFoundError - When the conversation does not
-     * exist, or the sender is not a participant
+     * exist, the sender is not a participant, or a block stands between the
+     * two
      * @throws MessageNotSendableError - When the conversation is declined, or
      * the sender is the recipient of a request they have not accepted
      * @throws EmptyMessageError - When the message carries neither text nor media
@@ -69,6 +74,15 @@ export class SendMessageUseCase {
         if (!conversation || !conversation.includes(input.senderId)) {
             throw new ConversationNotFoundError();
         }
+
+        // Ahead of canSend, so a blocked sender is told the thread is gone
+        // rather than that it is closed - the second answer would confirm it
+        // is still there.
+        await assertConversationVisible({
+            blockRepository: this.blockRepository,
+            conversation,
+            viewerId: input.senderId,
+        });
 
         if (!conversation.canSend(input.senderId)) {
             throw new MessageNotSendableError();

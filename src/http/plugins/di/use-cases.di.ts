@@ -28,6 +28,9 @@ import { FollowUserUseCase } from "@core/use-cases/follow-user/follow-user";
 import { UnfollowUserUseCase } from "@core/use-cases/follow-user/unfollow-user";
 import { GetFollowersUseCase } from "@core/use-cases/follow-user/get-followers";
 import { GetFollowingUseCase } from "@core/use-cases/follow-user/get-following";
+import { BlockUserUseCase } from "@core/use-cases/block-user/block-user";
+import { UnblockUserUseCase } from "@core/use-cases/block-user/unblock-user";
+import { ListBlockedUseCase } from "@core/use-cases/block-user/list-blocked";
 import { GetUserNotificationUseCase } from "@core/use-cases/notification/get-user";
 import { MarkAllNotificationsAsReadUseCase } from "@core/use-cases/notification/mark-all";
 import { MarkNotificationAsReadUseCase } from "@core/use-cases/notification/mark-one";
@@ -353,6 +356,21 @@ export const useCasesModule = {
     getFollowingUseCase: asClass(GetFollowingUseCase).singleton(),
 
     /**
+     * Use case for blocking another user
+     */
+    blockUserUseCase: asClass(BlockUserUseCase).singleton(),
+
+    /**
+     * Use case for lifting a block
+     */
+    unblockUserUseCase: asClass(UnblockUserUseCase).singleton(),
+
+    /**
+     * Use case for reading the accounts a user has blocked
+     */
+    listBlockedUseCase: asClass(ListBlockedUseCase).singleton(),
+
+    /**
      * Use case for getting user notifications
      */
     getUserNotificationsUseCase: asClass(
@@ -558,6 +576,7 @@ export const useCasesModule = {
             postRepository,
             cacheService,
             followUserRepository,
+            blockRepository,
             profileRepository,
             userInterestRepository,
             cryptoService,
@@ -571,6 +590,7 @@ export const useCasesModule = {
                 postRepository,
                 cacheService,
                 followUserRepository,
+                blockRepository,
                 profileRepository,
                 userInterestRepository,
                 cryptoService,
@@ -809,6 +829,7 @@ export const useCasesModule = {
             transactionService,
             conversationRepository,
             mediaAssetRepository,
+            blockRepository,
             realtimeService,
             config,
         ) =>
@@ -816,6 +837,7 @@ export const useCasesModule = {
                 transactionService,
                 conversationRepository,
                 mediaAssetRepository,
+                blockRepository,
                 realtimeService,
                 config.R2_PUBLIC_URL,
             ),

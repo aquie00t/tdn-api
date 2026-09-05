@@ -17,7 +17,11 @@ import type { INotificationRepository } from "@core/ports/repositories/notificat
 import type { Comment } from "@core/domain/entities/comment.entity";
 import { ArticleStatus } from "@core/domain/enums/article-status.enum";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
-import { buildArticle, buildComment } from "../../../helpers/mock-factories";
+import {
+    buildArticle,
+    buildComment,
+    buildBlockRepository,
+} from "../../../helpers/mock-factories";
 import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
 
 const CDN_URL = "https://cdn.example.com";
@@ -88,6 +92,7 @@ describe("CreateCommentUseCase (article target)", () => {
                         txNotificationRepo as INotificationRepository,
                     mediaAssetRepository:
                         mediaAssetRepo as IMediaAssetRepository,
+                    blockRepository: buildBlockRepository(),
                 } as TransactionContext),
             ),
         };

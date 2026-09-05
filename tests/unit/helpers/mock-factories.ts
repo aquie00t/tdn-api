@@ -1,3 +1,5 @@
+import { vi } from "vitest";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 import { User } from "@core/domain/entities/user.entity";
 import type { UserProps } from "@core/domain/interfaces/user-props.interface";
 import { RefreshToken } from "@core/domain/entities/refresh-token.entity";
@@ -169,4 +171,32 @@ export function buildArticle(overrides: Partial<ArticleProps> = {}): Article {
         updatedAt: new Date("2024-01-01T00:00:00Z"),
         ...overrides,
     });
+}
+
+/**
+ * A block repository that blocks nobody.
+ *
+ * Almost every use case now asks this port a question, and almost every test
+ * wants the same answer: no block stands, carry on. Building it here keeps
+ * that default in one place, so a test that cares about blocking overrides one
+ * method and a test that does not says nothing about it at all.
+ *
+ * @param overrides - Methods to replace, for the tests that do care.
+ * @returns A fully stubbed IBlockRepository.
+ */
+export function buildBlockRepository(
+    overrides: Partial<IBlockRepository> = {},
+): IBlockRepository {
+    return {
+        block: vi.fn().mockResolvedValue(true),
+        unblock: vi.fn().mockResolvedValue(true),
+        existsBetween: vi.fn().mockResolvedValue(false),
+        findPairState: vi
+            .fn()
+            .mockResolvedValue({ isBlocked: false, isBlockedBy: false }),
+        getInvisibleUserIds: vi.fn().mockResolvedValue([]),
+        listBlocked: vi.fn().mockResolvedValue([]),
+        countBlocked: vi.fn().mockResolvedValue(0),
+        ...overrides,
+    };
 }

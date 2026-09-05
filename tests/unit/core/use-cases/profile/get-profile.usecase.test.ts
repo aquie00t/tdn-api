@@ -5,7 +5,10 @@ import type { IFollowRepository } from "@core/ports/repositories/follow.reposito
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { IArticleRepository } from "@core/ports/repositories/article.repository";
 import { NotFoundError } from "@core/errors";
-import { buildProfile } from "../../../helpers/mock-factories";
+import {
+    buildProfile,
+    buildBlockRepository,
+} from "../../../helpers/mock-factories";
 
 describe("GetProfileUseCase", () => {
     let useCase: GetProfileUseCase;
@@ -13,6 +16,8 @@ describe("GetProfileUseCase", () => {
     let followRepository: Pick<IFollowRepository, "checkIsFollowing">;
     let postRepository: Pick<IPostRepository, "countByUserId">;
     let articleRepository: Pick<IArticleRepository, "countPublishedByAuthorId">;
+
+    let blockRepository: IBlockRepository;
 
     beforeEach(() => {
         profileRepository = {
@@ -27,11 +32,14 @@ describe("GetProfileUseCase", () => {
         articleRepository = {
             countPublishedByAuthorId: vi.fn().mockResolvedValue(0),
         };
+        blockRepository = buildBlockRepository();
+
         useCase = new GetProfileUseCase(
             profileRepository as IProfileRepository,
             followRepository as IFollowRepository,
             postRepository as IPostRepository,
             articleRepository as IArticleRepository,
+            blockRepository,
         );
     });
 
@@ -230,6 +238,62 @@ describe("GetProfileUseCase", () => {
             expect(
                 articleRepository.countPublishedByAuthorId,
             ).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("blocking", () => {
+        beforeEach(() => {
+            vi.mocked(profileRepository.findByUsername).mockResolvedValue(
+                buildProfile({ userId: "user-2" }),
+            );
+        });
+
+        it("should report which direction the block runs", async () => {
+            vi.mocked(blockRepository.findPairState).mockResolvedValue({
+                isBlocked: false,
+                isBlockedBy: true,
+            });
+
+            const result = await useCase.execute("someone", "user-1");
+
+            expect(result.isBlocked).toBe(false);
+            expect(result.isBlockedBy).toBe(true);
+        });
+
+        it("should still serve the profile so the client can explain itself", async () => {
+            vi.mocked(blockRepository.findPairState).mockResolvedValue({
+                isBlocked: true,
+                isBlockedBy: false,
+            });
+
+            const result = await useCase.execute("someone", "user-1");
+
+            expect(result.profile).not.toBeNull();
+        });
+
+        it("should withhold the counts and not issue their queries", async () => {
+            vi.mocked(blockRepository.findPairState).mockResolvedValue({
+                isBlocked: true,
+                isBlockedBy: false,
+            });
+
+            const result = await useCase.execute("someone", "user-1");
+
+            expect(result.postCount).toBe(0);
+            expect(result.articleCount).toBe(0);
+            expect(result.isFollowing).toBe(false);
+            expect(postRepository.countByUserId).not.toHaveBeenCalled();
+            expect(
+                articleRepository.countPublishedByAuthorId,
+            ).not.toHaveBeenCalled();
+        });
+
+        it("should report both flags false for a guest", async () => {
+            const result = await useCase.execute("someone");
+
+            expect(result.isBlocked).toBe(false);
+            expect(result.isBlockedBy).toBe(false);
+            expect(blockRepository.findPairState).not.toHaveBeenCalled();
         });
     });
 });

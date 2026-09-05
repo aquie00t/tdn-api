@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GetUserPostsUseCase } from "@core/use-cases/post/get-user-posts/get-user.posts.usecase";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
-import { buildPost } from "../../../helpers/mock-factories";
+import {
+    buildPost,
+    buildBlockRepository,
+} from "../../../helpers/mock-factories";
 import { PostType } from "@core/domain/enums/post-type.enum";
 
 describe("GetUserPostsUseCase", () => {
@@ -12,7 +15,10 @@ describe("GetUserPostsUseCase", () => {
         postRepository = {
             findByAuthorUsername: vi.fn(),
         };
-        useCase = new GetUserPostsUseCase(postRepository as IPostRepository);
+        useCase = new GetUserPostsUseCase(
+            postRepository as IPostRepository,
+            buildBlockRepository(),
+        );
     });
 
     it("should return posts and total for given username", async () => {
@@ -51,6 +57,7 @@ describe("GetUserPostsUseCase", () => {
             10,
             PostType.TECH_NEWS,
             undefined,
+            [],
         );
     });
 
@@ -73,6 +80,7 @@ describe("GetUserPostsUseCase", () => {
             5,
             undefined,
             "viewer-99",
+            [],
         );
     });
 });

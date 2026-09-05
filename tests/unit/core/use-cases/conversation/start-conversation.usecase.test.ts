@@ -7,6 +7,8 @@ import type { IConversationRepository } from "@core/ports/repositories/conversat
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { User } from "@core/domain/entities/user.entity";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
+import { buildBlockRepository } from "../../../helpers/mock-factories";
 
 const INITIATOR = "aaaa-1111";
 const RECIPIENT = "bbbb-2222";
@@ -27,6 +29,7 @@ describe("StartConversationUseCase", () => {
     >;
     let userRepo: Pick<IUserRepository, "findById">;
     let followRepo: Pick<IFollowRepository, "checkIsFollowing">;
+    let blockRepo: IBlockRepository;
 
     beforeEach(() => {
         conversationRepo = {
@@ -39,11 +42,13 @@ describe("StartConversationUseCase", () => {
         };
         userRepo = { findById: vi.fn().mockResolvedValue(buildUser()) };
         followRepo = { checkIsFollowing: vi.fn().mockResolvedValue(false) };
+        blockRepo = buildBlockRepository();
 
         useCase = new StartConversationUseCase(
             conversationRepo as IConversationRepository,
             userRepo as IUserRepository,
             followRepo as IFollowRepository,
+            blockRepo,
         );
     });
 
@@ -158,5 +163,54 @@ describe("StartConversationUseCase", () => {
                 recipientId: RECIPIENT,
             }),
         ).rejects.toThrow(InvalidRecipientError);
+    });
+
+    describe("blocking", () => {
+        beforeEach(() => {
+            vi.mocked(blockRepo.existsBetween).mockResolvedValue(true);
+        });
+
+        it("should refuse to open a thread with a blocked account", async () => {
+            await expect(
+                useCase.execute({
+                    initiatorId: INITIATOR,
+                    recipientId: RECIPIENT,
+                }),
+            ).rejects.toThrow(InvalidRecipientError);
+
+            expect(conversationRepo.create).not.toHaveBeenCalled();
+        });
+
+        it("should not hand back a thread the two already had", async () => {
+            vi.mocked(conversationRepo.findBetween).mockResolvedValue(
+                Conversation.create(
+                    INITIATOR,
+                    RECIPIENT,
+                    ConversationStatus.ACCEPTED,
+                ),
+            );
+
+            // The check runs ahead of the lookup: an existing conversation is
+            // returned as it stands, so checking afterwards would give the
+            // blocked account back the thread it is supposed to have lost.
+            await expect(
+                useCase.execute({
+                    initiatorId: INITIATOR,
+                    recipientId: RECIPIENT,
+                }),
+            ).rejects.toThrow(InvalidRecipientError);
+        });
+
+        it("should answer with the same error every other rejection uses", async () => {
+            // Distinguishing a block from a bot, a deleted account or one that
+            // never existed would turn this endpoint into a way to probe the
+            // user table.
+            await expect(
+                useCase.execute({
+                    initiatorId: INITIATOR,
+                    recipientId: RECIPIENT,
+                }),
+            ).rejects.toMatchObject({ statusCode: 400 });
+        });
     });
 });

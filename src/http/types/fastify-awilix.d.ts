@@ -6,6 +6,7 @@ import type { UserPurgeScheduler } from "@infrastructure/jobs/user/user-purge.sc
 import type { RefreshTokenPurgeScheduler } from "@infrastructure/jobs/refresh-token/refresh-token-purge.scheduler";
 import type { ProfileController } from "@services/profile.controller";
 import type { FollowUserController } from "@services/follow-user.controller";
+import type { BlockController } from "@controllers/block.controller";
 import type { WebSocketManager } from "@infrastructure/realtime/websocket/websocket-manager";
 import type { NotificationController } from "@controllers/notification.controller";
 import type { NotificationPurgeScheduler } from "@infrastructure/jobs/notification/notification-purge.scheduler";
@@ -54,6 +55,9 @@ declare module "@fastify/awilix" {
 
         /** Controller for follow/unfollow operations */
         followUserController: FollowUserController;
+
+        /** Controller for block/unblock operations and the block list */
+        blockController: BlockController;
 
         /** WebSocket manager for real-time communication */
         wsManager: WebSocketManager;

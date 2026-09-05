@@ -2,6 +2,7 @@ import { Notification } from "@core/domain/entities/notification.entity";
 import { NotificationType } from "@core/domain/enums/notification-type.enum";
 import type { IPostRepository } from "@core/ports/repositories/post.repository";
 import type { INotificationRepository } from "@core/ports/repositories/notification.repository";
+import type { IBlockRepository } from "@core/ports/repositories/block.repository";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
 import type { NotifyQuotedAuthorInput } from "./notify-quoted-author.input";
 
@@ -19,11 +20,13 @@ export class NotifyQuotedAuthorUseCase {
      * @param postRepository - Repository used to resolve the quoted post's author
      * @param notificationRepository - Repository for persisting the notification
      * @param realtimeService - Service for pushing the notification live
+     * @param blockRepository - Repository used to drop a blocked recipient
      */
     constructor(
         private readonly postRepository: IPostRepository,
         private readonly notificationRepository: INotificationRepository,
         private readonly realtimeService: RealtimePort,
+        private readonly blockRepository: IBlockRepository,
     ) {}
 
     /**
@@ -40,8 +43,10 @@ export class NotifyQuotedAuthorUseCase {
      * cascades, so deleting the quote takes its notification with it.
      *
      * Returns 0 without writing anything when the quoted post is already gone
-     * (a narrow race between the commit and this call) or when an account
-     * quotes itself, which is not news to anyone.
+     * (a narrow race between the commit and this call), when an account quotes
+     * itself, which is not news to anyone, or when a block stands between the
+     * two - the quote itself is refused upstream, so this is the backstop for
+     * one placed between that check and this call.
      */
     async execute(input: NotifyQuotedAuthorInput): Promise<number> {
         const quotedPost = await this.postRepository.findById(
@@ -51,6 +56,12 @@ export class NotifyQuotedAuthorUseCase {
 
         const recipientId = quotedPost.author.id;
         if (recipientId === input.issuerId) return 0;
+
+        const blocked = await this.blockRepository.existsBetween(
+            input.issuerId,
+            recipientId,
+        );
+        if (blocked) return 0;
 
         await this.notificationRepository.create(
             Notification.create(
