@@ -28,6 +28,18 @@ export interface IRefreshTokenRepository {
     findByTokenHash(tokenHash: string): Promise<RefreshToken | null>;
 
     /**
+     * Retrieves a refresh token by its own identifier.
+     *
+     * Used to follow a rotation chain: a retired token records which token
+     * took its place, and a retry arriving inside the grace window has to
+     * check that the successor is still live before it is trusted.
+     *
+     * @param id - The refresh token's identifier.
+     * @returns The RefreshToken entity if found, otherwise null.
+     */
+    findById(id: string): Promise<RefreshToken | null>;
+
+    /**
      * Updates an existing refresh token entity in the persistence layer.
      * @param refreshToken - The RefreshToken entity with updated values.
      */

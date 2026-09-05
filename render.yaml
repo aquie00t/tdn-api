@@ -169,6 +169,20 @@ projects:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # Mobile clients. All four have defaults in env.schema.ts, so the service
+      # boots without them; they are declared because the two build numbers are
+      # what lets the API refuse a version that is too old to be talked to, and
+      # that is not a setting anybody should have to find in the schema.
+      - key: REFRESH_ROTATION_GRACE_SECONDS
+        sync: false
+      - key: MEDIA_MAX_FILE_SIZE_MB
+        sync: false
+      - key: MOBILE_MIN_SUPPORTED_BUILD
+        sync: false
+      - key: MOBILE_LATEST_BUILD
+        sync: false
+      - key: MOBILE_STORE_URL_ANDROID
+        sync: false
       # Content reports. MODERATION_ALERT_EMAIL is the switch for both the
       # escalation alert and the morning summary: with it empty - the default -
       # reports are still filed and still queue up in the table, but nothing is

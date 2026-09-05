@@ -27,6 +27,17 @@ export interface RefreshTokenProps {
     /** Boolean flag indicating whether this token has been revoked */
     isRevoked: boolean;
 
+    /**
+     * When the token was retired, null while it is live.
+     *
+     * Reuse of a retired token is an alarm; this is what lets a retry seconds
+     * after a rotation be told apart from a replay days later.
+     */
+    revokedAt?: Date | null;
+
+    /** The token issued in this one's place, so a retry can find the chain. */
+    replacedById?: string | null;
+
     /** Creation timestamp of the refresh token */
     createdAt?: Date;
 

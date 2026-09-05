@@ -161,4 +161,56 @@ describe("RefreshToken Entity", () => {
             expect(token.isRevoked).toBe(true);
         });
     });
+
+    describe("rotation bookkeeping", () => {
+        it("should record when it was retired and what replaced it", () => {
+            const token = RefreshToken.with(buildProps({ isRevoked: false }));
+
+            token.revoke("token-2");
+
+            expect(token.isRevoked).toBe(true);
+            expect(token.replacedById).toBe("token-2");
+            expect(token.revokedAt).toBeInstanceOf(Date);
+        });
+
+        it("should leave the successor null for a plain revoke", () => {
+            const token = RefreshToken.with(buildProps({ isRevoked: false }));
+
+            token.revoke();
+
+            expect(token.replacedById).toBeNull();
+        });
+
+        it("should report a recent retirement as inside the window", () => {
+            const token = RefreshToken.with(
+                buildProps({
+                    isRevoked: true,
+                    revokedAt: new Date(Date.now() - 5_000),
+                }),
+            );
+
+            expect(token.wasRevokedWithin(30)).toBe(true);
+        });
+
+        it("should report an old retirement as outside the window", () => {
+            const token = RefreshToken.with(
+                buildProps({
+                    isRevoked: true,
+                    revokedAt: new Date(Date.now() - 120_000),
+                }),
+            );
+
+            expect(token.wasRevokedWithin(30)).toBe(false);
+        });
+
+        it("should report false when the retirement was never timestamped", () => {
+            // Rows that predate the column. Falling through to the alarm is
+            // the safe answer, not past it.
+            const token = RefreshToken.with(
+                buildProps({ isRevoked: true, revokedAt: null }),
+            );
+
+            expect(token.wasRevokedWithin(30)).toBe(false);
+        });
+    });
 });

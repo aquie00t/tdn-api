@@ -126,6 +126,13 @@ export class OAuthController extends BaseAuthController {
             userAgent: request.headers["user-agent"] ?? "Unknown Device",
         });
 
+        // Cookie only, deliberately. The exchange code is handed to a *web
+        // page* today - the callback redirects to FRONTEND_URL with the code
+        // in the query string - so a native channel here would be reachable
+        // from page JavaScript, which could trade the code it can already see
+        // for a thirty-day refresh token instead of a fifteen-minute access
+        // token. The app gets its own channel when the callback learns to
+        // redirect to the app's scheme, and not before.
         this.setRefreshTokenCookie(
             reply,
             response.tokens.refreshToken,

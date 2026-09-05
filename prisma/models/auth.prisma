@@ -5,6 +5,24 @@ model RefreshToken {
 
   isRevoked Boolean @default(false)
 
+  /// When the token was retired, null while it is live.
+  ///
+  /// Rotation reuse is an alarm - presenting a retired token revokes every
+  /// session the user has - and on a phone that alarm fires for the wrong
+  /// reason: a refresh whose *response* is lost to a dropped connection leaves
+  /// the client retrying with a token the server has already retired. This
+  /// timestamp is what lets a retry inside a short window be told apart from a
+  /// stolen token replayed days later.
+  revokedAt DateTime?
+
+  /// The token issued in this one's place, so a retry inside that window can
+  /// find where the chain went.
+  ///
+  /// A plain column rather than a self-relation: the purge deletes retired
+  /// tokens in bulk, and a foreign key would have to be nursed through that
+  /// for a pointer which is only meaningful for a few seconds.
+  replacedById String?
+
   deviceIp  String
   userAgent String
 

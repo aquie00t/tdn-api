@@ -71,6 +71,18 @@ Success responses are always `{ data, meta: { timestamp } }`. Errors are thrown 
 
 Auth decorators: `fastify.authenticate` (required) and `fastify.optionalAuthenticate` (populates `request.user` when a token is present — used by public feed endpoints to compute `isLiked`/`isBookmarked`).
 
+### Native clients
+
+One API, two clients. There is no separate mobile endpoint set; the difference is which **channel** a session is delivered on.
+
+**The channel rule:** a request is answered on the channel it arrived on. `/auth/refresh` and `/auth/logout` read the refresh token from the signed cookie *or* the request body, and refresh answers on whichever one carried it — so a browser, which always reaches us through the cookie, can never be answered with a refresh token in the body. That is the whole of the web's protection here and it is not conditional on anything the caller claims. Login has no incoming channel to mirror, so it takes `client: "web" | "native"` (absent means web); `native` returns `refreshToken`/`refreshTokenExpiresAt` in the body and sets no cookie. The flag grants nothing to an attacker — it only lets somebody who already has the password receive the token differently. **The OAuth exchange deliberately has no such flag:** the callback hands the exchange code to a web page today, so a native channel there would be reachable from page JavaScript, which could trade a code it can already see for a thirty-day refresh token. It gets one when the callback learns to redirect to the app's own scheme, and not before.
+
+**Rotation has a grace window.** Reuse detection is strict — presenting a retired token revokes every session — which is right on the web and hazardous on a phone, where a refresh whose *response* is lost leaves the client retrying with a token already retired. `RefreshToken.revokedAt` and `replacedById` let `RefreshUseCase.resolveRetry` tell the two apart: inside `REFRESH_ROTATION_GRACE_SECONDS` (30), with a successor that is still untouched, it is a retry — the successor is retired in turn and a fresh pair issued. Tokens are stored hashed, so the lost response cannot be replayed; the retry gets new tokens, not the old ones. Outside the window, or with a successor that has been used, it is the alarm it always was.
+
+**Rate limiting keys on the account** for authenticated traffic and on the IP for everything else (`rateLimitKeyFor`), because carrier NAT puts thousands of subscribers behind one address. The bearer token is verified inside the key generator rather than read from `request.user`: `@fastify/rate-limit` installs a global `onRequest` hook that runs *before* a route's `onRequest: [authenticate]`, so `request.user` is still empty there. `STRICT` overrides that with its own IP key, because it guards login and registration: with no proven account, a caller could attach a token of its own and be handed a fresh bucket per account it holds. Keeping registration on the IP key is what stops it collecting them.
+
+`GET /meta/client` reports the build floor (`MOBILE_MIN_SUPPORTED_BUILD`, zero meaning none) so a published app can be told it is too old. A web bundle is replaced every morning; an app version lives on phones for months, and without this there is no safe way to make a breaking change.
+
 ### Rate limiting
 
 `RateLimitPolicies` in `src/http/plugins/rate-limit.plugin.ts`: `STRICT` (3/15 min, `continueExceeding`) for login/register, `SENSITIVE` (5/min) for password reset, verification, and write/social actions, `STANDARD` (60/min) for authenticated reads, `PUBLIC` (100/min). Global default is 100/min. Requests with `Authorization: Bot <token>` are allow-listed after a sha256 lookup against `user.botToken` — suspended bots (`bannedAt`) are excluded from that lookup.
