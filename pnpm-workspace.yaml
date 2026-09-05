@@ -14,10 +14,14 @@ overrides:
   yaml: ^2.8.3
   brace-expansion: '>=5.0.9' # was ^5.0.5, below the patched range
   fast-jwt: 6.2.4
-  fast-uri: '>=3.1.5' # was >=3.1.2, below the patched range
+  fast-uri: '>=4.1.3' # GHSA-5jgf/f65p/fph4/jqff, was >=3.1.5 which let 4.1.2 in
   vite: 8.0.16 # kept exact: mirrors the devDependency
   ws: '>=8.21.0' # was >=8.20.1, below the patched range
   deepmerge-ts: '>=8.0.0' # GHSA DoS via recursive graphs; @prisma/config pins 7.1.5 exactly
+  # Reached only through the Prisma CLI, which carries it for MySQL datasources
+  # this project does not use - but the CLI is a runtime dependency now, so the
+  # code ships. GHSA-3f6p (auth downgrade) and GHSA-rgwj (decompression bomb).
+  mysql2: '>=3.23.1'
 
 allowBuilds:
   '@prisma/engines': true
