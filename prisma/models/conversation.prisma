@@ -58,6 +58,11 @@ model Conversation {
   lastMessageAt      DateTime? @map("last_message_at")
   lastMessagePreview String?   @map("last_message_preview")
 
+  /// How `lastMessagePreview` is encoded. Same scale as `Message.encVersion`,
+  /// tracked separately because the two are written by different statements
+  /// and a backfill can reach one before the other.
+  previewEncVersion Int @default(0) @map("preview_enc_version")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -78,7 +83,25 @@ model Message {
   conversationId String @map("conversation_id")
   senderId       String @map("sender_id")
 
+  /// The message text.
+  ///
+  /// Ciphertext from `encVersion` 1 onwards, so the column name is now a
+  /// slight lie - it is kept because renaming it buys nothing and costs every
+  /// reader of this table a moment of confusion about which is which.
   content String @default("")
+
+  /// How `content` is encoded.
+  ///
+  /// 0 - plaintext, written before encryption existed. Read back as-is.
+  /// 1 - AES-256-GCM under the server key, decrypted by the repository.
+  /// 2 - encrypted by the client; the server passes it through untouched and
+  ///     cannot read it. Nothing writes this yet.
+  ///
+  /// A column rather than a prefix on the string: a plaintext message that
+  /// happened to start with the prefix would be mistaken for ciphertext and
+  /// fail to decrypt. No index - the only query that filters on it is the
+  /// one-time backfill, which reads the table once either way.
+  encVersion Int @default(0) @map("enc_version")
 
   /// R2 object keys, without any CDN prefix - the same contract posts and
   /// comments use. The mapper rewrites them onto `R2_PUBLIC_URL`, and

@@ -8,19 +8,66 @@ import type { PrismaTransactionalClient } from "@infrastructure/persistence/data
 import { MessagePrismaMapper } from "@infrastructure/persistence/mappers/message-prisma.mapper";
 import type { MediaModerationStatus as PrismaMediaModerationStatus } from "@generated/prisma/client";
 import { decodeKeysetCursor } from "@core/use-cases/shared/pagination/keyset-cursor";
+import type { EncryptionPort } from "@core/ports/services/encryption.port";
+import {
+    decryptColumn,
+    encryptColumn,
+} from "@infrastructure/persistence/encryption/encrypted-column";
+import type { MessageRecord } from "@infrastructure/persistence/mappers/message-prisma.mapper";
 
 /**
  * Prisma-backed implementation of {@link IMessageRepository}.
+ *
+ * Message text is encrypted here, on the way to the column, and decrypted on
+ * the way back. Deliberately not in the mapper and not in the domain: what a
+ * row looks like at rest is a persistence concern, and `Message.content` stays
+ * plaintext everywhere above this class - the entity, the use cases and
+ * `Message.preview()` never learn that the column is a ciphertext blob.
  */
 export class PrismaMessageRepository implements IMessageRepository {
-    constructor(private readonly prisma: PrismaTransactionalClient) {}
+    /**
+     * Creates a new PrismaMessageRepository instance.
+     *
+     * @param prisma - The Prisma client, or a transaction-scoped client.
+     * @param messageEncryptionService - Cipher for the message text at rest.
+     */
+    constructor(
+        private readonly prisma: PrismaTransactionalClient,
+        private readonly messageEncryptionService: EncryptionPort,
+    ) {}
+
+    /**
+     * Rebuilds the entity from a row, decrypting the text as it goes.
+     *
+     * @param record - The stored row.
+     * @returns The domain entity, holding plaintext.
+     */
+    private toDomain(record: MessageRecord): Message {
+        return MessagePrismaMapper.toDomain({
+            ...record,
+            content: decryptColumn(
+                this.messageEncryptionService,
+                record.content,
+                record.encVersion,
+            ),
+        });
+    }
 
     async create(message: Message): Promise<Message> {
+        const { value, encVersion } = encryptColumn(
+            this.messageEncryptionService,
+            message.content,
+        );
+
         const record = await this.prisma.message.create({
-            data: MessagePrismaMapper.toPrismaCreate(message),
+            data: {
+                ...MessagePrismaMapper.toPrismaCreate(message),
+                content: value,
+                encVersion,
+            },
         });
 
-        return MessagePrismaMapper.toDomain(record);
+        return this.toDomain(record);
     }
 
     async findById(id: string): Promise<Message | null> {
@@ -28,7 +75,7 @@ export class PrismaMessageRepository implements IMessageRepository {
             where: { id },
         });
 
-        return record ? MessagePrismaMapper.toDomain(record) : null;
+        return record ? this.toDomain(record) : null;
     }
 
     /**
@@ -66,7 +113,7 @@ export class PrismaMessageRepository implements IMessageRepository {
             take: input.limit,
         });
 
-        return records.map((record) => MessagePrismaMapper.toDomain(record));
+        return records.map((record) => this.toDomain(record));
     }
 
     async softDelete(id: string, deletedAt: Date): Promise<void> {

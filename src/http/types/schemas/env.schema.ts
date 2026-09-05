@@ -9,6 +9,12 @@ export const EnvSchema = Type.Object({
     ]),
     DATABASE_URL: Type.String(),
     ACCESS_TOKEN_SECRET_KEY: Type.String(),
+    // Message text at rest. No default on purpose: a service that booted
+    // without it would either refuse every message or, worse, write plaintext
+    // that later reads back as a decryption failure. Generate with
+    // `openssl rand -base64 32`; rotating it orphans every row written under
+    // the old one, so it is not something to regenerate casually.
+    MESSAGE_ENCRYPTION_KEY: Type.String(),
     COOKIE_SECRET: Type.String(),
 
     // --- Authentication & Tokens ---
