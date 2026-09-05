@@ -1,3 +1,10 @@
+## [1.19.1](https://github.com/the-developer-network/tdn-api/compare/v1.19.0...v1.19.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **infra:** apply migrations before the deploy that needs them ([#265](https://github.com/the-developer-network/tdn-api/issues/265)) ([1ed71bb](https://github.com/the-developer-network/tdn-api/commit/1ed71bb9d80fc4db44f309144e2c945678048ee9))
+
 # [1.19.0](https://github.com/the-developer-network/tdn-api/compare/v1.18.0...v1.19.0) (2026-09-05)
 
 
