@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/the-developer-network/tdn-api/compare/v1.22.0...v1.23.0) (2026-09-05)
+
+
+### Features
+
+* **auth:** let a native client hold its own session ([#277](https://github.com/the-developer-network/tdn-api/issues/277)) ([2cb4882](https://github.com/the-developer-network/tdn-api/commit/2cb4882d419aaad3b86d9d5f7c3efd7d5f3f5663))
+
 # [1.22.0](https://github.com/the-developer-network/tdn-api/compare/v1.21.1...v1.22.0) (2026-09-05)
 
 
