@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/the-developer-network/tdn-api/compare/v1.21.1...v1.22.0) (2026-09-05)
+
+
+### Features
+
+* **report:** let users report posts and comments ([#271](https://github.com/the-developer-network/tdn-api/issues/271)) ([18697d6](https://github.com/the-developer-network/tdn-api/commit/18697d6cb167a56cca500a94032b97b913eaebbf))
+
 ## [1.21.1](https://github.com/the-developer-network/tdn-api/compare/v1.21.0...v1.21.1) (2026-09-05)
 
 
