@@ -1,0 +1,52 @@
+/// Which store's push service a token belongs to.
+///
+/// Recorded even though the sending side does not branch on it - Expo resolves
+/// FCM and APNs itself - because it is the first thing anybody looks at when a
+/// platform stops receiving notifications.
+enum DevicePlatform {
+  ANDROID
+  IOS
+}
+
+/// One installation of the app that has agreed to receive notifications.
+///
+/// The token is unique across the table rather than per user, and that is the
+/// point: a phone handed to somebody else, or an account switched inside the
+/// app, produces the *same* token under a new user. Keyed this way the
+/// registration moves the row instead of leaving one person's notifications
+/// arriving on another person's screen.
+///
+/// `lastSeenAt` is what makes an uninstalled app eventually stop being
+/// notified. Expo reports a token it knows to be dead, and those are deleted
+/// immediately, but a phone that is simply gone reports nothing - so a token
+/// nobody has refreshed for long enough is dropped on age.
+model DeviceToken {
+  id String @id @default(uuid())
+
+  /// The Expo push token. Unique across users - see the note on the model.
+  token String @unique
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  platform DevicePlatform
+
+  /// Build number of the app that registered, for working out whether a
+  /// delivery problem is version-shaped.
+  appVersion String? @map("app_version")
+
+  /// BCP-47 tag from the device, so a notification is written in the language
+  /// the phone is set to rather than the one the profile asked the feed for.
+  locale String?
+
+  /// Refreshed on every registration. The app re-registers at launch, so this
+  /// is a reasonable proxy for "this installation still exists".
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([lastSeenAt])
+  @@map("device_tokens")
+}

@@ -9,6 +9,8 @@ import type { FollowUserController } from "@services/follow-user.controller";
 import type { BlockController } from "@controllers/block.controller";
 import type { ReportController } from "@controllers/report.controller";
 import type { MetaController } from "@controllers/meta.controller";
+import type { DeviceController } from "@controllers/device.controller";
+import type { DevicePurgeScheduler } from "@infrastructure/jobs/device/device-purge.scheduler";
 import type { ReportDigestScheduler } from "@infrastructure/jobs/report/report-digest.scheduler";
 import type { ReportPurgeScheduler } from "@infrastructure/jobs/report/report-purge.scheduler";
 import type { WebSocketManager } from "@infrastructure/realtime/websocket/websocket-manager";
@@ -87,6 +89,12 @@ declare module "@fastify/awilix" {
 
         /** Controller for the client compatibility endpoint */
         metaController: MetaController;
+
+        /** Controller for push notification registrations */
+        deviceController: DeviceController;
+
+        /** Scheduler that drops abandoned push registrations */
+        devicePurgeScheduler: DevicePurgeScheduler;
 
         /** Scheduler for the morning summary of open reports */
         reportDigestScheduler: ReportDigestScheduler;

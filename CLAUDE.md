@@ -187,6 +187,18 @@ Unsubscribing is a signed link, no session: an HMAC of the user id under `ACCESS
 
 `docs/daily-digest.md` is the operator-facing description — what goes in the email, who receives it, and every knob.
 
+### Push notifications
+
+A socket only exists while the app is in the foreground, so notifications reach a backgrounded phone through **Expo push** instead. Every notification in the codebase follows the same two lines — store the row, emit `new-notification` — so `PushNotifyingRealtimeService` wraps that emit rather than touching a dozen use cases: it is registered *as* `realtimeService`, delegates to the socket transport, and dispatches `SendPushNotificationUseCase` fire-and-forget behind it. A notification added later is delivered to phones without anybody wiring it up.
+
+`DeviceToken.token` is unique across the table, not per user: a shared phone or a switched account produces the same token under a new user, so registration **moves** the row instead of leaving one person's notifications on another's screen. `POST`/`DELETE /devices` register and retire; the delete is scoped to the owner, since a push token is not a secret.
+
+Copy lives in `push-copy.ts` (tr/en), chosen from the **device's** locale rather than the profile's feed languages. The payload carries ids and a type only — and **direct messages are never pushed**: their text is encrypted at rest, and a preview in a push payload would route it through Google's servers. Chat events share the realtime channel and the decorator ignores them by event name.
+
+Dead tokens go two ways: Expo reports `DeviceNotRegistered` in a ticket and those rows are deleted at once, while a phone that was simply abandoned is caught by `DEVICE_PURGE_CRON` against `lastSeenAt` (the app re-registers at every launch, so age means something here). `PUSH_ENABLED=false` swaps in `NoopPushService` — devices still register, nothing is delivered.
+
+`docs/push-notifications.md` is the client-facing contract.
+
 ### Realtime and background jobs
 
 `FastifyRealtimeService` publishes to the Redis `realtime_events` channel; each instance subscribes and fans out to locally connected sockets via `WebSocketManager` — so notifications work across multiple processes. Never write to sockets directly from a use-case; go through `RealtimePort`.

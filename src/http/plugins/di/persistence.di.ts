@@ -9,6 +9,7 @@ import { PrismaBlockRepository } from "@infrastructure/persistence/repositories/
 import { PrismaNotificationRepository } from "@infrastructure/persistence/repositories/prisma-notification.repository";
 import { PrismaDigestDeliveryRepository } from "@infrastructure/persistence/repositories/prisma-digest-delivery.repository";
 import { PrismaReportRepository } from "@infrastructure/persistence/repositories/prisma-report.repository";
+import { PrismaDeviceTokenRepository } from "@infrastructure/persistence/repositories/prisma-device-token.repository";
 import { PrismaReportDigestDeliveryRepository } from "@infrastructure/persistence/repositories/prisma-report-digest-delivery.repository";
 import { PrismaUserInterestRepository } from "@infrastructure/persistence/repositories/prisma-user-interest.repository";
 import { PrismaPostRepository } from "@infrastructure/persistence/repositories/prisma-post.repository";
@@ -139,6 +140,11 @@ export const persistenceModule = {
      * Report repository for the content moderation queue
      */
     reportRepository: asClass(PrismaReportRepository).singleton(),
+
+    /**
+     * Device token repository for push notification addresses
+     */
+    deviceTokenRepository: asClass(PrismaDeviceTokenRepository).singleton(),
     reportDigestDeliveryRepository: asClass(
         PrismaReportDigestDeliveryRepository,
     ).singleton(),

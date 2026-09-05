@@ -18,3 +18,4 @@ export { ConversationStatus } from "./conversation-status.enum";
 export { ReportTargetKind } from "./report-target-kind.enum";
 export { ReportReason } from "./report-reason.enum";
 export { ReportStatus } from "./report-status.enum";
+export { DevicePlatform } from "./device-platform.enum";

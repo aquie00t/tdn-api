@@ -247,6 +247,19 @@ export const EnvSchema = Type.Object({
     // response body rather than in a cookie - which is why the two lists are
     // separate rather than one list with a rule about schemes.
     OAUTH_NATIVE_REDIRECT_ALLOWLIST: Type.String({ default: "" }),
+    // --- Push notifications ---
+    // Disabled by default, which swaps in a push service that sends nothing -
+    // the way MODERATION_ENABLED=false does for image scanning. Devices still
+    // register; nothing is delivered until there is a project to deliver
+    // through.
+    PUSH_ENABLED: Type.Boolean({ default: false }),
+    EXPO_ACCESS_TOKEN: Type.String({ default: "" }),
+    // How long a device that has stopped announcing itself is kept. The app
+    // re-registers at every launch, so a row this old is an installation that
+    // is gone - and one HTTP call per notification for the rest of the
+    // account's life if it is not dropped.
+    DEVICE_RETENTION_DAYS: Type.Number({ default: 90, minimum: 1 }),
+    DEVICE_PURGE_CRON: Type.String({ default: "0 6 * * *" }),
 
     // --- Mobile clients ---
     // A web client is whatever was served this morning; an app version lives on

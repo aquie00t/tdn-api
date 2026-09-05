@@ -23,6 +23,7 @@ import followRoutes from "@routes/profile/follow.routes";
 import blockRoutes from "@routes/profile/block.routes";
 import reportRoutes from "@routes/report.routes";
 import metaRoutes from "@routes/meta.routes";
+import deviceRoutes from "@routes/device.routes";
 import websocketPlugin from "./http/plugins/websocket.plugin";
 import realtimeRoutes from "@routes/realtime.routes";
 import notificationRoutes from "@routes/notification.routes";
@@ -30,6 +31,7 @@ import notificationPurgePlugin from "@plugins/custom/notification-purge.plugin";
 import dailyDigestPlugin from "@plugins/custom/daily-digest.plugin";
 import reportDigestPlugin from "@plugins/custom/report-digest.plugin";
 import reportPurgePlugin from "@plugins/custom/report-purge.plugin";
+import devicePurgePlugin from "@plugins/custom/device-purge.plugin";
 import userInterestRebuildPlugin from "@plugins/custom/user-interest-rebuild.plugin";
 import mediaModerationPlugin from "@plugins/custom/media-moderation.plugin";
 import messageRetentionPlugin from "@plugins/custom/message-retention.plugin";
@@ -120,6 +122,7 @@ export class App {
         this.server.register(dailyDigestPlugin);
         this.server.register(reportDigestPlugin);
         this.server.register(reportPurgePlugin);
+        this.server.register(devicePurgePlugin);
         this.server.register(messageRetentionPlugin);
     }
 
@@ -154,6 +157,8 @@ export class App {
         this.server.register(reportRoutes, { prefix: "/api/v1" });
 
         this.server.register(metaRoutes, { prefix: "/api/v1" });
+
+        this.server.register(deviceRoutes, { prefix: "/api/v1" });
 
         this.server.register(realtimeRoutes, { prefix: "/api/v1/realtime" });
 
