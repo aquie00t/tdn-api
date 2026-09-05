@@ -1,8 +1,10 @@
 import { type Static, Type } from "@fastify/type-provider-typebox";
 import { ResponseSchema } from "../create-response-schema";
+import { ClientKindSchema, NativeSessionFields } from "../auth/client.schema";
 
 export const OAuthExchangeBodySchema = Type.Object({
     code: Type.String({ minLength: 1 }),
+    client: ClientKindSchema,
 });
 
 export type OAuthExchangeBody = Static<typeof OAuthExchangeBodySchema>;
@@ -11,6 +13,7 @@ export const OAuthExchangeResponseSchema = ResponseSchema(
     Type.Object({
         accessToken: Type.String(),
         expiresAt: Type.Number(),
+        ...NativeSessionFields,
         user: Type.Object({
             id: Type.String({ format: "uuid" }),
             username: Type.String(),

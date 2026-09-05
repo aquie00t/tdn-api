@@ -225,6 +225,30 @@ export const EnvSchema = Type.Object({
     REPORT_RETENTION_DAYS: Type.Number({ default: 180, minimum: 1 }),
     REPORT_PURGE_CRON: Type.String({ default: "0 5 * * *" }),
 
+    // How long after a rotation a retired refresh token is still accepted as a
+    // retry rather than treated as a stolen one. Mobile clients lose the
+    // *response* to a refresh regularly - a dropped connection is enough - and
+    // without this window that retry signs the user out of every device.
+    REFRESH_ROTATION_GRACE_SECONDS: Type.Number({ default: 30, minimum: 0 }),
+
+    // Largest single upload accepted, in megabytes. The parser buffers what it
+    // reads and the instance is small, so this is a ceiling for the occasional
+    // large file rather than a target - clients compress first.
+    MEDIA_MAX_FILE_SIZE_MB: Type.Number({ default: 10, minimum: 1 }),
+
+    // --- Mobile clients ---
+    // A web client is whatever was served this morning; an app version lives on
+    // phones for months. These let the API tell a build that it is too old to
+    // be talked to, which is the only thing that makes a breaking change safe
+    // once there is an app in a store.
+    //
+    // Build numbers, not semantic versions: that is what the stores increment
+    // and what the client can report without parsing anything. Zero means "no
+    // floor", which is the state until the first release.
+    MOBILE_MIN_SUPPORTED_BUILD: Type.Number({ default: 0, minimum: 0 }),
+    MOBILE_LATEST_BUILD: Type.Number({ default: 0, minimum: 0 }),
+    MOBILE_STORE_URL_ANDROID: Type.String({ default: "" }),
+
     // Set to true to bypass rate limiting (e.g. in test environments)
     DISABLE_RATE_LIMIT: Type.Boolean({ default: false }),
 });

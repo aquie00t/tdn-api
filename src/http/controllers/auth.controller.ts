@@ -67,16 +67,17 @@ export class AuthController extends BaseAuthController {
             userAgent: request.headers["user-agent"] ?? "Unknown Device",
         });
 
-        this.setRefreshTokenCookie(
-            reply,
-            response.tokens.refreshToken,
-            response.tokens.refreshTokenExpiresAt,
-        );
+        const delivered = this.deliverRefreshToken(reply, {
+            channel: this.channelFor(request.body.client),
+            refreshToken: response.tokens.refreshToken,
+            refreshTokenExpiresAt: response.tokens.refreshTokenExpiresAt,
+        });
 
         reply.status(201).send({
             data: {
                 accessToken: response.tokens.accessToken,
                 expiresAt: response.tokens.expiresAt,
+                ...delivered,
                 user: response.user,
             },
             meta: { timestamp: new Date().toISOString() },
@@ -87,10 +88,12 @@ export class AuthController extends BaseAuthController {
         request: FastifyRequest<{ Body?: { refreshToken?: string } }>,
         reply: FastifyReply,
     ): Promise<void> {
-        const token =
-            this.unsignRefreshToken(request) ??
-            request.body?.refreshToken ??
-            null;
+        // The channel the request arrived on is the channel it is answered
+        // on. Nothing the caller says is consulted: a browser always reaches
+        // us through the cookie, so no request originating in a page can ever
+        // be answered with a refresh token in the body.
+        const cookieToken = this.unsignRefreshToken(request);
+        const token = cookieToken ?? this.bodyRefreshToken(request);
 
         if (!token) {
             throw new UnauthorizedError("Authentication session not found");
@@ -102,16 +105,17 @@ export class AuthController extends BaseAuthController {
             userAgent: request.headers["user-agent"] ?? "Unknown Device",
         });
 
-        this.setRefreshTokenCookie(
-            reply,
-            response.refreshToken,
-            response.refreshTokenExpiresAt,
-        );
+        const delivered = this.deliverRefreshToken(reply, {
+            channel: cookieToken ? "cookie" : "body",
+            refreshToken: response.refreshToken,
+            refreshTokenExpiresAt: response.refreshTokenExpiresAt,
+        });
 
         reply.status(200).send({
             data: {
                 accessToken: response.accessToken,
                 expiresAt: response.expiresAt,
+                ...delivered,
                 user: response.user,
             },
             meta: { timestamp: new Date().toISOString() },
@@ -119,7 +123,11 @@ export class AuthController extends BaseAuthController {
     }
 
     async logout(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-        const token = this.unsignRefreshToken(request);
+        // Reads both channels for the reason refresh does: a native client
+        // holds its token in the keystore rather than in a cookie, and a
+        // logout it cannot perform leaves the session alive for thirty days.
+        const token =
+            this.unsignRefreshToken(request) ?? this.bodyRefreshToken(request);
 
         if (token) {
             await this.logoutUseCase.execute({ token });

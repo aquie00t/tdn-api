@@ -11,6 +11,8 @@ export class RefreshTokenPrismaMapper {
             userAgent: raw.userAgent,
             expiresAt: raw.expiresAt,
             isRevoked: raw.isRevoked,
+            revokedAt: raw.revokedAt,
+            replacedById: raw.replacedById,
             createdAt: raw.createdAt,
             updatedAt: raw.updatedAt,
         });

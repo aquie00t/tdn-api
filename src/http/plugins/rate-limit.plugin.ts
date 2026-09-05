@@ -61,11 +61,56 @@ export const RateLimitPolicies = {
  *
  * @param fastify - The Fastify instance to register the rate limit plugin on.
  */
+/**
+ * The bucket a request is counted in.
+ *
+ * Authenticated traffic is counted per account, everything else per IP. Carrier
+ * NAT puts thousands of mobile subscribers behind one address, and a shared
+ * bucket makes the strict policies fire on people who did nothing.
+ *
+ * The bearer token is verified here rather than read from `request.user`:
+ * @fastify/rate-limit registers its own global `onRequest` hook, which runs
+ * before a route's `onRequest: [authenticate]`, so `request.user` is still
+ * empty at this point. Verifying is an HMAC check and costs little.
+ *
+ * Unauthenticated endpoints - login, registration, password reset - keep the IP
+ * key, which is the whole point of the strict policies on them: there is no
+ * account to charge the attempts to yet, and an attacker must not be able to
+ * pick their own bucket.
+ *
+ * @param fastify - Instance carrying the JWT verifier
+ * @param request - The incoming request
+ * @returns The rate limit key
+ */
+export function rateLimitKeyFor(
+    fastify: FastifyInstance,
+    request: FastifyRequest,
+): string {
+    const auth = request.headers.authorization;
+
+    if (auth?.startsWith("Bearer ")) {
+        try {
+            const payload = fastify.jwt.verify<{ id?: string }>(
+                auth.slice("Bearer ".length).trim(),
+            );
+
+            if (payload?.id) return `user:${payload.id}`;
+        } catch {
+            // Not a token we issued, or no longer valid. It is rejected
+            // downstream; here it is simply anonymous.
+        }
+    }
+
+    return request.ip;
+}
+
 function rateLimitPlugin(fastify: FastifyInstance): void {
     fastify.register(fastifyRateLimit, {
         global: true,
         max: 100,
         timeWindow: "1 minute",
+        keyGenerator: (request: FastifyRequest): string =>
+            rateLimitKeyFor(fastify, request),
         allowList: async (request: FastifyRequest): Promise<boolean> => {
             if (request.server.config.DISABLE_RATE_LIMIT) return true;
             const auth = request.headers.authorization;

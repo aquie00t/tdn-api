@@ -27,6 +27,8 @@ export class RefreshToken {
             userAgent,
             expiresAt,
             isRevoked: false,
+            revokedAt: null,
+            replacedById: null,
         });
     }
 
@@ -91,6 +93,22 @@ export class RefreshToken {
     }
 
     /**
+     * Get the moment this token was retired
+     * @returns The revocation date, or null while the token is live
+     */
+    get revokedAt(): Date | null {
+        return this.props.revokedAt ?? null;
+    }
+
+    /**
+     * Get the id of the token issued in this one's place
+     * @returns The successor's id, or null if this token was never rotated
+     */
+    get replacedById(): string | null {
+        return this.props.replacedById ?? null;
+    }
+
+    /**
      * Get the creation timestamp of the refresh token
      * @returns The creation date
      */
@@ -123,11 +141,40 @@ export class RefreshToken {
     }
 
     /**
-     * Revoke the refresh token
-     * This method mutates the entity state to mark the token as revoked
+     * Whether this token was retired within the last few seconds.
+     *
+     * The question a rotation retry asks. A token retired moments ago and
+     * presented again is almost always a client that never received the
+     * response carrying its replacement; the same token presented days later
+     * is the reuse the alarm exists for.
+     *
+     * A token retired before this column existed reports false, which is the
+     * safe answer: it falls through to the alarm rather than past it.
+     *
+     * @param seconds - Width of the window
+     * @returns True when the token was retired inside it
      */
-    public revoke(): void {
+    public wasRevokedWithin(seconds: number): boolean {
+        const revokedAt = this.props.revokedAt;
+
+        if (!revokedAt) return false;
+
+        return Date.now() - revokedAt.getTime() <= seconds * 1000;
+    }
+
+    /**
+     * Revoke the refresh token
+     *
+     * This method mutates the entity state to mark the token as revoked, and
+     * records when - and, when it was rotated rather than simply revoked,
+     * which token took its place.
+     *
+     * @param replacedById - The successor's id, for a rotation
+     */
+    public revoke(replacedById?: string): void {
         this.props.isRevoked = true;
+        this.props.revokedAt = new Date();
+        this.props.replacedById = replacedById ?? null;
         this.props.updatedAt = new Date();
     }
 }

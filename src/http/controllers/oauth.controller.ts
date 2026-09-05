@@ -126,16 +126,17 @@ export class OAuthController extends BaseAuthController {
             userAgent: request.headers["user-agent"] ?? "Unknown Device",
         });
 
-        this.setRefreshTokenCookie(
-            reply,
-            response.tokens.refreshToken,
-            response.tokens.refreshTokenExpiresAt,
-        );
+        const delivered = this.deliverRefreshToken(reply, {
+            channel: this.channelFor(request.body.client),
+            refreshToken: response.tokens.refreshToken,
+            refreshTokenExpiresAt: response.tokens.refreshTokenExpiresAt,
+        });
 
         reply.status(200).send({
             data: {
                 accessToken: response.tokens.accessToken,
                 expiresAt: response.tokens.expiresAt,
+                ...delivered,
                 user: response.user,
             },
             meta: { timestamp: new Date().toISOString() },

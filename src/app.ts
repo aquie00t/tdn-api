@@ -22,6 +22,7 @@ import profileRoutes from "@routes/profile/profile.routes";
 import followRoutes from "@routes/profile/follow.routes";
 import blockRoutes from "@routes/profile/block.routes";
 import reportRoutes from "@routes/report.routes";
+import metaRoutes from "@routes/meta.routes";
 import websocketPlugin from "./http/plugins/websocket.plugin";
 import realtimeRoutes from "@routes/realtime.routes";
 import notificationRoutes from "@routes/notification.routes";
@@ -151,6 +152,8 @@ export class App {
         this.server.register(blockRoutes, { prefix: "/api/v1" });
 
         this.server.register(reportRoutes, { prefix: "/api/v1" });
+
+        this.server.register(metaRoutes, { prefix: "/api/v1" });
 
         this.server.register(realtimeRoutes, { prefix: "/api/v1/realtime" });
 
