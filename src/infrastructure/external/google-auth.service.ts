@@ -15,9 +15,10 @@ export interface GoogleAuthConfig {
 export class GoogleAuthService implements GoogleAuthPort {
     constructor(private readonly config: GoogleAuthConfig) {}
 
-    getAuthorizationUrl(): string {
+    getAuthorizationUrl(state: string): string {
         const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
         const options = {
+            state,
             redirect_uri: this.config.callbackUrl,
             client_id: this.config.clientId,
             access_type: "offline",

@@ -169,6 +169,15 @@ projects:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # Where an OAuth flow may return to. Both are exact-match lists; the
+      # native one also switches that flow's session onto the response body
+      # instead of a cookie, which is why it is a separate list rather than a
+      # rule about URL schemes. Empty means the web app's own page only, which
+      # is what the flow did before it could be asked.
+      - key: OAUTH_REDIRECT_ALLOWLIST
+        sync: false
+      - key: OAUTH_NATIVE_REDIRECT_ALLOWLIST
+        sync: false
       # Mobile clients. All four have defaults in env.schema.ts, so the service
       # boots without them; they are declared because the two build numbers are
       # what lets the API refuse a version that is too old to be talked to, and

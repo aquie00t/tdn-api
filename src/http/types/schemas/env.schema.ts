@@ -236,6 +236,18 @@ export const EnvSchema = Type.Object({
     // large file rather than a target - clients compress first.
     MEDIA_MAX_FILE_SIZE_MB: Type.Number({ default: 10, minimum: 1 }),
 
+    // Where an OAuth flow may return to, beyond the web app's own page.
+    // Comma-separated and matched *exactly* - no prefix test, no host
+    // comparison. The target receives the exchange code, so a loose match here
+    // hands whoever owns the address a session, which is how open redirects
+    // stop being cosmetic.
+    OAUTH_REDIRECT_ALLOWLIST: Type.String({ default: "" }),
+    // The same, for the app's own scheme (e.g. tdn://oauth-success). A flow
+    // returning to one of these delivers its refresh token in the exchange
+    // response body rather than in a cookie - which is why the two lists are
+    // separate rather than one list with a rule about schemes.
+    OAUTH_NATIVE_REDIRECT_ALLOWLIST: Type.String({ default: "" }),
+
     // --- Mobile clients ---
     // A web client is whatever was served this morning; an app version lives on
     // phones for months. These let the API tell a build that it is too old to
