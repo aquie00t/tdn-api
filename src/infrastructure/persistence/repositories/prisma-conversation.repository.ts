@@ -16,6 +16,7 @@ import type { EncryptionPort } from "@core/ports/services/encryption.port";
 import {
     decryptNullableColumn,
     encryptColumn,
+    EncVersion,
 } from "@infrastructure/persistence/encryption/encrypted-column";
 
 /**
@@ -304,6 +305,32 @@ export class PrismaConversationRepository implements IConversationRepository {
         });
 
         return count > 0;
+    }
+
+    /**
+     * Clears the preview and counters of threads whose messages have expired.
+     *
+     * One statement rather than a read-then-write loop: the predicate is the
+     * same `lastMessageAt` the purge used to pick its rows, so the database can
+     * find them without this having to name them.
+     *
+     * `lastActivityAt` is deliberately left alone. It is the inbox's sort key
+     * and is never null; resetting it would reshuffle somebody's inbox as a
+     * side effect of a cleanup job.
+     */
+    async clearExpiredPreviews(cutoff: Date): Promise<number> {
+        const { count } = await this.prisma.conversation.updateMany({
+            where: { lastMessageAt: { lt: cutoff } },
+            data: {
+                lastMessagePreview: null,
+                previewEncVersion: EncVersion.PLAINTEXT,
+                lastMessageAt: null,
+                userAUnread: 0,
+                userBUnread: 0,
+            },
+        });
+
+        return count;
     }
 
     /**

@@ -172,4 +172,25 @@ export interface IConversationRepository {
         userId: string,
         excludeUserIds?: string[],
     ): Promise<number>;
+
+    /**
+     * Clears the denormalised preview of threads whose messages have expired.
+     *
+     * The preview is a copy of the newest message's text. Purging the messages
+     * and leaving it behind would keep the opening of every old conversation
+     * readable in a table nothing else in the thread survives in - which is
+     * most of what the retention window exists to remove.
+     *
+     * The unread counters go with it: they count messages that no longer
+     * exist, and a badge nobody can clear by opening the thread is worse than
+     * no badge.
+     *
+     * The conversation row itself stays. It then renders as an empty thread,
+     * which is exactly what a freshly opened one looks like; deleting it is a
+     * larger decision than expiring its contents.
+     *
+     * @param cutoff - The oldest moment a message may have been written at
+     * @returns How many conversations were cleared
+     */
+    clearExpiredPreviews(cutoff: Date): Promise<number>;
 }

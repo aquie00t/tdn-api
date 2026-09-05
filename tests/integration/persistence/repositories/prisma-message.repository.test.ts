@@ -224,4 +224,165 @@ describe("PrismaMessageRepository encryption (integration)", () => {
             ]);
         });
     });
+
+    describe("withdrawing a message", () => {
+        it("should destroy the text rather than hide it", async () => {
+            const id = await write("bunu geri çekiyorum");
+
+            await messages.softDelete(id, new Date());
+
+            const raw = await prisma.message.findUniqueOrThrow({
+                where: { id },
+                select: { content: true, encVersion: true, mediaUrls: true },
+            });
+
+            // The row survives so replies still have something to hang off,
+            // but nothing of what was said does. Before this, "delete" only
+            // stopped the mapper from serving the text.
+            expect(raw.content).not.toContain("geri");
+            expect(raw.mediaUrls).toEqual([]);
+            expect(raw.encVersion).toBe(EncVersion.SERVER);
+        });
+
+        it("should leave a row that still reads back", async () => {
+            const id = await write("silinecek");
+
+            await messages.softDelete(id, new Date());
+            const withdrawn = await messages.findById(id);
+
+            // The blanked text is an encrypted empty string. A bare "" in a
+            // column marked as ciphertext is too short to be a valid payload
+            // and this read would throw instead.
+            expect(withdrawn?.content).toBe("");
+            expect(withdrawn?.isDeleted).toBe(true);
+        });
+    });
+
+    describe("retention", () => {
+        /** Writes a message and backdates it past the window. */
+        const writeAged = async (
+            content: string,
+            daysOld: number,
+        ): Promise<string> => {
+            const id = await write(content);
+            const createdAt = new Date();
+            createdAt.setDate(createdAt.getDate() - daysOld);
+
+            await prisma.message.update({
+                where: { id },
+                data: { createdAt },
+            });
+
+            return id;
+        };
+
+        it("should find only messages past the cutoff", async () => {
+            const old = await writeAged("eski", 400);
+            await write("yeni");
+
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 365);
+
+            const expired = await messages.findExpired(cutoff, 100);
+
+            expect(expired.map((message) => message.id)).toEqual([old]);
+        });
+
+        it("should carry the media urls the purge has to delete", async () => {
+            const id = await write("");
+            await prisma.message.update({
+                where: { id },
+                data: {
+                    mediaUrls: ["https://cdn.example.com/messages/a.jpg"],
+                    createdAt: new Date("2020-01-01T00:00:00.000Z"),
+                },
+            });
+
+            const [expired] = await messages.findExpired(new Date(), 100);
+
+            // Read before the row goes: afterwards nothing names the objects.
+            expect(expired.mediaUrls).toEqual([
+                "https://cdn.example.com/messages/a.jpg",
+            ]);
+        });
+
+        it("should delete by id and report the count", async () => {
+            const first = await write("bir");
+            const second = await write("iki");
+
+            expect(await messages.deleteByIds([first, second])).toBe(2);
+            expect(await messages.findById(first)).toBeNull();
+        });
+
+        it("should treat an empty id list as a no-op", async () => {
+            expect(await messages.deleteByIds([])).toBe(0);
+        });
+
+        it("should clear the preview of an expired thread", async () => {
+            await conversations.applyNewMessage(conversationId, {
+                recipientId: bob,
+                sentAt: new Date("2020-01-01T00:00:00.000Z"),
+                preview: "çok eski önizleme",
+            });
+
+            const cleared = await conversations.clearExpiredPreviews(
+                new Date(),
+            );
+
+            expect(cleared).toBe(1);
+
+            const raw = await prisma.conversation.findUniqueOrThrow({
+                where: { id: conversationId },
+                select: {
+                    lastMessagePreview: true,
+                    lastMessageAt: true,
+                    userAUnread: true,
+                    userBUnread: true,
+                    lastActivityAt: true,
+                },
+            });
+
+            // The preview is a copy of the message text; leaving it would keep
+            // the opening of the conversation readable after everything it
+            // summarised was purged.
+            expect(raw.lastMessagePreview).toBeNull();
+            expect(raw.lastMessageAt).toBeNull();
+            expect(raw.userAUnread).toBe(0);
+            expect(raw.userBUnread).toBe(0);
+            // The inbox sort key is left alone: resetting it would reshuffle
+            // somebody's inbox as a side effect of a cleanup job.
+            expect(raw.lastActivityAt).not.toBeNull();
+        });
+
+        it("should leave a thread whose messages are still within the window", async () => {
+            await conversations.applyNewMessage(conversationId, {
+                recipientId: bob,
+                sentAt: new Date(),
+                preview: "taze önizleme",
+            });
+
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 365);
+
+            expect(await conversations.clearExpiredPreviews(cutoff)).toBe(0);
+            expect(
+                (await conversations.findById(conversationId))
+                    ?.lastMessagePreview,
+            ).toBe("taze önizleme");
+        });
+
+        it("should keep the conversation row itself", async () => {
+            await conversations.applyNewMessage(conversationId, {
+                recipientId: bob,
+                sentAt: new Date("2020-01-01T00:00:00.000Z"),
+                preview: "eski",
+            });
+
+            await conversations.clearExpiredPreviews(new Date());
+
+            // An emptied thread renders like a freshly opened one. Deleting it
+            // is a larger decision than expiring its contents.
+            expect(await conversations.findById(conversationId)).not.toBeNull();
+        });
+    });
 });

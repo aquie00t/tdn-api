@@ -64,6 +64,11 @@ export const EnvSchema = Type.Object({
     REDIS_URL: Type.String(),
     NOTIFICATION_PURGE_CRON: Type.String({ default: "0 3 * * *" }),
     NOTIFICATION_PURGE_GRACE_PERIOD_DAYS: Type.Number({ default: 30 }),
+    // How long direct message history is kept. Past this the message and its
+    // attachments are destroyed - by us as well as by the user, so shortening
+    // it is not something to do quietly.
+    MESSAGE_RETENTION_CRON: Type.String({ default: "0 4 * * *" }),
+    MESSAGE_RETENTION_DAYS: Type.Number({ default: 365, minimum: 1 }),
 
     RESEND_API_KEY: Type.String({ default: "resend_api_key" }),
 

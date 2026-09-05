@@ -188,6 +188,16 @@ projects:
       # backfill first, which does not exist yet.
       - key: MESSAGE_ENCRYPTION_KEY
         sync: false
+      # How long direct message history is kept, and when the purge runs.
+      # Both have defaults in env.schema.ts (365 days, 04:00 container time),
+      # so the service boots without them - they are declared here because
+      # shortening the window destroys user history that cannot be recovered,
+      # and that should be a visible setting rather than a constant only the
+      # schema knows.
+      - key: MESSAGE_RETENTION_DAYS
+        sync: false
+      - key: MESSAGE_RETENTION_CRON
+        sync: false
       - key: ACCESS_TOKEN_EXPIRES_IN
         sync: false
       region: frankfurt
