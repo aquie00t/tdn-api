@@ -8,6 +8,7 @@ import { LikeController } from "@controllers/like.controller";
 import { ProfileController } from "@controllers/profile.controller";
 import { FollowUserController } from "@controllers/follow-user.controller";
 import { BlockController } from "@controllers/block.controller";
+import { ReportController } from "@controllers/report.controller";
 import { CommentController } from "@controllers/comment.controller";
 import { BookmarkController } from "@controllers/bookmark.controller";
 import { TrendController } from "@controllers/trend.controller";
@@ -54,6 +55,7 @@ export const controllersModule = {
     ),
     followUserController: asClass(FollowUserController).singleton(),
     blockController: asClass(BlockController).singleton(),
+    reportController: asClass(ReportController).singleton(),
     notificationController: asClass(NotificationController).singleton(),
     postController: asClass(PostController).singleton(),
     commentController: asClass(CommentController).singleton(),

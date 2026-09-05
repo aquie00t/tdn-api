@@ -133,6 +133,20 @@ Blocking is announced where the client needs a screen (`UserBlockedError`, **403
 
 `docs/blocking.md` is the client-facing contract.
 
+### Content reporting
+
+`POST /reports` files one person's report of a **post or comment** — nothing else. An account is dealt with by blocking it, and a direct message is not public content, so reporting one would mean handing its plaintext to an operator. There is no read endpoint and no status endpoint: serving the queue would publish what an account has been accused of, and a report is closed by hand, exactly like a ban.
+
+The row carries a **copy** of what was reported — `targetAuthorId`, `contentSnapshot`, `mediaKeys`, all resolved at write time — and `targetId` is a plain column rather than a foreign key. That is the whole design: the quickest response available to a reported account is to delete the post, and a cascade would let them empty the queue. A reported comment also stores `targetParentId` so the email can link to the post it lives under; null for a comment on an article, which is addressed by slug.
+
+`@@unique(reporterId, targetKind, targetId)` makes a repeat report idempotent (`create` returns null on P2002, the use case answers `created: false`, the endpoint answers the same `received: true` either way) and is what makes the threshold meaningful: the alert counts rows, so it counts people.
+
+Two emails go to `MODERATION_ALERT_EMAIL`, and an empty address turns both off without affecting anything else. The **escalation alert** fires once, when `REPORT_ALERT_THRESHOLD` (3) separate people have reported the same content — compared with `===` so it does not repeat on every later report. The **morning summary** (`ReportDigestScheduler`, its own pinned timezone like the daily digest) lists the whole open queue rather than the last day's arrivals: a window anchored to the previous send loses what it covered whenever that email fails. An empty queue sends nothing. `ReportDigestDelivery` is the per-day claim, the same multi-instance guard `DigestDelivery` provides per user, taken last once there is something to send.
+
+`groupReports` (`src/core/use-cases/shared/reports/group-reports.ts`) is the pure presentation logic both emails share — collect by target, tally reasons, take the excerpt from the *earliest* report. Nothing is ever hidden automatically at any count; reports inform a person, and a rule that took content down on a count is one a group can point at anything it dislikes.
+
+`docs/reporting.md` is the operator-facing description — the endpoint, the emails, and the SQL for reading and closing the queue.
+
 ### Mentions
 
 `@handle` in a post, comment or article body resolves to real accounts at **write time** and is stored as a relation, never as the text that was typed — so a rename keeps historical mentions pointing at the right account and the response always serves the current handle. Reads carry `mentions: [{ id, username }]` beside `tags`.

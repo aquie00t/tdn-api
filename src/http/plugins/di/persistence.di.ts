@@ -8,6 +8,8 @@ import { PrismaFollowUserRepository } from "@infrastructure/persistence/reposito
 import { PrismaBlockRepository } from "@infrastructure/persistence/repositories/prisma-block.repository";
 import { PrismaNotificationRepository } from "@infrastructure/persistence/repositories/prisma-notification.repository";
 import { PrismaDigestDeliveryRepository } from "@infrastructure/persistence/repositories/prisma-digest-delivery.repository";
+import { PrismaReportRepository } from "@infrastructure/persistence/repositories/prisma-report.repository";
+import { PrismaReportDigestDeliveryRepository } from "@infrastructure/persistence/repositories/prisma-report-digest-delivery.repository";
 import { PrismaUserInterestRepository } from "@infrastructure/persistence/repositories/prisma-user-interest.repository";
 import { PrismaPostRepository } from "@infrastructure/persistence/repositories/prisma-post.repository";
 import { PrismaPostLikeRepository } from "@infrastructure/persistence/repositories/prisma-post-like.repository";
@@ -131,6 +133,14 @@ export const persistenceModule = {
     tagRepository: asClass(PrismaTagRepository).singleton(),
     digestDeliveryRepository: asClass(
         PrismaDigestDeliveryRepository,
+    ).singleton(),
+
+    /**
+     * Report repository for the content moderation queue
+     */
+    reportRepository: asClass(PrismaReportRepository).singleton(),
+    reportDigestDeliveryRepository: asClass(
+        PrismaReportDigestDeliveryRepository,
     ).singleton(),
 
     /**

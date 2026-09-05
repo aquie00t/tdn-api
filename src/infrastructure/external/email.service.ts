@@ -13,6 +13,11 @@ import { Resend } from "resend";
 import { digestCopyFor } from "./email/digest-copy";
 import { escapeHtml } from "./email/escape-html";
 import { renderDigestSections } from "./email/digest-template";
+import { renderReportDigest, renderReportItem } from "./email/report-template";
+import type {
+    ReportAlertEmail,
+    ReportDigestEmail,
+} from "@core/domain/interfaces/report.interface";
 
 export interface EmailConfig {
     from: string;
@@ -65,8 +70,26 @@ interface DigestEmailTemplate extends BaseEmailTemplate {
     unsubscribeLabel: string;
 }
 
+/**
+ * The operator's moderation mail.
+ *
+ * A digest in shape but not in kind, and kept apart from
+ * {@link DigestEmailTemplate} for one reason: there is no unsubscribing from a
+ * moderation queue, and a variant that demanded an unsubscribe link would have
+ * to be given a fake one.
+ */
+interface ReportEmailTemplate extends BaseEmailTemplate {
+    type: "report";
+
+    /** The rendered queue, already escaped. */
+    sectionsHtml: string;
+}
+
 type EmailTemplate =
-    OtpEmailTemplate | AlertEmailTemplate | DigestEmailTemplate;
+    | OtpEmailTemplate
+    | AlertEmailTemplate
+    | DigestEmailTemplate
+    | ReportEmailTemplate;
 
 function buildEmailHtml(template: EmailTemplate): string {
     const baseStyles = `
@@ -217,7 +240,10 @@ function buildEmailHtml(template: EmailTemplate): string {
                 </div>`
             : "";
 
-    const digestBlock = template.type === "digest" ? template.sectionsHtml : "";
+    const digestBlock =
+        template.type === "digest" || template.type === "report"
+            ? template.sectionsHtml
+            : "";
 
     const unsubscribeBlock =
         template.type === "digest"
@@ -348,6 +374,62 @@ export class EmailService implements EmailPort {
             html,
         );
     }
+    /**
+     * Tells the operator that one piece of content just crossed the reporting
+     * threshold.
+     *
+     * Sent through the same single-recipient path the transactional emails
+     * use, which swallows provider failures into the log rather than throwing.
+     * That is the right trade here: the alert is a courtesy on top of a report
+     * that is already stored and already in the queue, and a moderation
+     * endpoint that returns 500 because an email bounced would teach reporters
+     * to retry until it stops.
+     *
+     * @param input - The escalated content and what was said about it.
+     */
+    async sendReportAlert(input: ReportAlertEmail): Promise<void> {
+        const html = buildEmailHtml({
+            type: "report",
+            title: "Content Reported",
+            heading: "Moderation",
+            lang: "en",
+            greeting: "Heads up,",
+            body: `A ${input.item.targetKind.toLowerCase()} has now been reported by ${input.item.reporterCount} people, crossing the alert threshold of ${input.threshold}.`,
+            sectionsHtml: renderReportItem(input.item),
+            footer: "Nothing has been hidden automatically. docs/reporting.md has the statements for acting on this.",
+        });
+
+        await this.send(
+            input.to,
+            `[TDN] ${input.item.reporterCount} reports on a ${input.item.targetKind.toLowerCase()}`,
+            html,
+        );
+    }
+
+    /**
+     * Sends the operator the morning summary of open reports.
+     *
+     * @param input - The open queue, collected per target.
+     */
+    async sendReportDigest(input: ReportDigestEmail): Promise<void> {
+        const html = buildEmailHtml({
+            type: "report",
+            title: "Open Reports",
+            heading: "Moderation",
+            lang: "en",
+            greeting: "Good morning,",
+            body: "These reports are still open. They stay in this email until they are dealt with.",
+            sectionsHtml: renderReportDigest(input.items, input.totalPending),
+            footer: "docs/reporting.md has the statements for acting on these.",
+        });
+
+        await this.send(
+            input.to,
+            `[TDN] ${input.totalPending} open report${input.totalPending === 1 ? "" : "s"}`,
+            html,
+        );
+    }
+
     /**
      * Sends a morning digest to many recipients at once.
      *

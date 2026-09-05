@@ -7,6 +7,9 @@ import type { RefreshTokenPurgeScheduler } from "@infrastructure/jobs/refresh-to
 import type { ProfileController } from "@services/profile.controller";
 import type { FollowUserController } from "@services/follow-user.controller";
 import type { BlockController } from "@controllers/block.controller";
+import type { ReportController } from "@controllers/report.controller";
+import type { ReportDigestScheduler } from "@infrastructure/jobs/report/report-digest.scheduler";
+import type { ReportPurgeScheduler } from "@infrastructure/jobs/report/report-purge.scheduler";
 import type { WebSocketManager } from "@infrastructure/realtime/websocket/websocket-manager";
 import type { NotificationController } from "@controllers/notification.controller";
 import type { NotificationPurgeScheduler } from "@infrastructure/jobs/notification/notification-purge.scheduler";
@@ -77,6 +80,15 @@ declare module "@fastify/awilix" {
 
         /** Scheduler for the morning digest email */
         dailyDigestScheduler: DailyDigestScheduler;
+
+        /** Controller for filing content reports */
+        reportController: ReportController;
+
+        /** Scheduler for the morning summary of open reports */
+        reportDigestScheduler: ReportDigestScheduler;
+
+        /** Scheduler that drops reports past the retention window */
+        reportPurgeScheduler: ReportPurgeScheduler;
 
         /** Controller for the endpoints an email links to */
         emailController: EmailController;

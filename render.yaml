@@ -169,6 +169,28 @@ projects:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # Content reports. MODERATION_ALERT_EMAIL is the switch for both the
+      # escalation alert and the morning summary: with it empty - the default -
+      # reports are still filed and still queue up in the table, but nothing is
+      # mailed to anybody. Everything else here has a default in env.schema.ts.
+      # docs/reporting.md has the statements for reading and closing the queue,
+      # which is done by hand like a ban.
+      - key: MODERATION_ALERT_EMAIL
+        sync: false
+      - key: REPORT_ALERT_THRESHOLD
+        sync: false
+      - key: REPORT_DIGEST_ENABLED
+        sync: false
+      - key: REPORT_DIGEST_CRON
+        sync: false
+      - key: REPORT_DIGEST_TIMEZONE
+        sync: false
+      - key: REPORT_DIGEST_MAX_REPORTS
+        sync: false
+      - key: REPORT_RETENTION_DAYS
+        sync: false
+      - key: REPORT_PURGE_CRON
+        sync: false
       - key: CORS_ORIGIN
         sync: false
       - key: COOKIE_SECRET

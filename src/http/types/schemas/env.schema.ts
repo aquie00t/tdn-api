@@ -201,6 +201,30 @@ export const EnvSchema = Type.Object({
     DAILY_DIGEST_MAX_POSTS: Type.Number({ default: 5, minimum: 1 }),
     DAILY_DIGEST_CANDIDATE_POOL_SIZE: Type.Number({ default: 300, minimum: 1 }),
 
+    // --- Content reports ---
+    // Where moderation mail goes. Empty - the default - turns both the
+    // escalation alert and the morning summary off without touching anything
+    // else: reports are still filed and still queue up, they just wait for
+    // somebody to read the table.
+    MODERATION_ALERT_EMAIL: Type.String({ default: "" }),
+    // Separate people who must report one piece of content before the operator
+    // is interrupted. Never one: a single report is a claim, and a threshold is
+    // what stops one account summoning an email about anybody it dislikes.
+    REPORT_ALERT_THRESHOLD: Type.Number({ default: 3, minimum: 2 }),
+    // The morning summary of everything still open. Pinned to a timezone for
+    // the reason the daily digest is - it has to land at breakfast - and set an
+    // hour earlier so the queue is read before the day's traffic arrives.
+    REPORT_DIGEST_ENABLED: Type.Boolean({ default: false }),
+    REPORT_DIGEST_CRON: Type.String({ default: "0 8 * * *" }),
+    REPORT_DIGEST_TIMEZONE: Type.String({ default: "Europe/Istanbul" }),
+    // Most reports one summary covers. The count of everything open is
+    // reported beside the contents, so a truncated morning says so.
+    REPORT_DIGEST_MAX_REPORTS: Type.Number({ default: 50, minimum: 1 }),
+    // A report holds a copy of what somebody wrote, which is why it is useful
+    // and why it is not kept forever. Age is the only criterion.
+    REPORT_RETENTION_DAYS: Type.Number({ default: 180, minimum: 1 }),
+    REPORT_PURGE_CRON: Type.String({ default: "0 5 * * *" }),
+
     // Set to true to bypass rate limiting (e.g. in test environments)
     DISABLE_RATE_LIMIT: Type.Boolean({ default: false }),
 });

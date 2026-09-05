@@ -11,6 +11,10 @@ import { DailyDigestScheduler } from "@infrastructure/jobs/digest/daily-digest.s
 import { UserInterestRebuildScheduler } from "@infrastructure/jobs/user-interest/user-interest-rebuild.scheduler";
 import { MediaModerationJob } from "@infrastructure/jobs/media-moderation/media-moderation.job";
 import { MediaModerationScheduler } from "@infrastructure/jobs/media-moderation/media-moderation.scheduler";
+import { ReportDigestJob } from "@infrastructure/jobs/report/report-digest.job";
+import { ReportDigestScheduler } from "@infrastructure/jobs/report/report-digest.scheduler";
+import { ReportPurgeJob } from "@infrastructure/jobs/report/report-purge.job";
+import { ReportPurgeScheduler } from "@infrastructure/jobs/report/report-purge.scheduler";
 import { MessageRetentionJob } from "@infrastructure/jobs/message/message-retention.job";
 import { MessageRetentionScheduler } from "@infrastructure/jobs/message/message-retention.scheduler";
 
@@ -22,6 +26,8 @@ export const jobsModule = {
     userInterestRebuildJob: asClass(UserInterestRebuildJob).singleton(),
     mediaModerationJob: asClass(MediaModerationJob).singleton(),
     messageRetentionJob: asClass(MessageRetentionJob).singleton(),
+    reportDigestJob: asClass(ReportDigestJob).singleton(),
+    reportPurgeJob: asClass(ReportPurgeJob).singleton(),
 
     // --- Schedulers ---
     userPurgeScheduler: asFunction((userPurgeJob, config, logger) => {
@@ -90,6 +96,33 @@ export const jobsModule = {
     ).singleton(),
 
     dailyDigestJob: asClass(DailyDigestJob).singleton(),
+
+    reportDigestScheduler: asFunction((reportDigestJob, config, logger) => {
+        return new ReportDigestScheduler(
+            reportDigestJob,
+            {
+                cronExpression: config.REPORT_DIGEST_CRON,
+                timezone: config.REPORT_DIGEST_TIMEZONE,
+                // The address is the real switch: without somewhere to send
+                // the summary there is nothing for the schedule to do.
+                enabled:
+                    config.REPORT_DIGEST_ENABLED &&
+                    config.MODERATION_ALERT_EMAIL.length > 0,
+            },
+            logger,
+        );
+    }).singleton(),
+
+    reportPurgeScheduler: asFunction((reportPurgeJob, config, logger) => {
+        return new ReportPurgeScheduler(
+            reportPurgeJob,
+            {
+                cronExpression: config.REPORT_PURGE_CRON,
+                retentionDays: config.REPORT_RETENTION_DAYS,
+            },
+            logger,
+        );
+    }).singleton(),
 
     dailyDigestScheduler: asFunction((dailyDigestJob, config, logger) => {
         return new DailyDigestScheduler(
