@@ -23,7 +23,6 @@
         "migrate-bots": "cross-env DOTENV_CONFIG_PATH=.env.production tsx scripts/migrate-bots.ts",
         "assign-bot-categories": "tsx scripts/assign-bot-categories.ts",
         "backfill-post-lang": "tsx scripts/backfill-post-lang.ts",
-        "backfill-message-encryption": "tsx scripts/backfill-message-encryption.ts",
         "db:deploy": "prisma migrate deploy",
         "db:generate": "prisma generate",
         "db:studio": "prisma studio"
