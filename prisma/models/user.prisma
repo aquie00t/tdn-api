@@ -67,6 +67,11 @@ model User {
 
   digestDeliveries DigestDelivery[]
 
+  /// Both directions of a report, for the cascade rather than for reading:
+  /// a purged account takes its reports and the reports against it with it.
+  reportsFiled   Report[] @relation("ReportsFiled")
+  reportsAgainst Report[] @relation("ReportsAgainst")
+
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   commentLikes CommentLike[]

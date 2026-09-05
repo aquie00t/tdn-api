@@ -2,6 +2,10 @@ import type {
     DailyDigestEmail,
     DigestSendResult,
 } from "@core/domain/interfaces/digest.interface";
+import type {
+    ReportAlertEmail,
+    ReportDigestEmail,
+} from "@core/domain/interfaces/report.interface";
 
 /**
  * Base input structure for sending an email.
@@ -60,4 +64,26 @@ export interface EmailPort {
      * @returns How many the provider accepted, and which it refused.
      */
     sendDailyDigests(digests: DailyDigestEmail[]): Promise<DigestSendResult>;
+
+    /**
+     * Tells the operator that one piece of content just crossed the reporting
+     * threshold.
+     *
+     * The only report mail that interrupts: everything below the threshold
+     * waits for the morning summary. A moderation address that pings on every
+     * single report is one people stop reading, which costs more than a slow
+     * response to the reports that matter.
+     *
+     * @param input - The escalated content and what was said about it.
+     * @returns A promise that resolves when the email has been handed over.
+     */
+    sendReportAlert(input: ReportAlertEmail): Promise<void>;
+
+    /**
+     * Sends the operator the morning summary of open reports.
+     *
+     * @param input - The open queue, collected per target.
+     * @returns A promise that resolves when the email has been handed over.
+     */
+    sendReportDigest(input: ReportDigestEmail): Promise<void>;
 }

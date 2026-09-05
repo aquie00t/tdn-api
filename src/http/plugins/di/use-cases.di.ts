@@ -96,6 +96,13 @@ import { GetMessagesUseCase } from "@core/use-cases/message/get-messages";
 import { DeleteMessageUseCase } from "@core/use-cases/message/delete-message";
 import { PurgeExpiredMessagesUseCase } from "@core/use-cases/message/purge-expired";
 import { UploadMessageMediaUseCase } from "@core/use-cases/message/upload-message-media";
+import { CreateReportUseCase } from "@core/use-cases/report/create-report";
+import { SendReportDigestUseCase } from "@core/use-cases/report/send-report-digest";
+import { PurgeOldReportsUseCase } from "@core/use-cases/report/purge-old-reports";
+import {
+    REPORT_EXCERPT_LENGTH,
+    REPORT_MAX_DETAILS,
+} from "@core/domain/constants/report.constants";
 
 /**
  * Dependency injection module for use cases
@@ -141,6 +148,69 @@ export const useCasesModule = {
                 logger,
             ),
     ).singleton(),
+
+    /**
+     * Use case for reporting a post or a comment
+     */
+    createReportUseCase: asFunction(
+        (
+            reportRepository,
+            postRepository,
+            commentRepository,
+            userRepository,
+            emailService,
+            config,
+            logger,
+        ) =>
+            new CreateReportUseCase(
+                reportRepository,
+                postRepository,
+                commentRepository,
+                userRepository,
+                emailService,
+                {
+                    alertThreshold: config.REPORT_ALERT_THRESHOLD,
+                    alertEmail: config.MODERATION_ALERT_EMAIL,
+                    frontendUrl: config.FRONTEND_URL,
+                    excerptLength: REPORT_EXCERPT_LENGTH,
+                    maxDetails: REPORT_MAX_DETAILS,
+                },
+                logger,
+            ),
+    ).singleton(),
+
+    /**
+     * Use case for the morning summary of open reports
+     */
+    sendReportDigestUseCase: asFunction(
+        (
+            reportRepository,
+            reportDigestDeliveryRepository,
+            userRepository,
+            emailService,
+            config,
+        ) =>
+            new SendReportDigestUseCase(
+                reportRepository,
+                reportDigestDeliveryRepository,
+                userRepository,
+                emailService,
+                {
+                    enabled: config.REPORT_DIGEST_ENABLED,
+                    alertEmail: config.MODERATION_ALERT_EMAIL,
+                    maxReports: config.REPORT_DIGEST_MAX_REPORTS,
+                    frontendUrl: config.FRONTEND_URL,
+                    excerptLength: REPORT_EXCERPT_LENGTH,
+                    maxDetails: REPORT_MAX_DETAILS,
+                    timezone: config.REPORT_DIGEST_TIMEZONE,
+                },
+            ),
+    ).singleton(),
+
+    /**
+     * Use case for dropping reports that have aged out
+     */
+    purgeOldReportsUseCase: asClass(PurgeOldReportsUseCase).singleton(),
 
     /**
      * Use case for leaving, or rejoining, the daily digest

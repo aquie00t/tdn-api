@@ -15,3 +15,6 @@ export { MediaModerationStatus } from "./media-moderation-status.enum";
 export type { MediaModerationVerdict } from "./media-moderation-status.enum";
 export { MediaModerationCategory } from "./media-moderation-category.enum";
 export { ConversationStatus } from "./conversation-status.enum";
+export { ReportTargetKind } from "./report-target-kind.enum";
+export { ReportReason } from "./report-reason.enum";
+export { ReportStatus } from "./report-status.enum";

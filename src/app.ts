@@ -21,11 +21,14 @@ import multipartPlugin from "@plugins/multipart.plugin";
 import profileRoutes from "@routes/profile/profile.routes";
 import followRoutes from "@routes/profile/follow.routes";
 import blockRoutes from "@routes/profile/block.routes";
+import reportRoutes from "@routes/report.routes";
 import websocketPlugin from "./http/plugins/websocket.plugin";
 import realtimeRoutes from "@routes/realtime.routes";
 import notificationRoutes from "@routes/notification.routes";
 import notificationPurgePlugin from "@plugins/custom/notification-purge.plugin";
 import dailyDigestPlugin from "@plugins/custom/daily-digest.plugin";
+import reportDigestPlugin from "@plugins/custom/report-digest.plugin";
+import reportPurgePlugin from "@plugins/custom/report-purge.plugin";
 import userInterestRebuildPlugin from "@plugins/custom/user-interest-rebuild.plugin";
 import mediaModerationPlugin from "@plugins/custom/media-moderation.plugin";
 import messageRetentionPlugin from "@plugins/custom/message-retention.plugin";
@@ -114,6 +117,8 @@ export class App {
         this.server.register(userInterestRebuildPlugin);
         this.server.register(mediaModerationPlugin);
         this.server.register(dailyDigestPlugin);
+        this.server.register(reportDigestPlugin);
+        this.server.register(reportPurgePlugin);
         this.server.register(messageRetentionPlugin);
     }
 
@@ -144,6 +149,8 @@ export class App {
         this.server.register(followRoutes, { prefix: "/api/v1" });
 
         this.server.register(blockRoutes, { prefix: "/api/v1" });
+
+        this.server.register(reportRoutes, { prefix: "/api/v1" });
 
         this.server.register(realtimeRoutes, { prefix: "/api/v1/realtime" });
 

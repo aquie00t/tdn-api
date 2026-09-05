@@ -1,0 +1,118 @@
+/// What a report points at. Posts and comments only: an account is dealt with
+/// by blocking it, and a direct message is not public content - reporting one
+/// would mean handing its plaintext to an operator, which the encryption at
+/// rest exists to prevent.
+enum ReportTargetKind {
+  POST
+  COMMENT
+}
+
+/// Why the reporter says the content should not be there.
+///
+/// The list is deliberately short and close to the categories the media
+/// moderation tiers already use, so a human reading a queue is answering the
+/// same question the automated pipeline answers. `OTHER` exists because the
+/// alternative is people picking the nearest wrong label.
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  HATE
+  SEXUAL
+  VIOLENCE
+  SELF_HARM
+  MISINFORMATION
+  ILLEGAL
+  OTHER
+}
+
+/// Where a report stands. Moved by hand, like a ban: there is no endpoint and
+/// no admin panel, and `docs/reporting.md` carries the statements.
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  ACTIONED
+  DISMISSED
+}
+
+/// One person's report of one piece of content.
+///
+/// `targetId` is a plain column rather than a foreign key, and the reported
+/// text is copied onto the row rather than read through a relation. Both are
+/// the same decision: the obvious way for a reported account to make a report
+/// go away is to delete what was reported, and a cascade would let them. The
+/// snapshot is what an operator actually reads, so it has to survive the
+/// content it describes.
+///
+/// The unique constraint makes one person's report of one thing idempotent -
+/// a double tap and a retry both land on the row that is already there - and
+/// it is also what makes the escalation threshold mean anything: the alert
+/// counts rows, so it is counting distinct people by construction.
+model Report {
+  id String @id @default(uuid())
+
+  reporterId String @map("reporter_id")
+  reporter   User   @relation("ReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  targetKind ReportTargetKind @map("target_kind")
+  /// The post or comment id. No foreign key - see the note on the model.
+  targetId   String           @map("target_id")
+
+  /// For a reported comment, the post it was written under - so the email can
+  /// link somewhere useful instead of printing a bare uuid. Null for a
+  /// reported post, and null for a comment on an article: an article is
+  /// addressed by slug, and storing a post id that is really an article id
+  /// would build a link to the wrong place.
+  targetParentId String? @map("target_parent_id")
+
+  /// Who wrote the reported content, resolved at report time. Kept so the
+  /// queue can be read by author without joining back to content that may be
+  /// gone, and so repeat offenders are visible at all.
+  targetAuthorId String @map("target_author_id")
+  targetAuthor   User   @relation("ReportsAgainst", fields: [targetAuthorId], references: [id], onDelete: Cascade)
+
+  reason  ReportReason
+  /// The reporter's own words, optional and length-capped at the schema. User
+  /// input that reaches an operator's inbox, so every path that renders it
+  /// escapes it.
+  details String?
+
+  /// The reported text as it stood when the report was filed.
+  contentSnapshot String   @map("content_snapshot")
+  /// Storage keys of whatever was attached, without any CDN prefix.
+  mediaKeys       String[] @default([]) @map("media_keys")
+
+  status     ReportStatus @default(PENDING)
+  reviewedAt DateTime?    @map("reviewed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([reporterId, targetKind, targetId])
+  /// The queue read: everything still pending, oldest first.
+  @@index([status, createdAt])
+  /// The escalation count, and the "what else has this content collected"
+  /// question an operator asks next.
+  @@index([targetKind, targetId])
+  @@index([targetAuthorId])
+  @@map("reports")
+}
+
+/// One report digest claimed for one day.
+///
+/// The same claim the daily digest takes, for the same reason: several
+/// instances run this schedule and nothing coordinates them, so the insert is
+/// the coordination. There is no user column here - the digest goes to the
+/// operator address, so one row per day is the whole space.
+model ReportDigestDelivery {
+  id String @id @default(uuid())
+
+  /// The calendar day this digest belongs to, in the digest timezone.
+  digestOn DateTime @unique @map("digest_on") @db.Date
+
+  /// How many reports the email covered. Recorded so a morning that looks
+  /// quiet can be told apart from one that failed to send.
+  reportCount Int @default(0) @map("report_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("report_digest_deliveries")
+}
