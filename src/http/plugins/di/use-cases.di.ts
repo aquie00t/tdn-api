@@ -94,6 +94,7 @@ import { GetUnreadMessageCountUseCase } from "@core/use-cases/conversation/get-u
 import { SendMessageUseCase } from "@core/use-cases/message/send-message";
 import { GetMessagesUseCase } from "@core/use-cases/message/get-messages";
 import { DeleteMessageUseCase } from "@core/use-cases/message/delete-message";
+import { PurgeExpiredMessagesUseCase } from "@core/use-cases/message/purge-expired";
 import { UploadMessageMediaUseCase } from "@core/use-cases/message/upload-message-media";
 
 /**
@@ -851,7 +852,47 @@ export const useCasesModule = {
     /**
      * Use case for withdrawing a message
      */
-    deleteMessageUseCase: asClass(DeleteMessageUseCase).singleton(),
+    // Same reason as deleteMessageUseCase below: it deletes storage objects and
+    // needs the CDN origin to find their keys.
+    purgeExpiredMessagesUseCase: asFunction(
+        (
+            messageRepository,
+            conversationRepository,
+            storageService,
+            logger,
+            config,
+        ) =>
+            new PurgeExpiredMessagesUseCase(
+                messageRepository,
+                conversationRepository,
+                storageService,
+                logger,
+                config.R2_PUBLIC_URL,
+            ),
+    ).singleton(),
+
+    // asFunction because it needs the CDN origin to recover storage keys from
+    // the URLs it deletes, the same reason sendMessageUseCase is one.
+    deleteMessageUseCase: asFunction(
+        (
+            messageRepository,
+            conversationRepository,
+            realtimeService,
+            storageService,
+            mediaAssetRepository,
+            logger,
+            config,
+        ) =>
+            new DeleteMessageUseCase(
+                messageRepository,
+                conversationRepository,
+                realtimeService,
+                storageService,
+                mediaAssetRepository,
+                logger,
+                config.R2_PUBLIC_URL,
+            ),
+    ).singleton(),
 
     /**
      * Use case for storing a file to attach to a message

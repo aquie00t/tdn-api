@@ -8,17 +8,26 @@ import { ConversationNotFoundError, ForbiddenError } from "@core/errors";
 import type { IConversationRepository } from "@core/ports/repositories/conversation.repository";
 import type { IMessageRepository } from "@core/ports/repositories/message.repository";
 import type { RealtimePort } from "@core/ports/services/realtime.port";
+import type { StoragePort } from "@core/ports/services/storage.port";
+import type { IMediaAssetRepository } from "@core/ports/repositories/media-asset.repository";
+import type { LoggerPort } from "@core/ports/services/logger.port";
+import { MediaOwnerKind } from "@core/domain/enums";
 
 const SENDER = "aaaa-1111";
 const RECIPIENT = "bbbb-2222";
 
-const buildMessage = (deletedAt: Date | null = null): Message =>
+const CDN_URL = "https://cdn.example.com";
+
+const buildMessage = (
+    deletedAt: Date | null = null,
+    mediaUrls: string[] = [],
+): Message =>
     Message.with({
         id: "msg-1",
         conversationId: "conv-1",
         senderId: SENDER,
         content: "hello",
-        mediaUrls: [],
+        mediaUrls,
         isSensitive: false,
         mediaStatus: MediaModerationStatus.APPROVED,
         deletedAt,
@@ -30,6 +39,9 @@ describe("DeleteMessageUseCase", () => {
     let messageRepo: Pick<IMessageRepository, "findById" | "softDelete">;
     let conversationRepo: Pick<IConversationRepository, "findById">;
     let realtimeSvc: Pick<RealtimePort, "emitToUser">;
+    let storageSvc: Pick<StoragePort, "delete">;
+    let mediaAssetRepo: Pick<IMediaAssetRepository, "detachFromOwner">;
+    let logger: Pick<LoggerPort, "error">;
 
     beforeEach(() => {
         messageRepo = {
@@ -50,11 +62,20 @@ describe("DeleteMessageUseCase", () => {
             ),
         };
         realtimeSvc = { emitToUser: vi.fn() };
+        storageSvc = { delete: vi.fn().mockResolvedValue(undefined) };
+        mediaAssetRepo = {
+            detachFromOwner: vi.fn().mockResolvedValue(undefined),
+        };
+        logger = { error: vi.fn() };
 
         useCase = new DeleteMessageUseCase(
             messageRepo as IMessageRepository,
             conversationRepo as IConversationRepository,
             realtimeSvc as RealtimePort,
+            storageSvc as StoragePort,
+            mediaAssetRepo as IMediaAssetRepository,
+            logger as LoggerPort,
+            CDN_URL,
         );
     });
 
@@ -102,5 +123,74 @@ describe("DeleteMessageUseCase", () => {
         await expect(
             useCase.execute({ messageId: "msg-1", userId: SENDER }),
         ).rejects.toThrow(ConversationNotFoundError);
+    });
+
+    describe("attachments", () => {
+        it("removes them from storage", async () => {
+            vi.mocked(messageRepo.findById).mockResolvedValue(
+                buildMessage(null, [`${CDN_URL}/messages/photo.jpg`]),
+            );
+
+            await useCase.execute({ messageId: "msg-1", userId: SENDER });
+
+            expect(storageSvc.delete).toHaveBeenCalledWith(
+                "messages/photo.jpg",
+            );
+        });
+
+        it("removes them before the row forgets where they were", async () => {
+            vi.mocked(messageRepo.findById).mockResolvedValue(
+                buildMessage(null, [`${CDN_URL}/messages/photo.jpg`]),
+            );
+
+            const order: string[] = [];
+            vi.mocked(storageSvc.delete).mockImplementation(async () => {
+                order.push("storage");
+            });
+            vi.mocked(messageRepo.softDelete).mockImplementation(async () => {
+                order.push("softDelete");
+            });
+
+            await useCase.execute({ messageId: "msg-1", userId: SENDER });
+
+            // softDelete clears mediaUrls, so deleting afterwards would leave
+            // the objects with nothing left naming them.
+            expect(order).toEqual(["storage", "softDelete"]);
+        });
+
+        it("detaches the asset rows", async () => {
+            await useCase.execute({ messageId: "msg-1", userId: SENDER });
+
+            expect(mediaAssetRepo.detachFromOwner).toHaveBeenCalledWith(
+                MediaOwnerKind.MESSAGE,
+                "msg-1",
+            );
+        });
+
+        it("still withdraws the message when storage fails", async () => {
+            vi.mocked(messageRepo.findById).mockResolvedValue(
+                buildMessage(null, [`${CDN_URL}/messages/photo.jpg`]),
+            );
+            vi.mocked(storageSvc.delete).mockRejectedValue(
+                new Error("bucket unreachable"),
+            );
+
+            await useCase.execute({ messageId: "msg-1", userId: SENDER });
+
+            // An unreachable object must not leave the user staring at a
+            // message they asked to delete.
+            expect(messageRepo.softDelete).toHaveBeenCalled();
+            expect(logger.error).toHaveBeenCalled();
+        });
+
+        it("ignores a URL that points somewhere else", async () => {
+            vi.mocked(messageRepo.findById).mockResolvedValue(
+                buildMessage(null, ["https://elsewhere.example.com/x.jpg"]),
+            );
+
+            await useCase.execute({ messageId: "msg-1", userId: SENDER });
+
+            expect(storageSvc.delete).not.toHaveBeenCalled();
+        });
     });
 });

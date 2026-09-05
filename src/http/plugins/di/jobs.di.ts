@@ -11,6 +11,8 @@ import { DailyDigestScheduler } from "@infrastructure/jobs/digest/daily-digest.s
 import { UserInterestRebuildScheduler } from "@infrastructure/jobs/user-interest/user-interest-rebuild.scheduler";
 import { MediaModerationJob } from "@infrastructure/jobs/media-moderation/media-moderation.job";
 import { MediaModerationScheduler } from "@infrastructure/jobs/media-moderation/media-moderation.scheduler";
+import { MessageRetentionJob } from "@infrastructure/jobs/message/message-retention.job";
+import { MessageRetentionScheduler } from "@infrastructure/jobs/message/message-retention.scheduler";
 
 export const jobsModule = {
     // --- Jobs ---
@@ -19,6 +21,7 @@ export const jobsModule = {
     notificationPurgeJob: asClass(NotificationPurgeJob),
     userInterestRebuildJob: asClass(UserInterestRebuildJob).singleton(),
     mediaModerationJob: asClass(MediaModerationJob).singleton(),
+    messageRetentionJob: asClass(MessageRetentionJob).singleton(),
 
     // --- Schedulers ---
     userPurgeScheduler: asFunction((userPurgeJob, config, logger) => {
@@ -28,6 +31,19 @@ export const jobsModule = {
             logger,
         );
     }).singleton(),
+
+    messageRetentionScheduler: asFunction(
+        (messageRetentionJob, config, logger) => {
+            return new MessageRetentionScheduler(
+                messageRetentionJob,
+                {
+                    cronExpression: config.MESSAGE_RETENTION_CRON,
+                    retentionDays: config.MESSAGE_RETENTION_DAYS,
+                },
+                logger,
+            );
+        },
+    ).singleton(),
 
     refreshTokenPurgeScheduler: asFunction(
         (refreshTokenPurgeJob, config, logger) => {

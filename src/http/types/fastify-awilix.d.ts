@@ -10,6 +10,7 @@ import type { BlockController } from "@controllers/block.controller";
 import type { WebSocketManager } from "@infrastructure/realtime/websocket/websocket-manager";
 import type { NotificationController } from "@controllers/notification.controller";
 import type { NotificationPurgeScheduler } from "@infrastructure/jobs/notification/notification-purge.scheduler";
+import type { MessageRetentionScheduler } from "@infrastructure/jobs/message/message-retention.scheduler";
 import type { UserInterestRebuildScheduler } from "@infrastructure/jobs/user-interest/user-interest-rebuild.scheduler";
 import type PostController from "@services/post.controller";
 import type { CommentController } from "@controllers/comment.controller";
@@ -52,6 +53,9 @@ declare module "@fastify/awilix" {
 
         /** Scheduler for refresh token purge jobs */
         refreshTokenPurgeScheduler: RefreshTokenPurgeScheduler;
+
+        /** Scheduler that destroys message history past the retention window */
+        messageRetentionScheduler: MessageRetentionScheduler;
 
         /** Controller for follow/unfollow operations */
         followUserController: FollowUserController;

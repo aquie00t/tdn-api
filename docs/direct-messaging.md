@@ -11,7 +11,8 @@ read path.
 
 - [Conversation lifecycle](#conversation-lifecycle)
 - [Blocked participants](#blocked-participants)
-- [Encryption](#encryption)
+- [What is protected](#what-is-protected)
+- [Retention and deletion](#retention-and-deletion)
 - [Endpoints](#endpoints)
 - [Objects](#objects)
 - [Pagination](#pagination)
@@ -101,7 +102,7 @@ decision about one request; blocking is about the account, and it is reversible.
 
 ---
 
-## Encryption
+## What is protected
 
 Message text is encrypted at rest. `messages.content` and the denormalised
 `conversations.last_message_preview` hold AES-256-GCM ciphertext; the API
@@ -109,18 +110,54 @@ encrypts on the way in and decrypts on the way out, so **none of this is
 visible in the API contract** — clients send and receive plain text exactly as
 before.
 
-What that protects: a database dump, a backup file, somebody browsing rows
-through a console, a leaked connection string.
+Plainly, who can read a message:
 
-What it does not protect: anyone who reaches the running service, because the
-key is there with it. The server can read every message, and does so on every
-read.
+| | Can read it |
+| --- | --- |
+| A database dump, a backup, a console session, a leaked connection string | **no** |
+| Someone watching the network | **no** (TLS) |
+| Anyone who reaches the running service — including us | **yes** |
+| The client | **yes** — the server hands it plain text |
 
-**This is not end-to-end encryption**, which is still out of scope — see
-[Not supported](#not-supported). The rows carry an `enc_version` so both can
-exist side by side later: `0` plaintext, written before this shipped, `1`
-server-key, `2` reserved for client-encrypted text the server passes through
-untouched.
+**This is not end-to-end encryption.** The key sits with the service, so the
+server reads every message on every request, and so could anyone who got that
+far. We would rather say so than imply a guarantee the code does not make; the
+code is public, and you can check this yourself. End-to-end encryption remains
+out of scope — see [Not supported](#not-supported).
+
+**Metadata is not encrypted.** Who spoke to whom, when, how often, and whether a
+message carried an attachment are all readable in the clear. Encrypting content
+does not hide the shape of a conversation, and end-to-end encryption would not
+hide it either.
+
+Rows carry an `enc_version` so the schemes can sit side by side: `0` plaintext,
+written before encryption shipped, `1` server-key, `2` reserved for
+client-encrypted text the server would pass through untouched.
+
+---
+
+## Retention and deletion
+
+**Messages are kept for one year.** After that the message and its attachments
+are permanently deleted by a nightly job — from the database and from object
+storage, with no copy kept and no way for us to recover them. The window is
+`MESSAGE_RETENTION_DAYS`.
+
+When every message in a conversation has expired, the thread stays but is
+emptied: its preview and unread counters are cleared, and it renders the way a
+newly opened conversation does. The preview is cleared because it is a copy of
+the message text, and a summary that outlived what it summarised would be the
+one readable trace left.
+
+**Deleting a message deletes it.** `DELETE /messages/:id` blanks the stored text
+and removes the attachments from storage immediately. What remains is a
+tombstone — the row keeps its place so that a reply to it still has something to
+answer — carrying no content at all. This is worth stating because it was not
+always true: the message used to stay in the database in full, with the API
+declining to serve it.
+
+Neither is reversible. A withdrawn message is gone for its recipient as well as
+its sender, and expired history cannot be restored on request.
 
 ---
 
@@ -434,7 +471,7 @@ Deliberately out of scope in this version:
 
 - Group conversations
 - End-to-end encryption — message text is encrypted at rest, but the server
-  holds the key and can read it. See [Encryption](#encryption).
+  holds the key and can read it. See [What is protected](#what-is-protected).
 - Message editing
 - Typing indicators
 - End-to-end encryption

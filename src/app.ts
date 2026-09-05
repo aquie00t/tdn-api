@@ -28,6 +28,7 @@ import notificationPurgePlugin from "@plugins/custom/notification-purge.plugin";
 import dailyDigestPlugin from "@plugins/custom/daily-digest.plugin";
 import userInterestRebuildPlugin from "@plugins/custom/user-interest-rebuild.plugin";
 import mediaModerationPlugin from "@plugins/custom/media-moderation.plugin";
+import messageRetentionPlugin from "@plugins/custom/message-retention.plugin";
 import { postRoutes } from "@routes/post/post.routes";
 import { commentRoutes } from "@routes/post/comment.routes";
 import { likeRoutes } from "@routes/post/like.routes";
@@ -113,6 +114,7 @@ export class App {
         this.server.register(userInterestRebuildPlugin);
         this.server.register(mediaModerationPlugin);
         this.server.register(dailyDigestPlugin);
+        this.server.register(messageRetentionPlugin);
     }
 
     /**

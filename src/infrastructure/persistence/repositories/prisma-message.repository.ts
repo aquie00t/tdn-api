@@ -1,6 +1,7 @@
 import type { Message } from "@core/domain/entities/message.entity";
 import type { MediaState } from "@core/ports/repositories/media-asset.repository";
 import type {
+    ExpiredMessage,
     IMessageRepository,
     ListMessagesInput,
 } from "@core/ports/repositories/message.repository";
@@ -116,11 +117,61 @@ export class PrismaMessageRepository implements IMessageRepository {
         return records.map((record) => this.toDomain(record));
     }
 
+    /**
+     * Withdraws a message and destroys what it said.
+     *
+     * The row stays - a reply may be hanging off it - but the text and the
+     * media list do not. Previously this wrote only `deletedAt` and left both
+     * in place, so the API hid a message that the database still held in full.
+     *
+     * The blanked text is an *encrypted* empty string. Writing a bare `""`
+     * into a column marked `encVersion: 1` would leave a payload too short to
+     * be a valid GCM message, and the next read of the row would throw rather
+     * than return the empty text the tombstone expects.
+     */
     async softDelete(id: string, deletedAt: Date): Promise<void> {
+        const { value, encVersion } = encryptColumn(
+            this.messageEncryptionService,
+            "",
+        );
+
         await this.prisma.message.update({
             where: { id },
-            data: { deletedAt },
+            data: {
+                deletedAt,
+                content: value,
+                encVersion,
+                mediaUrls: [],
+            },
         });
+    }
+
+    /**
+     * Reads a batch of messages older than the retention window.
+     *
+     * Ordered oldest first so repeated runs make forward progress from the far
+     * end of the history rather than revisiting the same window.
+     */
+    async findExpired(cutoff: Date, limit: number): Promise<ExpiredMessage[]> {
+        return await this.prisma.message.findMany({
+            where: { createdAt: { lt: cutoff } },
+            select: { id: true, mediaUrls: true },
+            orderBy: { createdAt: "asc" },
+            take: limit,
+        });
+    }
+
+    /**
+     * Permanently deletes messages by id.
+     */
+    async deleteByIds(ids: string[]): Promise<number> {
+        if (ids.length === 0) return 0;
+
+        const { count } = await this.prisma.message.deleteMany({
+            where: { id: { in: ids } },
+        });
+
+        return count;
     }
 
     async updateMediaState(
