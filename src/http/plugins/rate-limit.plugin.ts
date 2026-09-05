@@ -33,6 +33,14 @@ export const RateLimitPolicies = {
         max: 3,
         timeWindow: "15 minutes",
         continueExceeding: true,
+        // Pinned to the IP, overriding the account key the rest of the API
+        // uses. This policy guards login and registration, where there is no
+        // proven account yet - so a caller may attach any valid token of its
+        // own and would otherwise be handed a fresh bucket per account it
+        // holds, turning three attempts per quarter hour into three times
+        // however many accounts it can collect. Keeping registration itself on
+        // the IP key is what bounds that collection.
+        keyGenerator: (request: FastifyRequest): string => request.ip,
     },
     SENSITIVE: {
         max: 5,

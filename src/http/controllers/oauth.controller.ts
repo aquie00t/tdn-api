@@ -126,17 +126,23 @@ export class OAuthController extends BaseAuthController {
             userAgent: request.headers["user-agent"] ?? "Unknown Device",
         });
 
-        const delivered = this.deliverRefreshToken(reply, {
-            channel: this.channelFor(request.body.client),
-            refreshToken: response.tokens.refreshToken,
-            refreshTokenExpiresAt: response.tokens.refreshTokenExpiresAt,
-        });
+        // Cookie only, deliberately. The exchange code is handed to a *web
+        // page* today - the callback redirects to FRONTEND_URL with the code
+        // in the query string - so a native channel here would be reachable
+        // from page JavaScript, which could trade the code it can already see
+        // for a thirty-day refresh token instead of a fifteen-minute access
+        // token. The app gets its own channel when the callback learns to
+        // redirect to the app's scheme, and not before.
+        this.setRefreshTokenCookie(
+            reply,
+            response.tokens.refreshToken,
+            response.tokens.refreshTokenExpiresAt,
+        );
 
         reply.status(200).send({
             data: {
                 accessToken: response.tokens.accessToken,
                 expiresAt: response.tokens.expiresAt,
-                ...delivered,
                 user: response.user,
             },
             meta: { timestamp: new Date().toISOString() },

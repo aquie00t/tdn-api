@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { rateLimitKeyFor } from "@plugins/rate-limit.plugin";
+import {
+    rateLimitKeyFor,
+    RateLimitPolicies,
+} from "@plugins/rate-limit.plugin";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 /**
@@ -63,5 +66,18 @@ describe("rateLimitKeyFor", () => {
         expect(rateLimitKeyFor(fastify, requestWith("Bot good"))).toBe(
             "203.0.113.7",
         );
+    });
+});
+
+describe("RateLimitPolicies.STRICT", () => {
+    it("should key on the IP regardless of any token attached", () => {
+        // Login and registration run under this policy. If a caller could
+        // pick its bucket by attaching a token it already holds, three
+        // attempts per quarter hour would become three per account.
+        const key = RateLimitPolicies.STRICT.keyGenerator(
+            requestWith("Bearer good"),
+        );
+
+        expect(key).toBe("203.0.113.7");
     });
 });
