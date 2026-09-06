@@ -1,3 +1,10 @@
+## [1.27.1](https://github.com/the-developer-network/tdn-api/compare/v1.27.0...v1.27.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* close three account-takeover paths found in review ([#284](https://github.com/the-developer-network/tdn-api/issues/284)) ([3654255](https://github.com/the-developer-network/tdn-api/commit/365425506bfb765df2fd2099dc3e6bc45fb44b9f))
+
 # [1.27.0](https://github.com/the-developer-network/tdn-api/compare/v1.26.0...v1.27.0) (2026-09-06)
 
 
