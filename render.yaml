@@ -177,6 +177,17 @@ projects:
       - key: OAUTH_REDIRECT_ALLOWLIST
         sync: false
       - key: OAUTH_NATIVE_REDIRECT_ALLOWLIST
+      # Push notifications. PUSH_ENABLED is the switch: with it false - the
+      # default - devices still register and nothing is delivered, so the
+      # feature can ship before there is an Expo project behind it.
+      # docs/push-notifications.md has the rest.
+      - key: PUSH_ENABLED
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
+      - key: DEVICE_RETENTION_DAYS
+        sync: false
+      - key: DEVICE_PURGE_CRON
         sync: false
       # Mobile clients. All four have defaults in env.schema.ts, so the service
       # boots without them; they are declared because the two build numbers are

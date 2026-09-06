@@ -1,5 +1,9 @@
 import { asClass, asFunction } from "awilix";
 import { EmailService } from "@infrastructure/external/email.service";
+import {
+    ExpoPushService,
+    NoopPushService,
+} from "@infrastructure/external/push/expo-push.service";
 import { GithubAuthService } from "@infrastructure/external/github-auth.service";
 import { GoogleAuthService } from "@infrastructure/external/google-auth.service";
 import { S3StorageService } from "@infrastructure/external/s3-storage.service";
@@ -11,6 +15,20 @@ import { NoopModerationService } from "@infrastructure/external/moderation/noop-
 export const externalModule = {
     // --- Services ---
     storageService: asClass(S3StorageService).singleton(),
+    /**
+     * Push delivery. Disabled by default: a deployment with no Expo project
+     * registers devices and sends nothing, rather than logging a failed HTTP
+     * call for every notification.
+     */
+    pushService: asFunction((config, logger) => {
+        if (!config.PUSH_ENABLED) return new NoopPushService();
+
+        return new ExpoPushService(
+            { accessToken: config.EXPO_ACCESS_TOKEN },
+            logger,
+        );
+    }).singleton(),
+
     emailService: asFunction((config, logger) => {
         return new EmailService(
             {

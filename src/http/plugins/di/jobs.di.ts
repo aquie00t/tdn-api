@@ -13,6 +13,8 @@ import { MediaModerationJob } from "@infrastructure/jobs/media-moderation/media-
 import { MediaModerationScheduler } from "@infrastructure/jobs/media-moderation/media-moderation.scheduler";
 import { ReportDigestJob } from "@infrastructure/jobs/report/report-digest.job";
 import { ReportDigestScheduler } from "@infrastructure/jobs/report/report-digest.scheduler";
+import { DevicePurgeJob } from "@infrastructure/jobs/device/device-purge.job";
+import { DevicePurgeScheduler } from "@infrastructure/jobs/device/device-purge.scheduler";
 import { ReportPurgeJob } from "@infrastructure/jobs/report/report-purge.job";
 import { ReportPurgeScheduler } from "@infrastructure/jobs/report/report-purge.scheduler";
 import { MessageRetentionJob } from "@infrastructure/jobs/message/message-retention.job";
@@ -28,6 +30,7 @@ export const jobsModule = {
     messageRetentionJob: asClass(MessageRetentionJob).singleton(),
     reportDigestJob: asClass(ReportDigestJob).singleton(),
     reportPurgeJob: asClass(ReportPurgeJob).singleton(),
+    devicePurgeJob: asClass(DevicePurgeJob).singleton(),
 
     // --- Schedulers ---
     userPurgeScheduler: asFunction((userPurgeJob, config, logger) => {
@@ -108,6 +111,17 @@ export const jobsModule = {
                 enabled:
                     config.REPORT_DIGEST_ENABLED &&
                     config.MODERATION_ALERT_EMAIL.length > 0,
+            },
+            logger,
+        );
+    }).singleton(),
+
+    devicePurgeScheduler: asFunction((devicePurgeJob, config, logger) => {
+        return new DevicePurgeScheduler(
+            devicePurgeJob,
+            {
+                cronExpression: config.DEVICE_PURGE_CRON,
+                retentionDays: config.DEVICE_RETENTION_DAYS,
             },
             logger,
         );

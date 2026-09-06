@@ -103,6 +103,10 @@ import { UploadMessageMediaUseCase } from "@core/use-cases/message/upload-messag
 import { CreateReportUseCase } from "@core/use-cases/report/create-report";
 import { SendReportDigestUseCase } from "@core/use-cases/report/send-report-digest";
 import { PurgeOldReportsUseCase } from "@core/use-cases/report/purge-old-reports";
+import { RegisterDeviceUseCase } from "@core/use-cases/device/register-device";
+import { UnregisterDeviceUseCase } from "@core/use-cases/device/unregister-device";
+import { PurgeStaleDevicesUseCase } from "@core/use-cases/device/purge-stale-devices";
+import { SendPushNotificationUseCase } from "@core/use-cases/notification/send-push";
 import {
     REPORT_EXCERPT_LENGTH,
     REPORT_MAX_DETAILS,
@@ -205,6 +209,29 @@ export const useCasesModule = {
         webAllowList: splitList(config.OAUTH_REDIRECT_ALLOWLIST),
         nativeAllowList: splitList(config.OAUTH_NATIVE_REDIRECT_ALLOWLIST),
     })).singleton(),
+
+    /**
+    /**
+     * Use case for registering an app installation for notifications
+     */
+    registerDeviceUseCase: asClass(RegisterDeviceUseCase).singleton(),
+
+    /**
+     * Use case for retiring one
+     */
+    unregisterDeviceUseCase: asClass(UnregisterDeviceUseCase).singleton(),
+
+    /**
+     * Use case for dropping installations that stopped announcing themselves
+     */
+    purgeStaleDevicesUseCase: asClass(PurgeStaleDevicesUseCase).singleton(),
+
+    /**
+     * Use case that puts a notification on a user's phones
+     */
+    sendPushNotificationUseCase: asClass(
+        SendPushNotificationUseCase,
+    ).singleton(),
 
     /**
      * Use case for reporting a post or a comment
