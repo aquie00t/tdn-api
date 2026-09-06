@@ -9,6 +9,9 @@ export interface BlockedUserSummary {
     username: string;
     fullName: string;
     avatarUrl: string;
+
+    /** Whether the account carries the paid verification badge */
+    isVerified: boolean;
     bio: string | null;
 }
 

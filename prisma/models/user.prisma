@@ -60,6 +60,22 @@ model User {
   /// rather than when the current access token expires.
   bannedAt DateTime?
 
+  /// When the paid verification badge expires, null for an account that has
+  /// never had one.
+  ///
+  /// Denormalised from the subscription because every read that shows an
+  /// author shows the badge - roughly a dozen queries - and none of them
+  /// should be joining a billing table to render a tick.
+  ///
+  /// A date rather than a boolean so that it expires on its own. A missed
+  /// provider notification then costs the badge at the end of the period the
+  /// user paid for, which is the failure everybody can live with; a boolean
+  /// would leave it on for good.
+  verifiedUntil DateTime?
+
+  /// The billing relationship, if this account has ever had one.
+  subscription Subscription?
+
   /// When the user opted out of the daily digest, null while subscribed.
   /// Written by the unsubscribe link, which carries a signed token and needs
   /// no session - a digest lands in an inbox long after one has expired.

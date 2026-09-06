@@ -1,4 +1,5 @@
 import { Article } from "@core/domain/entities/article.entity";
+import { isVerified } from "@core/use-cases/shared/verification/is-verified";
 import type { ArticleStatus } from "@core/domain/enums";
 import type { PostCategory } from "@core/domain/enums/post-category-enum";
 import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
@@ -10,6 +11,7 @@ export type ArticleWithRelations = Prisma.ArticleGetPayload<{
             select: {
                 id: true;
                 username: true;
+                verifiedUntil: true;
                 profile: { select: { avatarUrl: true; fullName: true } };
             };
         };
@@ -46,6 +48,7 @@ export interface ArticleResponse {
         avatarUrl: string;
         fullName: string | null;
         isMe: boolean;
+        isVerified: boolean;
     };
     tags: { name: string }[];
     /** Users named with an @handle in the body, resolved at write time. */
@@ -98,6 +101,7 @@ export class ArticlePrismaMapper {
                 username: dbArticle.author.username,
                 avatarUrl: dbArticle.author?.profile?.avatarUrl ?? undefined,
                 fullName: dbArticle.author?.profile?.fullName ?? undefined,
+                isVerified: isVerified(dbArticle.author.verifiedUntil),
             },
             tags: dbArticle.tags?.map((tag) => tag.name) ?? [],
             mentions: dbArticle.mentionedUsers ?? [],
@@ -202,6 +206,7 @@ export class ArticlePrismaMapper {
             author: {
                 id: article.author.id,
                 username,
+                isVerified: article.author.isVerified ?? false,
                 avatarUrl: article.author.avatarUrl
                     ? article.author.avatarUrl.startsWith("http")
                         ? article.author.avatarUrl

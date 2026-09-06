@@ -45,6 +45,14 @@ export interface PostProps {
         /**Optional fullName URL of the author for display name */
         fullName?: string;
 
+        /**
+         * Whether the author currently carries the paid verification badge.
+         *
+         * Derived from `User.verifiedUntil` at read time rather than stored,
+         * so one that has run out disappears without anything noticing.
+         */
+        isVerified?: boolean;
+
         isMe?: boolean;
     };
 

@@ -18,6 +18,9 @@ export interface GetFollowingUseCaseOutput {
      * The URL of the following user's avatar image. This is used for display purposes in the following list. It may be a default avatar if the user has not set one.
      */
     avatarUrl: string;
+
+    /** Whether the account carries the paid verification badge */
+    isVerified: boolean;
     /**
      * The bio of the following user, which is a short description they can set on their profile. This may be null if the user has not provided a bio. It is used for display purposes in the following list.
      */

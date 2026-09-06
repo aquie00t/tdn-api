@@ -8,6 +8,7 @@ export const CommentAuthorSchema = FBType.Object({
     username: FBType.String(),
     fullName: FBType.Optional(FBType.String()),
     avatarUrl: FBType.String(),
+    isVerified: FBType.Boolean(),
     isMe: FBType.Boolean(),
 });
 

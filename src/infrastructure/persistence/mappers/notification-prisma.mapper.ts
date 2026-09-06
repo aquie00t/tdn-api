@@ -1,4 +1,5 @@
 import type { NotificationType } from "@generated/prisma/client";
+import { isVerified } from "@core/use-cases/shared/verification/is-verified";
 import type { NotificationType as CoreNotificationType } from "@core/domain/enums/notification-type.enum";
 import { Notification } from "@core/domain/entities/notification.entity";
 
@@ -15,6 +16,7 @@ export interface PrismaNotificationItem {
     isRead: boolean;
     issuer: {
         username: string;
+        verifiedUntil: Date | null;
         profile: {
             avatarUrl: string;
         } | null;
@@ -45,6 +47,7 @@ export class NotificationPrismaMapper {
             commentId: item.commentId || undefined,
             articleSlug: item.article?.slug,
             username: item.issuer.username,
+            isVerified: isVerified(item.issuer.verifiedUntil),
             avatarUrl: item.issuer.profile?.avatarUrl ?? "",
             createdAt: item.createdAt,
             isRead: item.isRead,
@@ -75,10 +78,12 @@ export class NotificationPrismaMapper {
         articleSlug?: string;
         commentId?: string;
         username: string;
+        isVerified: boolean;
         isRead: boolean;
     } {
         return {
             id: notification.id,
+            isVerified: notification.isVerified,
             avatarUrl: notification.avatarUrl
                 ? notification.avatarUrl.startsWith("http")
                     ? notification.avatarUrl

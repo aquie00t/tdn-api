@@ -74,6 +74,9 @@ export interface ArticleProps {
 
         /** Indicates whether the author is the current authenticated user */
         isMe?: boolean;
+
+        /** Whether the author carries the paid verification badge */
+        isVerified?: boolean;
     };
 
     /** Tag names attached to the article, supplied explicitly by the author */

@@ -8,6 +8,7 @@ export const ArticleAuthorSchema = FBType.Object({
     username: FBType.String(),
     fullName: FBType.Union([FBType.String(), FBType.Null()]),
     avatarUrl: FBType.String(),
+    isVerified: FBType.Boolean(),
     isMe: FBType.Boolean(),
 });
 

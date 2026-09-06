@@ -25,6 +25,7 @@ export const BotProfileItemSchema = FBType.Object({
     username: FBType.String(),
     fullName: FBType.String(),
     avatarUrl: FBType.String(),
+    isVerified: FBType.Boolean(),
     bannerUrl: FBType.String(),
     bio: FBType.Union([FBType.String(), FBType.Null()]),
     categories: FBType.Array(FBType.Enum(PostCategory)),

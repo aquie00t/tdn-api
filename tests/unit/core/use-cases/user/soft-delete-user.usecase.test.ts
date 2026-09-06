@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { RevokeSubscriptionUseCase } from "@core/use-cases/billing/revoke-subscription";
 import { SoftDeleteUserUseCase } from "@core/use-cases/user/soft-delete";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { PasswordPort } from "@core/ports/services/password.port";
@@ -11,6 +12,7 @@ describe("SoftDeleteUserUseCase", () => {
     let userRepository: Pick<IUserRepository, "findById" | "softDeleteById">;
     let passwordService: Pick<PasswordPort, "verify">;
     let emailService: Pick<EmailPort, "sendDeleteUserEmail">;
+    let revokeSubscriptionUseCase: Pick<RevokeSubscriptionUseCase, "execute">;
 
     beforeEach(() => {
         userRepository = {
@@ -23,10 +25,13 @@ describe("SoftDeleteUserUseCase", () => {
         emailService = {
             sendDeleteUserEmail: vi.fn().mockResolvedValue(undefined),
         };
+        revokeSubscriptionUseCase = { execute: vi.fn().mockResolvedValue(true) };
+
         useCase = new SoftDeleteUserUseCase(
             userRepository as IUserRepository,
             passwordService as PasswordPort,
             emailService as EmailPort,
+            revokeSubscriptionUseCase as RevokeSubscriptionUseCase,
         );
     });
 
@@ -120,5 +125,20 @@ describe("SoftDeleteUserUseCase", () => {
         expect(emailService.sendDeleteUserEmail).toHaveBeenCalledWith({
             to: "target@example.com",
         });
+    });
+
+    it("should stop the account being charged", async () => {
+        // The platform promises a deleted account is not billed again, and the
+        // provider is the only thing that can keep that promise.
+        vi.mocked(userRepository.findById).mockResolvedValue(
+            buildUser({ password: "hashed" }),
+        );
+        vi.mocked(passwordService.verify).mockResolvedValue(true);
+
+        await useCase.execute({ id: "user-1", password: "correct" });
+
+        expect(revokeSubscriptionUseCase.execute).toHaveBeenCalledWith(
+            "user-1",
+        );
     });
 });

@@ -1,4 +1,5 @@
 import type { Prisma } from "@generated/prisma/client";
+import { isVerified } from "@core/use-cases/shared/verification/is-verified";
 import { Comment } from "@core/domain/entities/comment.entity";
 import { MediaModerationStatus } from "@core/domain/enums";
 import type { MentionedUser } from "@core/domain/interfaces/mentioned-user.interface";
@@ -9,6 +10,7 @@ export type CommentWithRelations = Prisma.CommentGetPayload<{
             select: {
                 id: true;
                 username: true;
+                verifiedUntil: true;
                 profile: { select: { avatarUrl: true; fullName: true } };
             };
         };
@@ -47,6 +49,7 @@ export interface CommentResponse {
         fullName?: string;
         avatarUrl: string;
         isMe: boolean;
+        isVerified: boolean;
     };
     likeCount: number;
     replyCount: number;
@@ -82,6 +85,7 @@ export class CommentPrismaMapper {
                 username: dbComment.author.username,
                 avatarUrl: dbComment.author?.profile?.avatarUrl ?? undefined,
                 fullName: dbComment.author?.profile?.fullName ?? undefined,
+                isVerified: isVerified(dbComment.author.verifiedUntil),
             },
             likeCount: dbComment.likeCount,
             replyCount: dbComment.replyCount,
@@ -137,6 +141,7 @@ export class CommentPrismaMapper {
                 isMe: currentUserId
                     ? comment.authorId === currentUserId
                     : false,
+                isVerified: author.isVerified ?? false,
             },
         };
     }

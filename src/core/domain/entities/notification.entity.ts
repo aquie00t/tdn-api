@@ -116,6 +116,14 @@ export class Notification {
     }
 
     /**
+     * Whether the issuer carries the paid verification badge
+     * @returns True while the badge is granted
+     */
+    get isVerified(): boolean {
+        return this.props.isVerified ?? false;
+    }
+
+    /**
      * Get the reference ID of the notification (optional)
      * @returns The reference ID or undefined if not provided
      */

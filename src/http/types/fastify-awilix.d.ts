@@ -11,6 +11,8 @@ import type { ReportController } from "@controllers/report.controller";
 import type { MetaController } from "@controllers/meta.controller";
 import type { DeviceController } from "@controllers/device.controller";
 import type { DevicePurgeScheduler } from "@infrastructure/jobs/device/device-purge.scheduler";
+import type { BillingController } from "@controllers/billing.controller";
+import type { SubscriptionReconcileScheduler } from "@infrastructure/jobs/billing/subscription-reconcile.scheduler";
 import type { ReportDigestScheduler } from "@infrastructure/jobs/report/report-digest.scheduler";
 import type { ReportPurgeScheduler } from "@infrastructure/jobs/report/report-purge.scheduler";
 import type { WebSocketManager } from "@infrastructure/realtime/websocket/websocket-manager";
@@ -95,6 +97,11 @@ declare module "@fastify/awilix" {
 
         /** Scheduler that drops abandoned push registrations */
         devicePurgeScheduler: DevicePurgeScheduler;
+        /** Controller for the subscription endpoint */
+        billingController: BillingController;
+
+        /** Scheduler that repairs billing state nightly */
+        subscriptionReconcileScheduler: SubscriptionReconcileScheduler;
 
         /** Scheduler for the morning summary of open reports */
         reportDigestScheduler: ReportDigestScheduler;

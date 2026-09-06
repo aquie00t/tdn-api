@@ -198,6 +198,19 @@ Copy lives in `push-copy.ts` (tr/en), chosen from the **device's** locale rather
 Dead tokens go two ways: Expo reports `DeviceNotRegistered` in a ticket and those rows are deleted at once, while a phone that was simply abandoned is caught by `DEVICE_PURGE_CRON` against `lastSeenAt` (the app re-registers at every launch, so age means something here). `PUSH_ENABLED=false` swaps in `NoopPushService` — devices still register, nothing is delivered.
 
 `docs/push-notifications.md` is the client-facing contract.
+### Verified badge
+
+A monthly paid subscription, and the only way to get a tick — no official badge, no manual grant. This half is provider-agnostic; the store adapter lands separately.
+
+**`User.verifiedUntil` is a date, denormalised onto the user row.** Denormalised because roughly a dozen queries show an author and none should join a billing table to render a tick; a *date* because that makes it expire on its own — a lost provider notification then costs the badge at the end of the period the user paid for, where a boolean would leave it on for good. `isVerified` is computed at read time by the shared `isVerified()` helper, and only `SyncSubscriptionUseCase` ever writes the column, from `Subscription.entitlementUntil()` — the single place a billing state becomes a badge. `ACTIVE` and `IN_GRACE` entitle (the user paid for the period they are in; a declined card is not a decision to stop paying), everything else does not.
+
+**One door in.** Every adapter reaches `SyncSubscriptionUseCase` with the provider's *absolute* state rather than a change, so a redelivered notification is harmless. It refuses two things: a `providerSubscriptionId` already claimed by another account (unique column — a shared receipt must not grant the badge to whoever presents it last) and an event older than `lastEventAt` (store notifications are unordered, and a late renewal would otherwise reinstate a cancelled subscription). `BillingEvent` is an audit trail, not the replay guard.
+
+**Ban and deletion stop the billing.** `SoftDeleteUserUseCase` revokes immediately — awaited, not fire-and-forget, because it is a promise about somebody's money. A ban has no code path to hook, so the nightly `SubscriptionReconcileScheduler` is the only thing that notices one; it also retries refused cancellations and re-applies what the provider says, repairing missed notifications. A provider that cannot say is left alone: "I do not know this subscription" is not "it ended".
+
+`NoopBillingService` stands in until there is a store, and deliberately never reports a subscription as active — a stub that granted entitlements would be free badges on any misconfigured environment.
+
+`docs/verified-badge.md` is the contract and the operator's SQL.
 
 ### Realtime and background jobs
 

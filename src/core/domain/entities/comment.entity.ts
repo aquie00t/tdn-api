@@ -239,6 +239,7 @@ export class Comment {
               username: string;
               avatarUrl?: string;
               fullName?: string;
+              isVerified?: boolean;
           }
         | undefined {
         return this.props.author;

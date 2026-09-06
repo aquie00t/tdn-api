@@ -107,6 +107,10 @@ import { RegisterDeviceUseCase } from "@core/use-cases/device/register-device";
 import { UnregisterDeviceUseCase } from "@core/use-cases/device/unregister-device";
 import { PurgeStaleDevicesUseCase } from "@core/use-cases/device/purge-stale-devices";
 import { SendPushNotificationUseCase } from "@core/use-cases/notification/send-push";
+import { SyncSubscriptionUseCase } from "@core/use-cases/billing/sync-subscription";
+import { RevokeSubscriptionUseCase } from "@core/use-cases/billing/revoke-subscription";
+import { GetSubscriptionUseCase } from "@core/use-cases/billing/get-subscription";
+import { ReconcileSubscriptionsUseCase } from "@core/use-cases/billing/reconcile-subscriptions";
 import {
     REPORT_EXCERPT_LENGTH,
     REPORT_MAX_DETAILS,
@@ -231,6 +235,28 @@ export const useCasesModule = {
      */
     sendPushNotificationUseCase: asClass(
         SendPushNotificationUseCase,
+    ).singleton(),
+
+    /**
+     * Use case that applies what a provider says about a subscription
+     */
+    syncSubscriptionUseCase: asClass(SyncSubscriptionUseCase).singleton(),
+
+    /**
+     * Use case that stops a subscription when an account is cut off
+     */
+    revokeSubscriptionUseCase: asClass(RevokeSubscriptionUseCase).singleton(),
+
+    /**
+     * Use case that reads an account its own subscription
+     */
+    getSubscriptionUseCase: asClass(GetSubscriptionUseCase).singleton(),
+
+    /**
+     * Use case that repairs billing state nightly
+     */
+    reconcileSubscriptionsUseCase: asClass(
+        ReconcileSubscriptionsUseCase,
     ).singleton(),
 
     /**

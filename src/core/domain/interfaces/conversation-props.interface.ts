@@ -19,6 +19,9 @@ export interface ConversationParticipant {
 
     /** Their stored avatar key or URL, when they have one */
     avatarUrl?: string;
+
+    /** Whether they carry the paid verification badge */
+    isVerified?: boolean;
 }
 
 /**

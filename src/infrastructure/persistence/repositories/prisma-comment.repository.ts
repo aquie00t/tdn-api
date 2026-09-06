@@ -50,6 +50,7 @@ export class PrismaCommentRepository implements ICommentRepository {
                     select: {
                         id: true,
                         username: true,
+                        verifiedUntil: true,
                         profile: {
                             select: { avatarUrl: true, fullName: true },
                         },
@@ -81,6 +82,7 @@ export class PrismaCommentRepository implements ICommentRepository {
                     select: {
                         id: true,
                         username: true,
+                        verifiedUntil: true,
                         profile: { select: { avatarUrl: true } },
                     },
                 },
@@ -138,6 +140,7 @@ export class PrismaCommentRepository implements ICommentRepository {
                     select: {
                         id: true,
                         username: true,
+                        verifiedUntil: true,
                         profile: {
                             select: { avatarUrl: true, fullName: true },
                         },
@@ -194,6 +197,7 @@ export class PrismaCommentRepository implements ICommentRepository {
                     select: {
                         id: true,
                         username: true,
+                        verifiedUntil: true,
                         profile: {
                             select: { avatarUrl: true, fullName: true },
                         },

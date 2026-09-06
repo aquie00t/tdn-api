@@ -41,6 +41,9 @@ export interface NotificationProps {
     /** Optional avatar URL of the issuer for display purposes */
     avatarUrl?: string;
 
+    /** Whether the issuer carries the paid verification badge */
+    isVerified?: boolean;
+
     /** Optional creation timestamp, defaults to current time if not provided */
     createdAt?: Date;
 

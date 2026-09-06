@@ -41,6 +41,9 @@ interface CachedArticle {
         username?: string;
         avatarUrl?: string;
         fullName?: string;
+
+        /** Whether the author carries the paid verification badge */
+        isVerified?: boolean;
     };
     tags: string[];
     mentions?: MentionedUser[];
@@ -245,6 +248,7 @@ export class GetArticlesUseCase {
                 username: article.author.username,
                 avatarUrl: article.author.avatarUrl,
                 fullName: article.author.fullName,
+                isVerified: article.author.isVerified,
             },
             tags: article.tags,
             mentions: article.mentions,
