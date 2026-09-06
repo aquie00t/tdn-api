@@ -10,6 +10,15 @@ export interface GoogleProfile {
 
     /** The derived username based on the user's Google email address. */
     username: string;
+
+    /**
+     * Whether Google says it has verified this address.
+     *
+     * Read rather than assumed. An OAuth login matches an existing account by
+     * email, so an unverified address is a way to walk into somebody else's
+     * account by claiming to own their mailbox.
+     */
+    isEmailVerified: boolean;
 }
 
 /**

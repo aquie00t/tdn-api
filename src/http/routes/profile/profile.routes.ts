@@ -42,7 +42,7 @@ import {
 } from "@typings/schemas/profile/suggested-users.schema";
 import { Type } from "@sinclair/typebox";
 import { ResponseSchema } from "@typings/schemas/create-response-schema";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 
 const UploadAvatarResponseSchema = ResponseSchema(
     Type.Object({ avatarUrl: Type.String() }),
@@ -113,11 +113,11 @@ function profileRoutes(fastify: FastifyInstance): void {
                 response: { 200: SearchProfilesResponseSchema },
                 tags: ["Profile"],
             },
-            onRequest: async (request) => {
-                if (request.headers.authorization) {
-                    await request.jwtVerify();
-                }
-            },
+            // `optionalAuthenticate` rather than a bare `jwtVerify`: the
+            // decorator also re-reads the account row, so a suspended or
+            // deleted account stops being treated as signed in here the way
+            // it does everywhere else.
+            onRequest: [fastify.optionalAuthenticate],
         },
         profileController.searchProfiles.bind(profileController),
     );
@@ -133,11 +133,9 @@ function profileRoutes(fastify: FastifyInstance): void {
                 response: { 200: GetProfileResponseSchema },
                 tags: ["Profile"],
             },
-            onRequest: async (request: FastifyRequest) => {
-                if (request.headers.authorization) {
-                    await request.jwtVerify();
-                }
-            },
+            // See the note on /search: the decorator re-reads the account row,
+            // so a suspended account stops being treated as signed in here.
+            onRequest: [fastify.optionalAuthenticate],
         },
         profileController.getProfile.bind(profileController),
     );
@@ -184,11 +182,11 @@ function profileRoutes(fastify: FastifyInstance): void {
                 response: { 200: SuggestedUsersResponseSchema },
                 tags: ["Profile"],
             },
-            onRequest: async (request) => {
-                if (request.headers.authorization) {
-                    await request.jwtVerify();
-                }
-            },
+            // `optionalAuthenticate` rather than a bare `jwtVerify`: the
+            // decorator also re-reads the account row, so a suspended or
+            // deleted account stops being treated as signed in here the way
+            // it does everywhere else.
+            onRequest: [fastify.optionalAuthenticate],
         },
         profileController.getSuggestions.bind(profileController),
     );

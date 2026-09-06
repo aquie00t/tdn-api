@@ -1,4 +1,5 @@
 import type { GithubLoginInput } from "./github-login.input";
+import { UnauthorizedError } from "@core/errors";
 import type { GithubAuthPort } from "@core/ports/services/github-auth.port";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { AuthTokenPort } from "@core/ports/services/auth-token.port";
@@ -22,6 +23,17 @@ export class GithubLoginUseCase {
         const profile = await this.githubAuthService.getUserProfileByCode(
             input.code,
         );
+
+        // Refused before the account is even looked up. This flow matches an
+        // existing account by email alone, so an address the provider has not
+        // verified is a way to walk into somebody else's account by claiming
+        // to own their mailbox - sign up at the provider with their address,
+        // authorise, and be handed their session.
+        if (!profile.isEmailVerified) {
+            throw new UnauthorizedError(
+                "GitHub has not verified this email address.",
+            );
+        }
 
         let user = await this.userRepository.findByEmail(profile.email);
 

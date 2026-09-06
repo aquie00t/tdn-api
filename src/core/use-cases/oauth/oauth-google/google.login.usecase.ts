@@ -1,4 +1,5 @@
 import type { GoogleAuthPort } from "@core/ports/services/google-auth.port";
+import { UnauthorizedError } from "@core/errors";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { AuthTokenPort } from "@core/ports/services/auth-token.port";
 import { AccountBannedError, AccountPendingDeletionError } from "@core/errors";
@@ -22,6 +23,17 @@ export class GoogleLoginUseCase {
         const profile = await this.googleAuthService.getUserProfileByCode(
             input.code,
         );
+
+        // Refused before the account is even looked up. This flow matches an
+        // existing account by email alone, so an address the provider has not
+        // verified is a way to walk into somebody else's account by claiming
+        // to own their mailbox - sign up at the provider with their address,
+        // authorise, and be handed their session.
+        if (!profile.isEmailVerified) {
+            throw new UnauthorizedError(
+                "Google has not verified this email address.",
+            );
+        }
 
         let user = await this.userRepository.findByEmail(profile.email);
 
@@ -53,7 +65,7 @@ export class GoogleLoginUseCase {
                 username: finalUsername,
                 provider: "google",
                 providerAccountId: profile.providerAccountId,
-                isEmailVerified: true,
+                isEmailVerified: profile.isEmailVerified,
             });
         }
 
