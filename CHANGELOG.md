@@ -1,3 +1,10 @@
+## [1.27.2](https://github.com/the-developer-network/tdn-api/compare/v1.27.1...v1.27.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* refuse unverified OAuth emails, verify Play pushes, stop trusting a client IP ([#285](https://github.com/the-developer-network/tdn-api/issues/285)) ([a586af2](https://github.com/the-developer-network/tdn-api/commit/a586af2c6f6de4da67e301b72646666dd9136bbe))
+
 ## [1.27.1](https://github.com/the-developer-network/tdn-api/compare/v1.27.0...v1.27.1) (2026-09-06)
 
 
