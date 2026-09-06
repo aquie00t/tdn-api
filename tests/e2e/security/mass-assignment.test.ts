@@ -71,7 +71,7 @@ describe("Identity cannot be supplied by the request body", () => {
             url: "/articles",
             payload: {
                 title: `Mass assignment ${ts}`,
-                content: "#".repeat(1) + " body long enough to pass validation",
+                body: "# A body long enough to pass validation.",
                 authorId: victimId,
             },
         });
@@ -103,7 +103,7 @@ describe("Identity cannot be supplied by the request body", () => {
             url: "/articles",
             payload: {
                 title: `Victim article ${ts}`,
-                content: "# a body long enough to pass validation",
+                body: "# A body long enough to pass validation.",
             },
         });
         const articleId = parseBody<{ data: { id: string } }>(created).data.id;

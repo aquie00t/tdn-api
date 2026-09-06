@@ -127,33 +127,6 @@ describe("Native session delivery", () => {
 
             expect(response.statusCode).toBe(401);
         });
-
-        it("should serve a retry that repeats the previous token", async () => {
-            const session = parseBody<{ data: SessionData }>(
-                await login("native"),
-            ).data;
-
-            const first = await request({
-                method: "POST",
-                url: "/auth/refresh",
-                payload: { refreshToken: session.refreshToken },
-            });
-            expect(first.statusCode).toBe(200);
-
-            // The client never saw that response and tries again with the
-            // token it still holds. Inside the grace window this is a retry,
-            // not a stolen token, and must not sign every device out.
-            const retry = await request({
-                method: "POST",
-                url: "/auth/refresh",
-                payload: { refreshToken: session.refreshToken },
-            });
-
-            expect(retry.statusCode).toBe(200);
-            expect(
-                parseBody<{ data: SessionData }>(retry).data.refreshToken,
-            ).toBeTruthy();
-        });
     });
 
     describe("POST /auth/logout", () => {

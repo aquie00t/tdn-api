@@ -40,6 +40,20 @@ describe("OAuth Redirect Endpoints", () => {
         };
     };
 
+    /**
+     * Hits a callback the way the browser that started the flow would.
+     */
+    const callback = (
+        provider: string,
+        query: string,
+        cookie: string,
+    ): ReturnType<typeof request> =>
+        request({
+            method: "GET",
+            url: `/oauth/${provider}/callback?${query}`,
+            cookies: { oauthState: cookie },
+        });
+
     describe("starting a flow", () => {
         it("should redirect to GitHub with a state parameter", async () => {
             const { statusCode, location, state } = await startFlow("github");
