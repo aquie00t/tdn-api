@@ -272,6 +272,13 @@ export const EnvSchema = Type.Object({
         minimum: 1,
     }),
 
+    // How a Play notification proves it came from Google. The OIDC pair is the
+    // real mechanism: Pub/Sub signs the push with a Google identity token, and
+    // both the audience and the service account it is signed as are checked.
+    // Set them on the push subscription and here, and the shared secret below
+    // stops being consulted.
+    PLAY_OIDC_AUDIENCE: Type.String({ default: "" }),
+    PLAY_OIDC_SERVICE_ACCOUNT: Type.String({ default: "" }),
     // Shared secret Pub/Sub appends to the Play notification push URL. Empty
     // - the default - closes that endpoint entirely rather than leaving an
     // unauthenticated route that writes billing state open by default.

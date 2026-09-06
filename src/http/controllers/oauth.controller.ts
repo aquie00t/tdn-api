@@ -1,4 +1,5 @@
 import { BaseAuthController } from "./base-auth.controller";
+import { clientIp } from "@plugins/shared/client-ip";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AccountPendingDeletionError } from "@core/errors";
 import type { GithubAuthPort } from "@core/ports/services/github-auth.port";
@@ -136,7 +137,7 @@ export class OAuthController extends BaseAuthController {
     ): Promise<void> {
         const response = await this.oauthExchangeUseCase.execute({
             code: request.body.code,
-            deviceIp: request.ip,
+            deviceIp: clientIp(request),
             userAgent: request.headers["user-agent"] ?? "Unknown Device",
         });
 

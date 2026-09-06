@@ -139,10 +139,19 @@ nothing would ever connect that token to that account again; the nightly
 reconcile finishes it.
 
 **`POST /api/v1/billing/play/notifications`** — where Pub/Sub pushes Google's
-notifications. No session, guarded by a shared secret on the URL
-(`?token=…`, `PLAY_NOTIFICATIONS_TOKEN`). **Empty means the endpoint is
-closed**, which is the right default for an unauthenticated route that writes
-billing state.
+notifications. No session, so it is guarded two ways and the better one wins:
+
+- **OIDC** (`PLAY_OIDC_AUDIENCE` + `PLAY_OIDC_SERVICE_ACCOUNT`). Pub/Sub signs
+  the push with a Google identity token; the signature is checked against
+  Google's published keys, and both the audience and the service account it is
+  signed as must match. Configure this on the push subscription and here, and
+  it is the only thing consulted.
+- **A shared secret on the URL** (`?token=…`, `PLAY_NOTIFICATIONS_TOKEN`), for
+  a subscription created without OIDC. Weaker, and knowingly so: a query string
+  is written into this service's access logs and into every proxy's.
+
+**With neither configured the endpoint is closed**, which is the right default
+for an unauthenticated route that writes billing state.
 
 The notification is treated as a **nudge, never as state**. It says a purchase
 changed; what it changed to is then read from the Play Developer API, and that
@@ -170,8 +179,6 @@ badge is granted. It needs the Play Console work: a subscription product, a
 service account with "View financial data" and "Manage orders and
 subscriptions", and the Pub/Sub topic.
 
-Verifying the OIDC token Google can attach to a push is the stronger
-alternative to the shared secret, and belongs with that same work.
 
 ## Settings
 
@@ -179,7 +186,9 @@ alternative to the shared secret, and belongs with that same work.
 | --- | --- | --- |
 | `SUBSCRIPTION_RECONCILE_CRON` | `0 3 * * *` | When the repair pass runs. |
 | `SUBSCRIPTION_RECONCILE_BATCH_SIZE` | `500` | Rows examined per pass. |
-| `PLAY_NOTIFICATIONS_TOKEN` | _(empty)_ | Shared secret on the push URL. Empty closes the endpoint. |
+| `PLAY_OIDC_AUDIENCE` | _(empty)_ | Audience set on the Pub/Sub push subscription. |
+| `PLAY_OIDC_SERVICE_ACCOUNT` | _(empty)_ | Service account Pub/Sub signs the push as. |
+| `PLAY_NOTIFICATIONS_TOKEN` | _(empty)_ | Fallback shared secret on the push URL, used only when OIDC is unconfigured. |
 
 There is no provider yet. `NoopBillingService` stands in, and it deliberately
 never reports a subscription as active — a stub that granted entitlements would
