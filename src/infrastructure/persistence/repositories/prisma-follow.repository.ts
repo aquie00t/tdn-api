@@ -62,6 +62,7 @@ export class PrismaFollowUserRepository implements IFollowRepository {
             username: string;
             fullName: string;
             avatarUrl: string;
+            isVerified: boolean;
             bio: string | null;
         }[]
     > {
@@ -108,6 +109,7 @@ export class PrismaFollowUserRepository implements IFollowRepository {
             username: string;
             fullName: string;
             avatarUrl: string;
+            isVerified: boolean;
             bio: string | null;
         }[]
     > {

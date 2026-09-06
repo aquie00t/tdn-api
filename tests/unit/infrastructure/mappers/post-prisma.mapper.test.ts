@@ -349,6 +349,7 @@ describe("PostPrismaMapper", () => {
                 profile: {
                     avatarUrl: "uploads/quoted-avatar.jpg",
                     fullName: "Quoted Author",
+                    isVerified: false,
                 },
             },
         };
@@ -412,6 +413,7 @@ describe("PostPrismaMapper", () => {
                     username: "quoted-author",
                     avatarUrl: `${CDN}/uploads/quoted-avatar.jpg`,
                     fullName: "Quoted Author",
+                    isVerified: false,
                 },
             });
         });

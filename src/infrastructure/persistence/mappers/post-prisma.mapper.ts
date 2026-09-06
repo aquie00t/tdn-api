@@ -58,6 +58,7 @@ export interface QuotedPostResponse {
         username: string;
         avatarUrl: string;
         fullName: string | null;
+        isVerified: boolean;
     };
 }
 
@@ -286,6 +287,7 @@ export class PostPrismaMapper {
                     cdnUrl,
                 ),
                 fullName: quoted.author.fullName ?? null,
+                isVerified: quoted.author.isVerified ?? false,
             },
         };
     }
