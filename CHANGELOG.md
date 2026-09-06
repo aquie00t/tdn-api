@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/the-developer-network/tdn-api/compare/v1.24.0...v1.25.0) (2026-09-06)
+
+
+### Features
+
+* **notification:** deliver notifications to phones as well as sockets ([#279](https://github.com/the-developer-network/tdn-api/issues/279)) ([b6efdfa](https://github.com/the-developer-network/tdn-api/commit/b6efdfa794ac794ad8bb2831feb5ccc0404c5554))
+
 # [1.24.0](https://github.com/the-developer-network/tdn-api/compare/v1.23.0...v1.24.0) (2026-09-05)
 
 
