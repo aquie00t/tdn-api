@@ -78,6 +78,7 @@ describe("GetBotProfilesUseCase", () => {
                 username: "tsbot",
                 fullName: "TypeScript Bot",
                 avatarUrl: "https://example.com/avatar.png",
+                isVerified: false,
                 bannerUrl: "https://example.com/banner.png",
                 bio: "TS news",
                 categories: [PostCategory.BACKEND],

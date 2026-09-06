@@ -46,6 +46,7 @@ export class PrismaCommentBookmarkRepository implements ICommentBookmarkReposito
                                 select: {
                                     id: true,
                                     username: true,
+                                    verifiedUntil: true,
                                     profile: {
                                         select: {
                                             avatarUrl: true,

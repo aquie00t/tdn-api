@@ -146,6 +146,14 @@ export class Profile {
     }
 
     /**
+     * Whether the account carries the paid verification badge
+     * @returns True while the badge is granted
+     */
+    get isVerified(): boolean {
+        return this.props.isVerified ?? false;
+    }
+
+    /**
      * Get the number of users following this profile
      * @returns The followers count
      */

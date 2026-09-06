@@ -9,6 +9,7 @@ export const ProfileItemSchema = FBType.Object({
     bio: FBType.Union([FBType.String(), FBType.Null()]),
     location: FBType.Union([FBType.String(), FBType.Null()]),
     avatarUrl: FBType.String(),
+    isVerified: FBType.Boolean(),
     bannerUrl: FBType.String(),
     socials: FBType.Record(FBType.String(), FBType.String()),
     categories: FBType.Array(FBType.Enum(PostCategory)),

@@ -1,0 +1,101 @@
+/// Which store or gateway a subscription is billed through.
+///
+/// One value today. The column exists so that adding the App Store, or a web
+/// gateway, is a new value and a new adapter rather than a second table -
+/// everything above this line is the same whichever one is paying.
+enum BillingProvider {
+  GOOGLE_PLAY
+}
+
+/// Where a subscription stands, in the provider's terms.
+///
+/// Deliberately close to what the stores report rather than a tidier scheme of
+/// our own: every value here arrives from outside, and a translation layer
+/// would only give two vocabularies a chance to disagree.
+enum SubscriptionStatus {
+  /// Purchase started, payment not yet confirmed.
+  PENDING
+  ACTIVE
+  /// Payment failed and the provider is retrying. The badge stays on until it
+  /// gives up - the user paid for the period they are in.
+  IN_GRACE
+  /// Provider gave up; the subscription is over unless the user resubscribes.
+  CANCELED
+  /// Ended because we cancelled it - a ban, or a deleted account.
+  REVOKED
+}
+
+/// One account's billing relationship, whether or not it currently pays.
+///
+/// A single row per user that is never deleted while the account exists. It
+/// holds the provider's identifiers even after a subscription ends, because
+/// resubscribing must attach to the same customer rather than creating a
+/// second one that nobody can reconcile.
+///
+/// Note what is *not* here: invoices, receipts, amounts, payment methods. The
+/// store keeps all of that and shows it to the user itself, and copying it
+/// would mean owning a second, permanently stale ledger.
+model Subscription {
+  id String @id @default(uuid())
+
+  userId String @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider BillingProvider
+
+  /// The provider's identifier for the payer, kept across resubscriptions.
+  providerCustomerId String? @map("provider_customer_id")
+
+  /// The provider's identifier for the current subscription. Unique so that
+  /// one purchase cannot be claimed by two accounts.
+  providerSubscriptionId String? @unique @map("provider_subscription_id")
+
+  status SubscriptionStatus
+
+  /// When the paid period ends. The badge is derived from this, not from
+  /// `status` - see `User.verifiedUntil`.
+  currentPeriodEnd DateTime? @map("current_period_end")
+
+  /// Set when the user has cancelled but the period they paid for is still
+  /// running.
+  cancelAtPeriodEnd Boolean @default(false) @map("cancel_at_period_end")
+
+  /// Timestamp of the provider event this row was last written from.
+  ///
+  /// Store notifications are not ordered. Without this, a renewal delivered
+  /// after the cancellation that superseded it would quietly reinstate a
+  /// subscription that is over.
+  lastEventAt DateTime? @map("last_event_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+/// One provider notification, recorded after it has been applied.
+///
+/// Not the mechanism that makes replays safe - every sync writes the state the
+/// provider reports rather than adjusting what is already there, so applying
+/// the same event twice lands in the same place. This is the audit trail:
+/// which notifications arrived, when, and in what order, which is the first
+/// thing anybody wants when a subscription is in the wrong state.
+model BillingEvent {
+  /// The provider's own event identifier.
+  id String @id
+
+  provider BillingProvider
+
+  /// The provider's event type, as sent.
+  type String
+
+  /// Which subscription it concerned, when it named one.
+  providerSubscriptionId String? @map("provider_subscription_id")
+
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@index([providerSubscriptionId])
+  @@index([processedAt])
+  @@map("billing_events")
+}

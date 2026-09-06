@@ -73,6 +73,7 @@ export class PrismaNotificationRepository implements INotificationRepository {
                 issuer: {
                     select: {
                         username: true,
+                        verifiedUntil: true,
                         profile: {
                             select: {
                                 avatarUrl: true,
@@ -124,6 +125,7 @@ export class PrismaNotificationRepository implements INotificationRepository {
                 issuer: {
                     select: {
                         username: true,
+                        verifiedUntil: true,
                         profile: {
                             select: {
                                 avatarUrl: true,

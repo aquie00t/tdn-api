@@ -1,4 +1,5 @@
 import { Profile } from "@core/domain/entities/profile.entity";
+import { isVerified } from "@core/use-cases/shared/verification/is-verified";
 import type { PostCategory } from "@core/domain/enums/post-category-enum";
 import type { UpdateProfileInput } from "@core/use-cases/profile/update-profil/update-profile-usecase.input";
 import type {
@@ -9,6 +10,7 @@ import type {
 type PrismaProfileWithUserAndCounts = PrismaProfile & {
     user?: {
         username: string;
+        verifiedUntil?: Date | null;
         _count?: {
             followers: number;
             following: number;
@@ -33,6 +35,7 @@ export class ProfilePrismaMapper {
             userId: dbProfile.userId,
 
             username: dbProfile.user?.username || "unknown",
+            isVerified: isVerified(dbProfile.user?.verifiedUntil),
             fullName: dbProfile.fullName,
             bio: dbProfile.bio,
             location: dbProfile.location,
@@ -81,6 +84,7 @@ export class ProfilePrismaMapper {
         location: string | null;
         avatarUrl: string;
         bannerUrl: string;
+        isVerified: boolean;
         socials: Record<string, string>;
         categories: PostCategory[];
         languages: string[];
@@ -97,6 +101,7 @@ export class ProfilePrismaMapper {
             location: profile.location,
             avatarUrl: profile.avatarUrl,
             bannerUrl: profile.bannerUrl,
+            isVerified: profile.isVerified,
             socials: profile.socials,
             categories: profile.categories,
             languages: profile.languages,

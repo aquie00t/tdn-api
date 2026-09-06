@@ -1,4 +1,5 @@
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
+import { isVerified } from "@core/use-cases/shared/verification/is-verified";
 import type { IFollowRepository } from "@core/ports/repositories/follow.repository";
 
 export class PrismaFollowUserRepository implements IFollowRepository {
@@ -74,6 +75,7 @@ export class PrismaFollowUserRepository implements IFollowRepository {
                     select: {
                         id: true,
                         username: true,
+                        verifiedUntil: true,
                         profile: {
                             select: {
                                 fullName: true,
@@ -91,6 +93,7 @@ export class PrismaFollowUserRepository implements IFollowRepository {
             username: f.follower.username,
             fullName: f.follower.profile?.fullName || "",
             avatarUrl: f.follower.profile?.avatarUrl || "",
+            isVerified: isVerified(f.follower.verifiedUntil),
             bio: f.follower.profile?.bio || null,
         }));
     }
@@ -118,6 +121,7 @@ export class PrismaFollowUserRepository implements IFollowRepository {
                     select: {
                         id: true,
                         username: true,
+                        verifiedUntil: true,
                         profile: {
                             select: {
                                 fullName: true,
@@ -135,6 +139,7 @@ export class PrismaFollowUserRepository implements IFollowRepository {
             username: f.following.username,
             fullName: f.following.profile?.fullName || "",
             avatarUrl: f.following.profile?.avatarUrl || "",
+            isVerified: isVerified(f.following.verifiedUntil),
             bio: f.following.profile?.bio || null,
         }));
     }

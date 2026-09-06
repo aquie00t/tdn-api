@@ -20,6 +20,7 @@ export const ConversationItemSchema = FBType.Object({
         username: FBType.String(),
         fullName: FBType.Optional(FBType.String()),
         avatarUrl: FBType.String(),
+        isVerified: FBType.Boolean(),
     }),
     unreadCount: FBType.Number(),
     lastMessagePreview: FBType.Union([FBType.String(), FBType.Null()]),

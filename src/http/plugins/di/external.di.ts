@@ -4,6 +4,7 @@ import {
     ExpoPushService,
     NoopPushService,
 } from "@infrastructure/external/push/expo-push.service";
+import { NoopBillingService } from "@infrastructure/external/billing/noop-billing.service";
 import { GithubAuthService } from "@infrastructure/external/github-auth.service";
 import { GoogleAuthService } from "@infrastructure/external/google-auth.service";
 import { S3StorageService } from "@infrastructure/external/s3-storage.service";
@@ -28,6 +29,13 @@ export const externalModule = {
             logger,
         );
     }).singleton(),
+    /**
+     * The store or gateway that bills. There is no adapter yet - the store
+     * one arrives with the purchase flow - and the stub deliberately never
+     * reports a subscription as active, so a misconfigured environment
+     * cannot hand out free badges.
+     */
+    billingService: asClass(NoopBillingService).singleton(),
 
     emailService: asFunction((config, logger) => {
         return new EmailService(

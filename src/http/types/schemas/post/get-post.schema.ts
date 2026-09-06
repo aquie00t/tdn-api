@@ -7,6 +7,7 @@ export const PostAuthorSchema = FBType.Object({
     id: FBType.String({ format: "uuid" }),
     username: FBType.String(),
     avatarUrl: FBType.String(),
+    isVerified: FBType.Boolean(),
     fullName: FBType.Union([FBType.String(), FBType.Null()]),
     isMe: FBType.Optional(FBType.Boolean()),
 });

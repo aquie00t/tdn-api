@@ -261,6 +261,17 @@ export const EnvSchema = Type.Object({
     DEVICE_RETENTION_DAYS: Type.Number({ default: 90, minimum: 1 }),
     DEVICE_PURGE_CRON: Type.String({ default: "0 6 * * *" }),
 
+    // --- Verified badge ---
+    // The nightly repair for billing state that drifted. It is also the only
+    // thing that notices a ban, since those are applied by hand in SQL and have
+    // no code path to hook - so the promise that a suspended account stops
+    // being charged rests on this schedule running.
+    SUBSCRIPTION_RECONCILE_CRON: Type.String({ default: "0 3 * * *" }),
+    SUBSCRIPTION_RECONCILE_BATCH_SIZE: Type.Number({
+        default: 500,
+        minimum: 1,
+    }),
+
     // --- Mobile clients ---
     // A web client is whatever was served this morning; an app version lives on
     // phones for months. These let the API tell a build that it is too old to

@@ -63,6 +63,9 @@ export interface ProfileProps {
     /** The username of the associated user */
     username: string;
 
+    /** Whether the account carries the paid verification badge */
+    isVerified?: boolean;
+
     /** Number of users following this profile */
     followersCount: number;
 

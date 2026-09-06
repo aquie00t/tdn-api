@@ -16,6 +16,9 @@ export interface BotProfileItem {
     /** Storage path or URL of the bot's avatar image. */
     avatarUrl: string;
 
+    /** Whether the account carries the paid verification badge */
+    isVerified: boolean;
+
     /** Storage path or URL of the bot's banner image. */
     bannerUrl: string;
 

@@ -189,6 +189,13 @@ projects:
         sync: false
       - key: DEVICE_PURGE_CRON
         sync: false
+      # The paid verification badge. Both have defaults; they are declared
+      # because the reconcile pass is what notices a ban, and turning it off or
+      # slowing it down is a decision somebody should have to make on purpose.
+      - key: SUBSCRIPTION_RECONCILE_CRON
+        sync: false
+      - key: SUBSCRIPTION_RECONCILE_BATCH_SIZE
+        sync: false
       # Mobile clients. All four have defaults in env.schema.ts, so the service
       # boots without them; they are declared because the two build numbers are
       # what lets the API refuse a version that is too old to be talked to, and

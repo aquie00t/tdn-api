@@ -1,4 +1,5 @@
 import type { PrismaTransactionalClient } from "@infrastructure/persistence/database/prisma-client.type";
+import { isVerified } from "@core/use-cases/shared/verification/is-verified";
 import type {
     BlockedUserSummary,
     BlockPairState,
@@ -152,6 +153,7 @@ export class PrismaBlockRepository implements IBlockRepository {
                     select: {
                         id: true,
                         username: true,
+                        verifiedUntil: true,
                         profile: {
                             select: {
                                 fullName: true,
@@ -169,6 +171,7 @@ export class PrismaBlockRepository implements IBlockRepository {
             username: block.blocked.username,
             fullName: block.blocked.profile?.fullName || "",
             avatarUrl: block.blocked.profile?.avatarUrl || "",
+            isVerified: isVerified(block.blocked.verifiedUntil),
             bio: block.blocked.profile?.bio || null,
         }));
     }

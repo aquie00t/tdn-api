@@ -15,6 +15,8 @@ import { ReportDigestJob } from "@infrastructure/jobs/report/report-digest.job";
 import { ReportDigestScheduler } from "@infrastructure/jobs/report/report-digest.scheduler";
 import { DevicePurgeJob } from "@infrastructure/jobs/device/device-purge.job";
 import { DevicePurgeScheduler } from "@infrastructure/jobs/device/device-purge.scheduler";
+import { SubscriptionReconcileJob } from "@infrastructure/jobs/billing/subscription-reconcile.job";
+import { SubscriptionReconcileScheduler } from "@infrastructure/jobs/billing/subscription-reconcile.scheduler";
 import { ReportPurgeJob } from "@infrastructure/jobs/report/report-purge.job";
 import { ReportPurgeScheduler } from "@infrastructure/jobs/report/report-purge.scheduler";
 import { MessageRetentionJob } from "@infrastructure/jobs/message/message-retention.job";
@@ -31,6 +33,7 @@ export const jobsModule = {
     reportDigestJob: asClass(ReportDigestJob).singleton(),
     reportPurgeJob: asClass(ReportPurgeJob).singleton(),
     devicePurgeJob: asClass(DevicePurgeJob).singleton(),
+    subscriptionReconcileJob: asClass(SubscriptionReconcileJob).singleton(),
 
     // --- Schedulers ---
     userPurgeScheduler: asFunction((userPurgeJob, config, logger) => {
@@ -126,6 +129,18 @@ export const jobsModule = {
             logger,
         );
     }).singleton(),
+    subscriptionReconcileScheduler: asFunction(
+        (subscriptionReconcileJob, config, logger) => {
+            return new SubscriptionReconcileScheduler(
+                subscriptionReconcileJob,
+                {
+                    cronExpression: config.SUBSCRIPTION_RECONCILE_CRON,
+                    batchSize: config.SUBSCRIPTION_RECONCILE_BATCH_SIZE,
+                },
+                logger,
+            );
+        },
+    ).singleton(),
 
     reportPurgeScheduler: asFunction((reportPurgeJob, config, logger) => {
         return new ReportPurgeScheduler(

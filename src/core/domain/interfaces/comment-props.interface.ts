@@ -67,6 +67,9 @@ export interface CommentProps {
         avatarUrl?: string;
         /** Full name of the author */
         fullName?: string;
+
+        /** Whether the author carries the paid verification badge */
+        isVerified?: boolean;
     };
 
     /**

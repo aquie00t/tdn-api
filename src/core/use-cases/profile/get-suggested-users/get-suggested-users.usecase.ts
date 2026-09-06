@@ -21,6 +21,7 @@ export class GetSuggestedUsersUseCase {
             username: profile.username,
             fullName: profile.fullName,
             avatarUrl: profile.avatarUrl,
+            isVerified: profile.isVerified,
             bannerUrl: profile.bannerUrl,
             bio: profile.bio,
             followersCount: profile.followersCount,

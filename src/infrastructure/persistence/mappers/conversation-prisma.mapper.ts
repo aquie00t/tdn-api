@@ -1,4 +1,5 @@
 import type { Prisma } from "@generated/prisma/client";
+import { isVerified } from "@core/use-cases/shared/verification/is-verified";
 import { Conversation } from "@core/domain/entities/conversation.entity";
 import type { ConversationStatus } from "@core/domain/enums";
 
@@ -12,6 +13,7 @@ import type { ConversationStatus } from "@core/domain/enums";
 export const conversationParticipantSelect = {
     id: true,
     username: true,
+    verifiedUntil: true,
     profile: { select: { avatarUrl: true, fullName: true } },
 } as const;
 
@@ -40,6 +42,7 @@ export interface ConversationResponse {
         username: string;
         fullName?: string;
         avatarUrl: string;
+        isVerified: boolean;
     };
 
     /** How many messages the reader has not seen. */
@@ -86,6 +89,7 @@ export class ConversationPrismaMapper {
                 username: user.username,
                 fullName: user.profile?.fullName ?? undefined,
                 avatarUrl: user.profile?.avatarUrl ?? undefined,
+                isVerified: isVerified(user.verifiedUntil),
             })),
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,
@@ -144,6 +148,7 @@ export class ConversationPrismaMapper {
                 username: other.username,
                 fullName: other.fullName,
                 avatarUrl: this.resolveAvatarUrl(other.avatarUrl, cdnUrl),
+                isVerified: other.isVerified ?? false,
             },
             unreadCount: conversation.unreadFor(viewerId),
             lastMessagePreview: conversation.lastMessagePreview,

@@ -19,3 +19,5 @@ export { ReportTargetKind } from "./report-target-kind.enum";
 export { ReportReason } from "./report-reason.enum";
 export { ReportStatus } from "./report-status.enum";
 export { DevicePlatform } from "./device-platform.enum";
+export { SubscriptionStatus } from "./subscription-status.enum";
+export { BillingProvider } from "./billing-provider.enum";

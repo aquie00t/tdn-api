@@ -43,6 +43,9 @@ export interface QuotedPostSnapshot {
         /** Optional avatar URL of the author for display purposes */
         avatarUrl?: string;
 
+        /** Whether the author carries the paid verification badge */
+        isVerified?: boolean;
+
         /** Optional display name of the author */
         fullName?: string;
     };

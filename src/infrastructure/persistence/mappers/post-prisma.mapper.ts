@@ -1,4 +1,5 @@
 import { Post } from "@core/domain/entities/post.entity";
+import { isVerified } from "@core/use-cases/shared/verification/is-verified";
 import type { PostCategory } from "@core/domain/enums/post-category-enum";
 import { MediaModerationStatus } from "@core/domain/enums/media-moderation-status.enum";
 import type { PostType } from "@core/domain/enums/post-type.enum";
@@ -11,6 +12,7 @@ export type PostWithRelations = Prisma.PostGetPayload<{
             select: {
                 id: true;
                 username: true;
+                verifiedUntil: true;
                 profile: { select: { avatarUrl: true; fullName: true } };
             };
         };
@@ -24,6 +26,7 @@ export type PostWithRelations = Prisma.PostGetPayload<{
                     select: {
                         id: true;
                         username: true;
+                        verifiedUntil: true;
                         profile: {
                             select: { avatarUrl: true; fullName: true };
                         };
@@ -73,6 +76,7 @@ export interface PostResponse {
         avatarUrl: string;
         isMe?: boolean;
         fullName: string | null;
+        isVerified: boolean;
     };
     isLiked: boolean;
     isBookmarked: boolean;
@@ -112,6 +116,7 @@ export class PostPrismaMapper {
                 username: dbPost.author.username,
                 avatarUrl: dbPost.author?.profile?.avatarUrl ?? undefined,
                 fullName: dbPost.author?.profile?.fullName ?? undefined,
+                isVerified: isVerified(dbPost.author.verifiedUntil),
             },
 
             tags: dbPost.tags?.map((t) => t.name) || [],
@@ -146,6 +151,9 @@ export class PostPrismaMapper {
                           fullName:
                               dbPost.quotedPost.author?.profile?.fullName ??
                               undefined,
+                          isVerified: isVerified(
+                              dbPost.quotedPost.author.verifiedUntil,
+                          ),
                       },
                   }
                 : undefined,
@@ -228,6 +236,7 @@ export class PostPrismaMapper {
                 avatarUrl: this.resolveAvatarUrl(post.author.avatarUrl, cdnUrl),
                 fullName: post.author.fullName ?? null,
                 isMe: currentUserId ? post.author.id === currentUserId : false,
+                isVerified: post.author.isVerified ?? false,
             },
             tags: post.tags?.map((t) => ({ name: t })) || [],
             mentions: post.mentions,

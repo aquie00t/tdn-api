@@ -10,6 +10,7 @@ import { PrismaNotificationRepository } from "@infrastructure/persistence/reposi
 import { PrismaDigestDeliveryRepository } from "@infrastructure/persistence/repositories/prisma-digest-delivery.repository";
 import { PrismaReportRepository } from "@infrastructure/persistence/repositories/prisma-report.repository";
 import { PrismaDeviceTokenRepository } from "@infrastructure/persistence/repositories/prisma-device-token.repository";
+import { PrismaSubscriptionRepository } from "@infrastructure/persistence/repositories/prisma-subscription.repository";
 import { PrismaReportDigestDeliveryRepository } from "@infrastructure/persistence/repositories/prisma-report-digest-delivery.repository";
 import { PrismaUserInterestRepository } from "@infrastructure/persistence/repositories/prisma-user-interest.repository";
 import { PrismaPostRepository } from "@infrastructure/persistence/repositories/prisma-post.repository";
@@ -145,6 +146,10 @@ export const persistenceModule = {
      * Device token repository for push notification addresses
      */
     deviceTokenRepository: asClass(PrismaDeviceTokenRepository).singleton(),
+    /**
+     * Subscription repository for the paid verification badge
+     */
+    subscriptionRepository: asClass(PrismaSubscriptionRepository).singleton(),
     reportDigestDeliveryRepository: asClass(
         PrismaReportDigestDeliveryRepository,
     ).singleton(),

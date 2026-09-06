@@ -138,6 +138,7 @@ export class Post {
         username?: string;
         avatarUrl?: string;
         fullName?: string;
+        isVerified?: boolean;
     } {
         return this.props.author;
     }

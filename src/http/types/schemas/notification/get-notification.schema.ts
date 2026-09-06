@@ -10,6 +10,7 @@ const NotificationItemSchema = FBType.Object({
     username: FBType.Optional(FBType.String()),
     type: FBType.Enum(NotificationType),
     avatarUrl: FBType.Optional(FBType.String()),
+    isVerified: FBType.Boolean(),
     // The most specific target id, kept for clients written against the old
     // shape. New clients should read the explicit ids below.
     referenceId: FBType.Optional(FBType.String()),

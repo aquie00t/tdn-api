@@ -26,6 +26,7 @@ type ArticleRelationInclude = {
         select: {
             id: true;
             username: true;
+            verifiedUntil: true;
             profile: { select: { avatarUrl: true; fullName: true } };
         };
     };
@@ -66,6 +67,7 @@ export class PrismaArticleRepository implements IArticleRepository {
                 select: {
                     id: true,
                     username: true,
+                    verifiedUntil: true,
                     profile: { select: { avatarUrl: true, fullName: true } },
                 },
             },

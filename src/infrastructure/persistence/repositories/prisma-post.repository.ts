@@ -26,6 +26,7 @@ const POST_AUTHOR_SELECT = {
     select: {
         id: true,
         username: true,
+        verifiedUntil: true,
         profile: { select: { avatarUrl: true, fullName: true } },
     },
 } as const;

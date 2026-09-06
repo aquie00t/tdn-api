@@ -71,6 +71,7 @@ describe("GetSuggestedUsersUseCase", () => {
             username: profile.username,
             fullName: profile.fullName,
             avatarUrl: profile.avatarUrl,
+            isVerified: false,
             bannerUrl: profile.bannerUrl,
             bio: profile.bio,
             followersCount: profile.followersCount,

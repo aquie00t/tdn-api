@@ -6,6 +6,7 @@ export const FollowListItemSchema = FBType.Object({
     username: FBType.String(),
     fullName: FBType.String(),
     avatarUrl: FBType.String(),
+    isVerified: FBType.Boolean(),
     bio: FBType.Union([FBType.String(), FBType.Null()]),
     isFollowing: FBType.Boolean(),
     isMe: FBType.Boolean(),

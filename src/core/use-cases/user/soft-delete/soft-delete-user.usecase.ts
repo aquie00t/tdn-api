@@ -3,6 +3,7 @@ import { NotFoundError } from "@core/errors/common/not-found.error";
 import type { EmailPort } from "@core/ports/services/email.port";
 import type { PasswordPort } from "@core/ports/services/password.port";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
+import type { RevokeSubscriptionUseCase } from "@core/use-cases/billing/revoke-subscription";
 import type { SoftDeleteUserUseCaseInput } from "./soft-delete-user-usecase.input";
 
 /**
@@ -19,11 +20,13 @@ export class SoftDeleteUserUseCase {
      * @param userRepository - Repository for managing user data
      * @param passwordService - Service for password verification
      * @param emailService - Service for sending emails
+     * @param revokeSubscriptionUseCase - Stops the account being charged
      */
     constructor(
         private readonly userRepository: IUserRepository,
         private readonly passwordService: PasswordPort,
         private readonly emailService: EmailPort,
+        private readonly revokeSubscriptionUseCase: RevokeSubscriptionUseCase,
     ) {}
 
     /**
@@ -54,6 +57,16 @@ export class SoftDeleteUserUseCase {
         if (!isPasswordValid) throw new BadRequestError("Invalid password.");
 
         await this.userRepository.softDeleteById(input.id);
+
+        // Awaited, not fired and forgotten: this platform promises that a
+        // deleted account stops being charged, and a promise about somebody's
+        // money is not something to lose to a dropped promise. It cancels at
+        // the provider immediately rather than at the end of the period,
+        // because the account is going away either way.
+        //
+        // The nightly reconcile retries anything the provider refused, which
+        // is why a failure here does not have to stop the deletion.
+        await this.revokeSubscriptionUseCase.execute(input.id);
 
         await this.emailService.sendDeleteUserEmail({
             to: user.email,
