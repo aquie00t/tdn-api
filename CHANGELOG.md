@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/the-developer-network/tdn-api/compare/v1.25.0...v1.26.0) (2026-09-06)
+
+
+### Features
+
+* **billing:** add the paid verification badge, without a provider ([#280](https://github.com/the-developer-network/tdn-api/issues/280)) ([9b76741](https://github.com/the-developer-network/tdn-api/commit/9b76741d1155a24c8a5b5e0be1a9d64a65d711f8))
+
 # [1.25.0](https://github.com/the-developer-network/tdn-api/compare/v1.24.0...v1.25.0) (2026-09-06)
 
 
