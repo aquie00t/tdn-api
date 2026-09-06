@@ -22,7 +22,12 @@ describe("OAuth Redirect Endpoints", () => {
     const startFlow = async (
         provider: "github" | "google",
         redirect?: string,
-    ): Promise<{ statusCode: number; location: string; state: string }> => {
+    ): Promise<{
+        statusCode: number;
+        location: string;
+        state: string;
+        cookie: string;
+    }> => {
         const response = await request({
             method: "GET",
             url: `/oauth/${provider}${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`,
@@ -33,10 +38,16 @@ describe("OAuth Redirect Endpoints", () => {
             ? (new URL(location).searchParams.get("state") ?? "")
             : "";
 
+        // The flow is bound to the browser that started it, so a callback has
+        // to carry this back the way a real browser would.
+        const cookie =
+            response.cookies.find((c) => c.name === "oauthState")?.value ?? "";
+
         return {
             statusCode: response.statusCode,
             location: location ?? "",
             state,
+            cookie,
         };
     };
 
