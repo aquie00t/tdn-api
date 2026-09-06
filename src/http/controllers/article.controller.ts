@@ -74,9 +74,12 @@ export class ArticleController {
     ): Promise<void> {
         const authorId = request.user.id;
 
+        // The identity goes last. Spreading a request body over it lets the
+        // body name its own author, and a validator that happens to strip
+        // unknown keys is not a guarantee this code should lean on.
         const article = await this.createArticleUseCase.execute({
-            authorId,
             ...request.body,
+            authorId,
         });
 
         return reply.status(201).send({
@@ -105,10 +108,14 @@ export class ArticleController {
     ): Promise<void> {
         const userId = request.user.id;
 
+        // Identity last, for the reason given in `create` - and here it is
+        // sharper: `UpdateArticleUseCase` proves ownership by asking whether
+        // `userId` owns the article, so a body that supplies its own `userId`
+        // does not fail that check, it satisfies it.
         const article = await this.updateArticleUseCase.execute({
+            ...request.body,
             articleId: request.params.id,
             userId,
-            ...request.body,
         });
 
         return reply.status(200).send({

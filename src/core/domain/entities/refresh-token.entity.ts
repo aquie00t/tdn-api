@@ -163,6 +163,27 @@ export class RefreshToken {
     }
 
     /**
+     * Points an already-retired token at a newer successor.
+     *
+     * Used when a retry is served: the token the client keeps presenting was
+     * retired once, and the chain behind it has moved on since. Without this
+     * it would still point at a successor *we* retired on its behalf, and the
+     * next retry would read that as a stolen token and revoke every session
+     * the user has - for a client whose only fault was losing two responses in
+     * a row.
+     *
+     * `revokedAt` is deliberately left alone: the grace window is anchored to
+     * the first rotation, so repeated retries cannot slide it forward
+     * indefinitely.
+     *
+     * @param replacedById - The successor now standing in its place
+     */
+    public repoint(replacedById: string): void {
+        this.props.replacedById = replacedById;
+        this.props.updatedAt = new Date();
+    }
+
+    /**
      * Revoke the refresh token
      *
      * This method mutates the entity state to mark the token as revoked, and

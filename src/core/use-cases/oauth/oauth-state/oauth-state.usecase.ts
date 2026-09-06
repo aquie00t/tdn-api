@@ -61,14 +61,20 @@ export class BeginOAuthUseCase {
      *
      * @param provider - Which provider to start with
      * @param requestedRedirect - Where the caller wants to be returned to
-     * @returns The authorization URL to redirect to
+     * @returns The authorization URL, and the state to bind to this browser
      *
      * @throws BadRequestError - When the requested redirect is not allow-listed
+     *
+     * @remarks
+     * The state is returned as well as stored because holding it in the cache
+     * only proves that *somebody* started a flow here. Proving that the
+     * browser finishing one is the browser that started it takes a second
+     * copy, in a cookie, and that is the caller's job.
      */
     async execute(
         provider: OAuthProvider,
         requestedRedirect?: string,
-    ): Promise<{ authorizationUrl: string }> {
+    ): Promise<{ authorizationUrl: string; state: string }> {
         const target = resolveRedirectTarget(
             requestedRedirect,
             this.oauthRedirectConfig,
@@ -94,7 +100,7 @@ export class BeginOAuthUseCase {
                 ? this.githubAuthService.getAuthorizationUrl(state)
                 : this.googleAuthService.getAuthorizationUrl(state);
 
-        return { authorizationUrl };
+        return { authorizationUrl, state };
     }
 }
 
@@ -118,6 +124,10 @@ export class ConsumeOAuthStateUseCase {
      *
      * Single use: the value is deleted before it is trusted, so a callback URL
      * that is replayed - or handed to somebody else - finds nothing.
+     *
+     * The caller must have already checked that the browser presenting this
+     * callback is the one that started the flow. A state that exists in the
+     * cache proves only that some browser did.
      *
      * A callback with no usable state is not treated as fatal. It is answered
      * on the default web target with an error, because the alternative is a

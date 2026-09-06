@@ -18,6 +18,40 @@ import type { OAuthStartQuery } from "@typings/schemas/oauth/oauth-start.schema"
 /** What a provider hands back on the callback. */
 type CallbackQuery = { code?: string; error?: string; state?: string };
 
+/**
+ * Cookie holding the state of the flow this browser started.
+ *
+ * The other half of the state check. What is kept in the cache proves that
+ * somebody started a flow on this deployment; this proves that the browser
+ * presenting the callback is that somebody. Without it an attacker can start a
+ * flow with their own account, hand the resulting callback URL to a victim,
+ * and have the victim's browser finish it - leaving them signed in as the
+ * attacker, typing into an account somebody else can read.
+ */
+const STATE_COOKIE = "oauthState";
+
+/**
+ * Appends a query parameter, whether or not the target already has some.
+ *
+ * An allow-listed target may perfectly reasonably carry its own query string -
+ * `https://app.example/cb?tenant=x` - and gluing `?code=…` onto that produces
+ * an address no client can parse the code out of.
+ *
+ * @param url - The target
+ * @param key - Parameter name
+ * @param value - Parameter value, already encoded
+ * @returns The target with the parameter appended
+ */
+function appendParam(url: string, key: string, value: string): string {
+    return `${url}${url.includes("?") ? "&" : "?"}${key}=${value}`;
+}
+
+/** Scoped to the OAuth routes; nothing else has any use for it. */
+const STATE_COOKIE_PATH = "/api/v1/oauth";
+
+/** Matches the cache entry the state lives in. */
+const STATE_COOKIE_MAX_AGE_SECONDS = 600;
+
 export class OAuthController extends BaseAuthController {
     constructor(
         private readonly githubAuthService: GithubAuthPort,
@@ -135,10 +169,23 @@ export class OAuthController extends BaseAuthController {
         request: FastifyRequest<{ Querystring: OAuthStartQuery }>,
         reply: FastifyReply,
     ): Promise<void> {
-        const { authorizationUrl } = await this.beginOAuthUseCase.execute(
-            provider,
-            request.query.redirect,
-        );
+        const { authorizationUrl, state } =
+            await this.beginOAuthUseCase.execute(
+                provider,
+                request.query.redirect,
+            );
+
+        // `lax` rather than `strict`: the callback arrives as a top-level
+        // navigation from the provider, which `strict` would strip the cookie
+        // from - and then every legitimate flow would fail the check.
+        reply.setCookie(STATE_COOKIE, state, {
+            path: STATE_COOKIE_PATH,
+            httpOnly: true,
+            secure: this.isProduction,
+            sameSite: "lax",
+            maxAge: STATE_COOKIE_MAX_AGE_SECONDS,
+            signed: true,
+        });
 
         reply.redirect(authorizationUrl);
     }
@@ -162,7 +209,19 @@ export class OAuthController extends BaseAuthController {
     ): Promise<void> {
         const { code, error, state } = request.query;
 
-        const target = await this.consumeOAuthStateUseCase.execute(state);
+        const expectedState = this.readStateCookie(request);
+
+        reply.clearCookie(STATE_COOKIE, { path: STATE_COOKIE_PATH });
+
+        // Checked before the cache is even consulted. A state that exists
+        // there proves a flow was started; only the cookie proves it was
+        // started by the browser standing here.
+        const bound =
+            Boolean(state) && Boolean(expectedState) && state === expectedState;
+
+        const target = bound
+            ? await this.consumeOAuthStateUseCase.execute(state)
+            : null;
 
         // A callback with no usable state is a callback that cannot be tied to
         // a flow anybody started here: a replay, an expired attempt, or a link
@@ -196,17 +255,45 @@ export class OAuthController extends BaseAuthController {
                   }));
 
             reply.redirect(
-                `${target.successUrl}?code=${encodeURIComponent(exchangeCode)}`,
+                appendParam(
+                    target.successUrl,
+                    "code",
+                    encodeURIComponent(exchangeCode),
+                ),
             );
         } catch (err: unknown) {
             if (err instanceof AccountPendingDeletionError) {
                 return reply.redirect(
-                    `${target.successUrl}?error=account_pending_deletion&recoveryToken=${encodeURIComponent(err.recoveryToken)}`,
+                    appendParam(
+                        appendParam(
+                            target.successUrl,
+                            "error",
+                            "account_pending_deletion",
+                        ),
+                        "recoveryToken",
+                        encodeURIComponent(err.recoveryToken),
+                    ),
                 );
             }
 
             return this.fail(reply, target, "oauth_failed");
         }
+    }
+
+    /**
+     * Reads the state this browser was given when it started a flow.
+     *
+     * @param request - The callback request
+     * @returns The state, or null when the cookie is absent or unsigned
+     */
+    private readStateCookie(request: FastifyRequest): string | null {
+        const raw = request.cookies[STATE_COOKIE];
+
+        if (!raw) return null;
+
+        const unsigned = request.unsignCookie(raw);
+
+        return unsigned.valid && unsigned.value ? unsigned.value : null;
     }
 
     /**
@@ -222,7 +309,7 @@ export class OAuthController extends BaseAuthController {
         reason: string,
     ): void {
         reply.redirect(
-            `${target.errorUrl}?error=${encodeURIComponent(reason)}`,
+            appendParam(target.errorUrl, "error", encodeURIComponent(reason)),
         );
     }
 }

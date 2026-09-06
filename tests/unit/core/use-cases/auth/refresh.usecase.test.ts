@@ -56,6 +56,10 @@ describe("RefreshUseCase", () => {
         useCase = new RefreshUseCase(
             transactionSvc as TransactionPort,
             authTokenSvc as AuthTokenPort,
+            // The same double stands in for the repository outside the
+            // transaction; what matters is that the revocation is issued
+            // there rather than inside it.
+            refreshTokenRepo as IRefreshTokenRepository,
             GRACE_SECONDS,
         );
     });
@@ -253,6 +257,31 @@ describe("RefreshUseCase", () => {
             expect(successor.isRevoked).toBe(true);
             expect(successor.replacedById).toBe("token-3");
             expect(refreshTokenRepo.update).toHaveBeenCalledWith(successor);
+        });
+
+        it("should serve a second consecutive retry rather than raise the alarm", async () => {
+            // Two responses lost in a row. The client is still holding the
+            // token it started with, and the successor it points at was
+            // retired by the *first* retry - by us, not by anybody who
+            // received it. Reading that as theft signs an honest user out of
+            // every device they own.
+            const { retired } = arrangeRetry(5);
+
+            await useCase.execute(input);
+
+            expect(retired.replacedById).toBe("token-3");
+            expect(refreshTokenRepo.revokeAllByUserId).not.toHaveBeenCalled();
+        });
+
+        it("should not move the window forward when it serves a retry", async () => {
+            // Otherwise a stolen token could be kept alive indefinitely by
+            // presenting it every twenty-nine seconds.
+            const { retired } = arrangeRetry(5);
+            const revokedAtBefore = retired.revokedAt;
+
+            await useCase.execute(input);
+
+            expect(retired.revokedAt).toEqual(revokedAtBefore);
         });
 
         it("should raise the alarm for a reuse outside the window", async () => {

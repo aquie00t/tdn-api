@@ -20,9 +20,12 @@ function fastifyWith(valid: Record<string, { id?: string }>): FastifyInstance {
     } as unknown as FastifyInstance;
 }
 
-function requestWith(authorization?: string): FastifyRequest {
+function requestWith(
+    authorization?: string,
+    headers: Record<string, string> = {},
+): FastifyRequest {
     return {
-        headers: authorization ? { authorization } : {},
+        headers: authorization ? { authorization, ...headers } : headers,
         ip: "203.0.113.7",
     } as unknown as FastifyRequest;
 }
@@ -70,6 +73,18 @@ describe("rateLimitKeyFor", () => {
 });
 
 describe("RateLimitPolicies.STRICT", () => {
+    it("should prefer the edge address over the proxied one", () => {
+        // `request.ip` is the left-hand end of X-Forwarded-For, which the
+        // client writes. Keying brute-force protection on it hands the caller
+        // a fresh bucket per request; the edge header is set by Cloudflare and
+        // cannot be supplied from outside.
+        const key = RateLimitPolicies.STRICT.keyGenerator(
+            requestWith(undefined, { "cf-connecting-ip": "198.51.100.9" }),
+        );
+
+        expect(key).toBe("198.51.100.9");
+    });
+
     it("should key on the IP regardless of any token attached", () => {
         // Login and registration run under this policy. If a caller could
         // pick its bucket by attaching a token it already holds, three

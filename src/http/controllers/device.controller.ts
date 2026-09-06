@@ -31,9 +31,16 @@ export class DeviceController {
         request: FastifyRequest<{ Body: RegisterDeviceBody }>,
         reply: FastifyReply,
     ): Promise<void> {
+        // Fields named one by one rather than spread. The account comes from
+        // the session and must not be something a request body can set, and
+        // an ordering that depends on the validator stripping unknown keys is
+        // one refactor away from not being true.
         await this.registerDeviceUseCase.execute({
             currentUserId: request.user!.id,
-            ...request.body,
+            token: request.body.token,
+            platform: request.body.platform,
+            appVersion: request.body.appVersion,
+            locale: request.body.locale,
         });
 
         reply.status(200).send({

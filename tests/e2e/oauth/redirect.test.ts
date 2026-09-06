@@ -22,7 +22,12 @@ describe("OAuth Redirect Endpoints", () => {
     const startFlow = async (
         provider: "github" | "google",
         redirect?: string,
-    ): Promise<{ statusCode: number; location: string; state: string }> => {
+    ): Promise<{
+        statusCode: number;
+        location: string;
+        state: string;
+        cookie: string;
+    }> => {
         const response = await request({
             method: "GET",
             url: `/oauth/${provider}${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`,
@@ -33,8 +38,32 @@ describe("OAuth Redirect Endpoints", () => {
             ? (new URL(location).searchParams.get("state") ?? "")
             : "";
 
-        return { statusCode: response.statusCode, location: location ?? "", state };
+        // The flow is bound to the browser that started it, so a callback has
+        // to carry this back the way a real browser would.
+        const cookie =
+            response.cookies.find((c) => c.name === "oauthState")?.value ?? "";
+
+        return {
+            statusCode: response.statusCode,
+            location: location ?? "",
+            state,
+            cookie,
+        };
     };
+
+    /**
+     * Hits a callback the way the browser that started the flow would.
+     */
+    const callback = (
+        provider: string,
+        query: string,
+        cookie: string,
+    ): ReturnType<typeof request> =>
+        request({
+            method: "GET",
+            url: `/oauth/${provider}/callback?${query}`,
+            cookies: { oauthState: cookie },
+        });
 
     describe("starting a flow", () => {
         it("should redirect to GitHub with a state parameter", async () => {
@@ -88,12 +117,13 @@ describe("OAuth Redirect Endpoints", () => {
 
     describe("finishing a flow", () => {
         it("should report a provider error on the target the flow started for", async () => {
-            const { state } = await startFlow("github");
+            const { state, cookie } = await startFlow("github");
 
-            const response = await request({
-                method: "GET",
-                url: `/oauth/github/callback?error=access_denied&state=${state}`,
-            });
+            const response = await callback(
+                "github",
+                `error=access_denied&state=${state}`,
+                cookie,
+            );
 
             expect(response.statusCode).toBe(302);
             expect(response.headers.location).toBe(
@@ -102,12 +132,9 @@ describe("OAuth Redirect Endpoints", () => {
         });
 
         it("should report a missing code on the target the flow started for", async () => {
-            const { state } = await startFlow("google");
+            const { state, cookie } = await startFlow("google");
 
-            const response = await request({
-                method: "GET",
-                url: `/oauth/google/callback?state=${state}`,
-            });
+            const response = await callback("google", `state=${state}`, cookie);
 
             expect(response.statusCode).toBe(302);
             expect(response.headers.location).toBe(
@@ -116,15 +143,33 @@ describe("OAuth Redirect Endpoints", () => {
         });
 
         it("should send an app flow's failure to the app", async () => {
-            const { state } = await startFlow("github", NATIVE_TARGET);
+            const { state, cookie } = await startFlow("github", NATIVE_TARGET);
 
-            const response = await request({
-                method: "GET",
-                url: `/oauth/github/callback?error=access_denied&state=${state}`,
-            });
+            const response = await callback(
+                "github",
+                `error=access_denied&state=${state}`,
+                cookie,
+            );
 
             expect(response.headers.location).toBe(
                 `${NATIVE_TARGET}?error=github_access_denied`,
+            );
+        });
+
+        it("should complete nothing when the browser did not start the flow", async () => {
+            // The state exists in the cache, so it passes the old check. What
+            // it does not have is the cookie the starting browser was given -
+            // which is the whole point: an attacker can start a flow with
+            // their own account and hand the callback URL to a victim.
+            const { state } = await startFlow("github");
+
+            const response = await request({
+                method: "GET",
+                url: `/oauth/github/callback?code=whatever&state=${state}`,
+            });
+
+            expect(response.headers.location).toBe(
+                `${FRONTEND_URL}/login?error=invalid_state`,
             );
         });
 
@@ -154,16 +199,18 @@ describe("OAuth Redirect Endpoints", () => {
         });
 
         it("should spend a state exactly once", async () => {
-            const { state } = await startFlow("github");
+            const { state, cookie } = await startFlow("github");
 
-            const first = await request({
-                method: "GET",
-                url: `/oauth/github/callback?error=access_denied&state=${state}`,
-            });
-            const replay = await request({
-                method: "GET",
-                url: `/oauth/github/callback?error=access_denied&state=${state}`,
-            });
+            const first = await callback(
+                "github",
+                `error=access_denied&state=${state}`,
+                cookie,
+            );
+            const replay = await callback(
+                "github",
+                `error=access_denied&state=${state}`,
+                cookie,
+            );
 
             expect(first.headers.location).toBe(
                 `${FRONTEND_URL}/login?error=github_access_denied`,

@@ -22,8 +22,8 @@ function reportPurgePlugin(fastify: FastifyInstance): void {
         );
     });
 
-    fastify.addHook("onClose", () => {
-        reportPurgeScheduler.stop();
+    fastify.addHook("onClose", async () => {
+        await reportPurgeScheduler.stop();
 
         fastify.log.info(
             {

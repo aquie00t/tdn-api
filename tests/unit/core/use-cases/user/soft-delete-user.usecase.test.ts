@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { RevokeSubscriptionUseCase } from "@core/use-cases/billing/revoke-subscription";
 import { SoftDeleteUserUseCase } from "@core/use-cases/user/soft-delete";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
@@ -32,6 +33,7 @@ describe("SoftDeleteUserUseCase", () => {
             passwordService as PasswordPort,
             emailService as EmailPort,
             revokeSubscriptionUseCase as RevokeSubscriptionUseCase,
+            { error: vi.fn(), warn: vi.fn() } as unknown as LoggerPort,
         );
     });
 
@@ -140,5 +142,23 @@ describe("SoftDeleteUserUseCase", () => {
         expect(revokeSubscriptionUseCase.execute).toHaveBeenCalledWith(
             "user-1",
         );
+    });
+
+    it("should complete the deletion even if the cancellation fails", async () => {
+        // The account is already soft-deleted by then; throwing here would
+        // report a 500 for a deletion that happened, and skip the email.
+        vi.mocked(userRepository.findById).mockResolvedValue(
+            buildUser({ password: "hashed" }),
+        );
+        vi.mocked(passwordService.verify).mockResolvedValue(true);
+        vi.mocked(revokeSubscriptionUseCase.execute).mockRejectedValue(
+            new Error("billing down"),
+        );
+
+        await expect(
+            useCase.execute({ id: "user-1", password: "correct" }),
+        ).resolves.toBeUndefined();
+
+        expect(emailService.sendDeleteUserEmail).toHaveBeenCalled();
     });
 });

@@ -380,10 +380,16 @@ export const useCasesModule = {
      * Use case for JWT token refresh
      */
     refreshUseCase: asFunction(
-        (transactionService, authTokenService, config) =>
+        (
+            transactionService,
+            authTokenService,
+            refreshTokenRepository,
+            config,
+        ) =>
             new RefreshUseCase(
                 transactionService,
                 authTokenService,
+                refreshTokenRepository,
                 config.REFRESH_ROTATION_GRACE_SECONDS,
             ),
     ).singleton(),
