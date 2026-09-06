@@ -12,6 +12,7 @@ import type { MetaController } from "@controllers/meta.controller";
 import type { DeviceController } from "@controllers/device.controller";
 import type { DevicePurgeScheduler } from "@infrastructure/jobs/device/device-purge.scheduler";
 import type { BillingController } from "@controllers/billing.controller";
+import type { PlayBillingController } from "@controllers/play-billing.controller";
 import type { SubscriptionReconcileScheduler } from "@infrastructure/jobs/billing/subscription-reconcile.scheduler";
 import type { ReportDigestScheduler } from "@infrastructure/jobs/report/report-digest.scheduler";
 import type { ReportPurgeScheduler } from "@infrastructure/jobs/report/report-purge.scheduler";
@@ -99,6 +100,9 @@ declare module "@fastify/awilix" {
         devicePurgeScheduler: DevicePurgeScheduler;
         /** Controller for the subscription endpoint */
         billingController: BillingController;
+
+        /** Controller for the Google Play billing endpoints */
+        playBillingController: PlayBillingController;
 
         /** Scheduler that repairs billing state nightly */
         subscriptionReconcileScheduler: SubscriptionReconcileScheduler;

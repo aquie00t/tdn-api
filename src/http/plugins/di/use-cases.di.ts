@@ -111,6 +111,7 @@ import { SyncSubscriptionUseCase } from "@core/use-cases/billing/sync-subscripti
 import { RevokeSubscriptionUseCase } from "@core/use-cases/billing/revoke-subscription";
 import { GetSubscriptionUseCase } from "@core/use-cases/billing/get-subscription";
 import { ReconcileSubscriptionsUseCase } from "@core/use-cases/billing/reconcile-subscriptions";
+import { RegisterPlayPurchaseUseCase } from "@core/use-cases/billing/register-play-purchase";
 import {
     REPORT_EXCERPT_LENGTH,
     REPORT_MAX_DETAILS,
@@ -251,6 +252,13 @@ export const useCasesModule = {
      * Use case that reads an account its own subscription
      */
     getSubscriptionUseCase: asClass(GetSubscriptionUseCase).singleton(),
+
+    /**
+     * Use case that attaches a Play purchase to the account that made it
+     */
+    registerPlayPurchaseUseCase: asClass(
+        RegisterPlayPurchaseUseCase,
+    ).singleton(),
 
     /**
      * Use case that repairs billing state nightly

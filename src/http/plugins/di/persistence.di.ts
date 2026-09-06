@@ -11,6 +11,7 @@ import { PrismaDigestDeliveryRepository } from "@infrastructure/persistence/repo
 import { PrismaReportRepository } from "@infrastructure/persistence/repositories/prisma-report.repository";
 import { PrismaDeviceTokenRepository } from "@infrastructure/persistence/repositories/prisma-device-token.repository";
 import { PrismaSubscriptionRepository } from "@infrastructure/persistence/repositories/prisma-subscription.repository";
+import { PrismaBillingEventRepository } from "@infrastructure/persistence/repositories/prisma-billing-event.repository";
 import { PrismaReportDigestDeliveryRepository } from "@infrastructure/persistence/repositories/prisma-report-digest-delivery.repository";
 import { PrismaUserInterestRepository } from "@infrastructure/persistence/repositories/prisma-user-interest.repository";
 import { PrismaPostRepository } from "@infrastructure/persistence/repositories/prisma-post.repository";
@@ -150,6 +151,7 @@ export const persistenceModule = {
      * Subscription repository for the paid verification badge
      */
     subscriptionRepository: asClass(PrismaSubscriptionRepository).singleton(),
+    billingEventRepository: asClass(PrismaBillingEventRepository).singleton(),
     reportDigestDeliveryRepository: asClass(
         PrismaReportDigestDeliveryRepository,
     ).singleton(),

@@ -5,6 +5,7 @@ import {
     NoopPushService,
 } from "@infrastructure/external/push/expo-push.service";
 import { NoopBillingService } from "@infrastructure/external/billing/noop-billing.service";
+import { PlayNotificationService } from "@infrastructure/external/billing/play/play-notification.service";
 import { GithubAuthService } from "@infrastructure/external/github-auth.service";
 import { GoogleAuthService } from "@infrastructure/external/google-auth.service";
 import { S3StorageService } from "@infrastructure/external/s3-storage.service";
@@ -36,6 +37,13 @@ export const externalModule = {
      * cannot hand out free badges.
      */
     billingService: asClass(NoopBillingService).singleton(),
+
+    /**
+     * Handles what Google pushes about subscriptions. Useful before the
+     * provider adapter exists: it still records deliveries, spots
+     * redeliveries and finds the account a purchase belongs to.
+     */
+    playNotificationService: asClass(PlayNotificationService).singleton(),
 
     emailService: asFunction((config, logger) => {
         return new EmailService(

@@ -272,6 +272,11 @@ export const EnvSchema = Type.Object({
         minimum: 1,
     }),
 
+    // Shared secret Pub/Sub appends to the Play notification push URL. Empty
+    // - the default - closes that endpoint entirely rather than leaving an
+    // unauthenticated route that writes billing state open by default.
+    PLAY_NOTIFICATIONS_TOKEN: Type.String({ default: "" }),
+
     // --- Mobile clients ---
     // A web client is whatever was served this morning; an app version lives on
     // phones for months. These let the API tell a build that it is too old to
