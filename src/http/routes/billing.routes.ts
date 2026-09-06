@@ -53,12 +53,16 @@ export default function billingRoutes(fastify: FastifyInstance): void {
                 tags: ["Billing"],
             },
             onRequest: [fastify.authenticate],
-            // A retried hand-over is already harmless: the sync writes the
-            // provider's absolute state onto one row per account, so reporting
-            // the same purchase twice lands in the same place. It should still
-            // carry `idempotency: true` once that plugin is on main, to save
-            // the second verification round trip.
-            config: { rateLimit: RateLimitPolicies.SENSITIVE },
+            config: {
+                // A retried hand-over is already harmless - the sync writes
+                // the provider's absolute state onto one row per account - but
+                // the claim spares a second verification round trip to Google,
+                // and this is exactly the call a phone retries: it fires right
+                // after a purchase, when the app has just come back from the
+                // Play sheet.
+                idempotency: true,
+                rateLimit: RateLimitPolicies.SENSITIVE,
+            },
         },
         playBillingController.registerPurchase.bind(playBillingController),
     );
