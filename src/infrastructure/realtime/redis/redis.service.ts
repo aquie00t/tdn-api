@@ -76,6 +76,39 @@ export class RedisService implements CachePort {
         }
     }
 
+    /**
+     * Writes a value only when the key is not already taken.
+     *
+     * `SET NX EX` in one round trip: the store decides the race rather than
+     * this process reading and then writing.
+     *
+     * Throws rather than swallowing, unlike its neighbours. A caller asking
+     * "did I win the claim?" cannot be answered with silence - the two
+     * possible lies are "you won" (two requests both proceed) and "you lost"
+     * (a legitimate request is refused). It is for the caller to decide what a
+     * cache outage means.
+     *
+     * @param key - The key to claim.
+     * @param value - The value to write if the claim succeeds.
+     * @param ttlSeconds - How long the claim lives.
+     * @returns True when this caller took the key.
+     */
+    async setIfAbsent(
+        key: string,
+        value: string,
+        ttlSeconds: number,
+    ): Promise<boolean> {
+        const result = await this.publisher.set(
+            key,
+            value,
+            "EX",
+            ttlSeconds,
+            "NX",
+        );
+
+        return result === "OK";
+    }
+
     async delete(key: string): Promise<void> {
         try {
             await this.publisher.del(key);

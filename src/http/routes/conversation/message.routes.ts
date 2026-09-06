@@ -75,7 +75,10 @@ export function messageRoutes(fastify: FastifyInstance): void {
                 response: { 201: MessageResponseSchema },
                 tags: ["Conversation"],
             },
-            config: { rateLimit: RateLimitPolicies.SENSITIVE },
+            config: {
+                idempotency: true,
+                rateLimit: RateLimitPolicies.SENSITIVE,
+            },
         },
         conversationController.sendMessage.bind(conversationController),
     );
@@ -94,7 +97,10 @@ export function messageRoutes(fastify: FastifyInstance): void {
                 response: { 200: UploadMessageMediaResponseSchema },
                 tags: ["Conversation"],
             },
-            config: { rateLimit: RateLimitPolicies.SENSITIVE },
+            config: {
+                idempotency: true,
+                rateLimit: RateLimitPolicies.SENSITIVE,
+            },
         },
         conversationController.uploadMedia.bind(conversationController),
     );

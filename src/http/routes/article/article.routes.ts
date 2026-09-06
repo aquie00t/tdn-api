@@ -113,7 +113,10 @@ export function articleRoutes(fastify: FastifyInstance): void {
                 response: { 201: ArticleResponseSchema },
                 tags: ["Article"],
             },
-            config: { rateLimit: RateLimitPolicies.SENSITIVE },
+            config: {
+                idempotency: true,
+                rateLimit: RateLimitPolicies.SENSITIVE,
+            },
         },
         articleController.create.bind(articleController),
     );
