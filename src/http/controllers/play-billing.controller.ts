@@ -3,6 +3,7 @@ import { UnauthorizedError } from "@core/errors";
 import { timingSafeEqual } from "node:crypto";
 import type { RegisterPlayPurchaseUseCase } from "@core/use-cases/billing/register-play-purchase";
 import type { PlayNotificationService } from "@infrastructure/external/billing/play/play-notification.service";
+import type { GoogleOidcVerifier } from "@infrastructure/external/billing/play/google-oidc-verifier";
 import type {
     PlayNotificationQuery,
     RegisterPlayPurchaseBody,
@@ -48,11 +49,13 @@ export class PlayBillingController {
      *
      * @param registerPlayPurchaseUseCase - Attaches a purchase to an account
      * @param playNotificationService - Handles what Google pushes
+     * @param googleOidcVerifier - Proves a push really came from Google
      * @param config - Environment configuration, for the push secret
      */
     constructor(
         private readonly registerPlayPurchaseUseCase: RegisterPlayPurchaseUseCase,
         private readonly playNotificationService: PlayNotificationService,
+        private readonly googleOidcVerifier: GoogleOidcVerifier,
         private readonly config: FastifyInstance["config"],
     ) {}
 
@@ -100,12 +103,7 @@ export class PlayBillingController {
         request: FastifyRequest<{ Querystring: PlayNotificationQuery }>,
         reply: FastifyReply,
     ): Promise<void> {
-        const expected = this.config.PLAY_NOTIFICATIONS_TOKEN;
-
-        // No secret configured means the endpoint is not wired up yet. Closed
-        // rather than open: an unauthenticated endpoint that writes billing
-        // state is not something to leave ajar by default.
-        if (!expected || !matchesSecret(request.query.token, expected)) {
+        if (!(await this.callerIsGoogle(request))) {
             throw new UnauthorizedError();
         }
 
@@ -117,5 +115,37 @@ export class PlayBillingController {
         );
 
         reply.status(204).send();
+    }
+
+    /**
+     * Decides whether a push really came from Google.
+     *
+     * Two mechanisms, and the better one wins where it is available. A signed
+     * identity token proves the caller; a shared secret in the query string
+     * only proves they have read something that ends up in access logs - ours
+     * and every proxy's. The secret stays because a Pub/Sub subscription can
+     * be created without OIDC, and a deployment part-way through being wired
+     * up should not silently start accepting anything.
+     *
+     * With neither configured the endpoint is closed, which is the right
+     * default for an unauthenticated route that writes billing state.
+     *
+     * @param request - The push request
+     * @returns True when the caller is accepted
+     */
+    private async callerIsGoogle(
+        request: FastifyRequest<{ Querystring: PlayNotificationQuery }>,
+    ): Promise<boolean> {
+        if (this.googleOidcVerifier.isConfigured) {
+            return this.googleOidcVerifier.verify(
+                request.headers.authorization,
+            );
+        }
+
+        const expected = this.config.PLAY_NOTIFICATIONS_TOKEN;
+
+        return (
+            Boolean(expected) && matchesSecret(request.query.token, expected)
+        );
     }
 }

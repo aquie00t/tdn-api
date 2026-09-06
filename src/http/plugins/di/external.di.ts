@@ -6,6 +6,7 @@ import {
 } from "@infrastructure/external/push/expo-push.service";
 import { NoopBillingService } from "@infrastructure/external/billing/noop-billing.service";
 import { PlayNotificationService } from "@infrastructure/external/billing/play/play-notification.service";
+import { GoogleOidcVerifier } from "@infrastructure/external/billing/play/google-oidc-verifier";
 import { GithubAuthService } from "@infrastructure/external/github-auth.service";
 import { GoogleAuthService } from "@infrastructure/external/google-auth.service";
 import { S3StorageService } from "@infrastructure/external/s3-storage.service";
@@ -44,6 +45,19 @@ export const externalModule = {
      * redeliveries and finds the account a purchase belongs to.
      */
     playNotificationService: asClass(PlayNotificationService).singleton(),
+
+    /**
+     * Proves a Play notification came from Google rather than from somebody
+     * who read a log line. Unconfigured, the endpoint falls back to the
+     * shared secret on the push URL.
+     */
+    googleOidcVerifier: asFunction(
+        (config) =>
+            new GoogleOidcVerifier({
+                audience: config.PLAY_OIDC_AUDIENCE,
+                serviceAccountEmail: config.PLAY_OIDC_SERVICE_ACCOUNT,
+            }),
+    ).singleton(),
 
     emailService: asFunction((config, logger) => {
         return new EmailService(

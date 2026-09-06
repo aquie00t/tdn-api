@@ -1,4 +1,5 @@
 import { UnauthorizedError } from "@core/errors";
+import { clientIp } from "@plugins/shared/client-ip";
 import type { ForgotPasswordUseCase } from "@core/use-cases/auth/forgot-password";
 import type { LoginUseCase } from "@core/use-cases/auth/login";
 import type { LogoutUseCase } from "@core/use-cases/auth/logout";
@@ -63,7 +64,7 @@ export class AuthController extends BaseAuthController {
         const response = await this.loginUseCase.execute({
             identifier: request.body.identifier,
             password: request.body.password,
-            deviceIp: request.ip,
+            deviceIp: clientIp(request),
             userAgent: request.headers["user-agent"] ?? "Unknown Device",
         });
 
@@ -101,7 +102,7 @@ export class AuthController extends BaseAuthController {
 
         const response = await this.refreshUseCase.execute({
             token,
-            deviceIp: request.ip,
+            deviceIp: clientIp(request),
             userAgent: request.headers["user-agent"] ?? "Unknown Device",
         });
 
@@ -200,7 +201,7 @@ export class AuthController extends BaseAuthController {
     ): Promise<void> {
         const response = await this.recoverAccountUseCase.execute({
             recoveryToken: request.body.recoveryToken,
-            deviceIp: request.ip,
+            deviceIp: clientIp(request),
             userAgent: request.headers["user-agent"] ?? "Unknown Device",
         });
 

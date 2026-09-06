@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { UnauthorizedError } from "@core/errors";
 import { GoogleLoginUseCase } from "@core/use-cases/oauth/oauth-google";
 import type { GoogleAuthPort } from "@core/ports/services/google-auth.port";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
@@ -12,6 +13,7 @@ const mockProfile = {
     providerAccountId: "google-456",
     username: "googleuser",
     email: "googleuser@example.com",
+    isEmailVerified: true,
 };
 
 describe("GoogleLoginUseCase", () => {
@@ -104,7 +106,7 @@ describe("GoogleLoginUseCase", () => {
         expect(userRepository.createWithOAuth).not.toHaveBeenCalled();
     });
 
-    it("should create new user with isEmailVerified always true", async () => {
+    it("should carry the provider's verification flag onto the new account", async () => {
         vi.mocked(userRepository.findByEmail).mockResolvedValue(null);
         vi.mocked(userRepository.findByUsername).mockResolvedValue(null);
         vi.mocked(cryptoService.generateRandomHex).mockReturnValue(
@@ -162,5 +164,20 @@ describe("GoogleLoginUseCase", () => {
             }),
             60,
         );
+    });
+
+    it("should refuse a login on an address the provider has not verified", async () => {
+        // The flow matches an existing account by email alone, so an
+        // unverified address is a way into somebody else's account: register
+        // at the provider with their address, authorise, and be handed their
+        // session.
+        vi.mocked(googleAuthService.getUserProfileByCode).mockResolvedValue({
+            ...mockProfile,
+            isEmailVerified: false,
+        });
+
+        await expect(useCase.execute({ code: "code", delivery: "cookie" })).rejects.toThrow(UnauthorizedError);
+
+        expect(userRepository.findByEmail).not.toHaveBeenCalled();
     });
 });

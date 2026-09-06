@@ -78,6 +78,10 @@ export class GoogleAuthService implements GoogleAuthPort {
                 );
             });
 
+        // `verified_email` comes from the userinfo endpoint; treat anything
+        // that is not an explicit true as unverified.
+        const isEmailVerified = googleUser.verified_email === true;
+
         const derivedUsername = googleUser.email
             .split("@")[0]
             .toLowerCase()
@@ -87,6 +91,7 @@ export class GoogleAuthService implements GoogleAuthPort {
             email: googleUser.email,
             username: derivedUsername,
             providerAccountId: googleUser.id,
+            isEmailVerified,
         };
     }
 }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { UnauthorizedError } from "@core/errors";
 import { GithubLoginUseCase } from "@core/use-cases/oauth/oauth-github";
 import type { GithubAuthPort } from "@core/ports/services/github-auth.port";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
@@ -162,5 +163,20 @@ describe("GithubLoginUseCase", () => {
             }),
             60,
         );
+    });
+
+    it("should refuse a login on an address the provider has not verified", async () => {
+        // The flow matches an existing account by email alone, so an
+        // unverified address is a way into somebody else's account: register
+        // at the provider with their address, authorise, and be handed their
+        // session.
+        vi.mocked(githubAuthService.getUserProfileByCode).mockResolvedValue({
+            ...mockProfile,
+            isEmailVerified: false,
+        });
+
+        await expect(useCase.execute({ code: "code", delivery: "cookie" })).rejects.toThrow(UnauthorizedError);
+
+        expect(userRepository.findByEmail).not.toHaveBeenCalled();
     });
 });

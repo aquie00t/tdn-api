@@ -1,4 +1,5 @@
 import { ForbiddenError } from "@core/errors";
+import { assertSafeSocialLinks } from "@core/use-cases/shared/profile/social-links";
 import type { IProfileRepository } from "@core/ports/repositories/profile.repository";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { UpdateProfileInput } from "./update-profile-usecase.input";
@@ -38,6 +39,8 @@ export class UpdateProfileUseCase {
      * @throws {ForbiddenError} When a non-bot account tries to set categories.
      */
     async execute(input: UpdateProfileInput): Promise<void> {
+        assertSafeSocialLinks(input.socials);
+
         if (input.categories !== undefined) {
             const user = await this.userRepository.findById(input.userId);
 

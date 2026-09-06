@@ -2,6 +2,7 @@ import fastifyPlugin from "fastify-plugin";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { TooManyRequestsError } from "@core/errors";
+import { clientIp } from "@plugins/shared/client-ip";
 import { createHash } from "node:crypto";
 
 /**
@@ -28,32 +29,6 @@ import { createHash } from "node:crypto";
  *   - `timeWindow`: Time window for rate limiting ("1 minute")
  */
 // jsdoc
-/**
- * The caller's address, as far as it can be trusted.
- *
- * `request.ip` is not good enough for the policies that stop brute force. The
- * app runs with `trustProxy: true`, which tells Fastify to believe the whole
- * `X-Forwarded-For` chain - and the left-hand end of that chain is written by
- * the client. A caller can therefore change `request.ip` on every request and
- * be handed a fresh bucket each time, which is the entire protection gone.
- *
- * `CF-Connecting-IP` is not spoofable in the same way: Cloudflare overwrites
- * it at the edge, and the deployment has no route that bypasses the edge - the
- * Render subdomain is disabled, so the custom domain is the only way in. Where
- * that header is absent (local development, tests) there is no proxy to lie
- * through either, and `request.ip` is the real peer.
- *
- * @param request - The incoming request
- * @returns The address to count this request against
- */
-function untrustedClientIp(request: FastifyRequest): string {
-    const edgeIp = request.headers["cf-connecting-ip"];
-
-    if (typeof edgeIp === "string" && edgeIp.length > 0) return edgeIp;
-
-    return request.ip;
-}
-
 export const RateLimitPolicies = {
     STRICT: {
         max: 3,
@@ -66,8 +41,7 @@ export const RateLimitPolicies = {
         // account it holds, turning three attempts per quarter hour into three
         // times however many accounts it can collect. Keeping registration
         // itself on this key is what bounds that collection.
-        keyGenerator: (request: FastifyRequest): string =>
-            untrustedClientIp(request),
+        keyGenerator: (request: FastifyRequest): string => clientIp(request),
     },
     SENSITIVE: {
         max: 5,
@@ -136,7 +110,7 @@ export function rateLimitKeyFor(
         }
     }
 
-    return untrustedClientIp(request);
+    return clientIp(request);
 }
 
 function rateLimitPlugin(fastify: FastifyInstance): void {

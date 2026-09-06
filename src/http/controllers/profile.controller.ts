@@ -86,8 +86,13 @@ export class ProfileController {
         const body = request.body;
 
         await this.updateProfileUseCase.execute({
-            userId,
+            // Identity last. Nothing exploitable reaches here today - the
+            // schema sets `additionalProperties: false` and AJV strips the
+            // rest - but this use case authorises on `input.userId`, so a body
+            // supplying its own would satisfy that check rather than fail it,
+            // and the ordering should not be the thing standing in the way.
             ...body,
+            userId,
         });
 
         reply.status(204).send();

@@ -193,6 +193,10 @@ projects:
       # Shared secret on the Play notification push URL. Empty keeps that
       # endpoint closed, which is the right default for an unauthenticated
       # route that writes billing state.
+      - key: PLAY_OIDC_AUDIENCE
+        sync: false
+      - key: PLAY_OIDC_SERVICE_ACCOUNT
+        sync: false
       - key: PLAY_NOTIFICATIONS_TOKEN
         sync: false
       # The paid verification badge. Both have defaults; they are declared
