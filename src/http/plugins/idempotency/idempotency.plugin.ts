@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fastifyPlugin from "fastify-plugin";
-import { ConflictError } from "@core/errors";
+import { BadRequestError, ConflictError } from "@core/errors";
 import type { CachePort } from "@core/ports/services/cache.port";
 import {
     fingerprintBody,
@@ -16,8 +16,19 @@ const REPLAY_HEADER = "idempotent-replay";
 /** Longest key a client may send; anything longer is a mistake or an attack. */
 const MAX_KEY_LENGTH = 200;
 
-/** How long a claim and its answer are remembered. */
+/** How long a completed answer is remembered. */
 const RECORD_TTL_SECONDS = 24 * 60 * 60;
+
+/**
+ * How long an *unfinished* claim is held.
+ *
+ * Short on purpose. The claim is cleared when the response is sent, so the
+ * only thing that leaves one behind is a process that died mid-request - a
+ * redeploy, a crash - and a claim that then sat for a day would answer every
+ * retry with "still in progress" for a write that never happened. Longer than
+ * any request this guards takes, and far shorter than a working day.
+ */
+const CLAIM_TTL_SECONDS = 120;
 
 /**
  * Largest response body kept for replay.
@@ -117,7 +128,9 @@ function idempotencyPlugin(fastify: FastifyInstance): void {
         if (typeof key !== "string" || key.length === 0 || !userId) return;
 
         if (key.length > MAX_KEY_LENGTH) {
-            throw new ConflictError("Idempotency-Key is too long.");
+            // A malformed request, not a conflict. A client told 409 reads it
+            // as "already done" and stops retrying with a corrected key.
+            throw new BadRequestError("Idempotency-Key is too long.");
         }
 
         const cacheKey = idempotencyCacheKey(
@@ -137,7 +150,7 @@ function idempotencyPlugin(fastify: FastifyInstance): void {
                     state: "in-flight",
                     fingerprint,
                 } satisfies IdempotencyRecord),
-                RECORD_TTL_SECONDS,
+                CLAIM_TTL_SECONDS,
             );
         } catch (error: unknown) {
             // Fail open, deliberately. This is a safety net over a write that

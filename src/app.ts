@@ -69,6 +69,22 @@ export class App {
 
         this.server = Fastify({
             allowErrorHandlerOverride: true,
+            ajv: {
+                customOptions: {
+                    // Fastify's default is `true`, which only strips unknown
+                    // properties from schemas that say
+                    // `additionalProperties: false` - and a plain TypeBox
+                    // object says nothing, so unknown keys survive validation
+                    // and reach the handler. Anywhere a handler spreads
+                    // `...request.body` over an identity taken from the
+                    // session, that is an account takeover: the body wins.
+                    //
+                    // "all" drops every property the schema did not declare,
+                    // which removes the whole class rather than the three
+                    // places it currently bites.
+                    removeAdditional: "all",
+                },
+            },
             logger: isTest
                 ? false
                 : isDevelopment

@@ -2,6 +2,7 @@ import { BillingProvider, SubscriptionStatus } from "@core/domain/enums";
 import type { BillingPort } from "@core/ports/services/billing.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { SyncSubscriptionUseCase } from "../sync-subscription";
+import { isVerified } from "@core/use-cases/shared/verification/is-verified";
 
 /**
  * Input DTO for the RegisterPlayPurchaseUseCase.
@@ -83,6 +84,9 @@ export class RegisterPlayPurchaseUseCase {
             },
         });
 
-        return { isVerified: result.verifiedUntil !== null };
+        // Through the shared helper, not `!== null`. An expiry in the past is
+        // not a badge, and this is the one place that could otherwise answer
+        // the badge question differently from every profile and post.
+        return { isVerified: isVerified(result.verifiedUntil) };
     }
 }

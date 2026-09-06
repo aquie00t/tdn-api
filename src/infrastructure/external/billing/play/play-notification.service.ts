@@ -4,7 +4,10 @@ import type { ISubscriptionRepository } from "@core/ports/repositories/subscript
 import type { BillingPort } from "@core/ports/services/billing.port";
 import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { SyncSubscriptionUseCase } from "@core/use-cases/billing/sync-subscription";
-import { parsePlayNotification } from "./play-notification";
+import {
+    parsePlayNotification,
+    type PlaySubscriptionNotification,
+} from "./play-notification";
 
 /**
  * What handling a notification came to.
@@ -75,6 +78,29 @@ export class PlayNotificationService {
 
         if (!isNew) return "duplicate";
 
+        try {
+            return await this.apply(notification);
+        } catch (error: unknown) {
+            // The delivery was recorded before the work, so a failure here
+            // would make Pub/Sub's redelivery look like a duplicate and drop
+            // it silently. Releasing the record puts the retry back on the
+            // table; the exception then reaches the caller as a 5xx, which is
+            // the answer that makes Google send it again.
+            await this.billingEventRepository.forget(notification.messageId);
+
+            throw error;
+        }
+    }
+
+    /**
+     * Reads the truth from Google and applies it.
+     *
+     * @param notification - The delivery being handled
+     * @returns What became of it
+     */
+    private async apply(
+        notification: PlaySubscriptionNotification,
+    ): Promise<PlayNotificationOutcome> {
         const subscription =
             await this.subscriptionRepository.findByProviderSubscriptionId(
                 notification.purchaseToken,

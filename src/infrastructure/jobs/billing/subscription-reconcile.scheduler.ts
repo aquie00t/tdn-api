@@ -78,9 +78,18 @@ export class SubscriptionReconcileScheduler {
 
     /**
      * Stops the schedule.
+     *
+     * Destroys the task rather than only dropping the reference. node-cron
+     * keeps its own registry, so a schedule that is merely forgotten keeps
+     * firing after `onClose` - against a Prisma client that has already
+     * disconnected.
      */
-    stop(): void {
+    async stop(): Promise<void> {
         if (!this.task) return;
+
+        const task = this.task;
         this.task = undefined;
+
+        await task.destroy();
     }
 }

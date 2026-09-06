@@ -121,17 +121,15 @@ describe("POST /auth/refresh - Token Refresh Flow", () => {
     });
 
     /**
-     * Compromise detection, and the window that keeps it from firing on a
-     * dropped connection.
+     * Compromise detection.
      *
-     * A rotated token presented again moments later is almost always a client
-     * that never received the response carrying its replacement - on a mobile
-     * network that happens routinely - so inside the grace window it is served
-     * as a retry. Presented a third time it is a genuine reuse: the successor
-     * from the retry has been consumed, which no honest client could have
-     * done, and every session is revoked.
+     * CI runs with `REFRESH_ROTATION_GRACE_SECONDS=0`, so a rotated token
+     * presented again is a reuse rather than a retry - the window itself is
+     * covered by unit tests, which can move a clock, and this covers the thing
+     * that actually protects an account: presenting a retired token kills
+     * every session the user has, including ones opened elsewhere.
      */
-    it("should serve a retry inside the grace window and alarm on a real reuse", async () => {
+    it("should revoke every session when a retired token is reused", async () => {
         const ts3 = Date.now();
         const compromiseUser = {
             email: `compromise_${ts3}@example.com`,
@@ -164,19 +162,17 @@ describe("POST /auth/refresh - Token Refresh Flow", () => {
 
         expect(firstRefresh.statusCode).toBe(200);
 
-        // The client never saw that response and tries again with the token
-        // it still holds. Inside the window this is a retry, not a theft.
-        const retry = await request({
+        // A second session, opened before the alarm. It must not survive it.
+        const secondSession = await request({
             method: "POST",
-            url: "/auth/refresh",
-            headers: { cookie: originalCookie },
+            url: "/auth/login",
+            payload: {
+                identifier: compromiseUser.email,
+                password: compromiseUser.password,
+            },
         });
+        const siblingCookie = extractRefreshTokenCookie(secondSession);
 
-        expect(retry.statusCode).toBe(200);
-
-        // A third attempt with the same token cannot be a lost response: the
-        // successor the retry issued has already been retired, so somebody is
-        // replaying a token they should not hold.
         const compromiseResponse = await request({
             method: "POST",
             url: "/auth/refresh",
@@ -193,6 +189,17 @@ describe("POST /auth/refresh - Token Refresh Flow", () => {
         expect(body.detail).toBe(
             "Security alert: Session compromised. All sessions revoked.",
         );
+
+        // The message is not the point - the revocation is. A revocation rolled
+        // back with its own transaction leaves this session alive while
+        // telling its owner it was killed.
+        const sibling = await request({
+            method: "POST",
+            url: "/auth/refresh",
+            headers: { cookie: siblingCookie },
+        });
+
+        expect(sibling.statusCode).toBe(401);
     });
 
     /**

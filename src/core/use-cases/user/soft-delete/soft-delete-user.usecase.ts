@@ -4,6 +4,7 @@ import type { EmailPort } from "@core/ports/services/email.port";
 import type { PasswordPort } from "@core/ports/services/password.port";
 import type { IUserRepository } from "@core/ports/repositories/user.repository";
 import type { RevokeSubscriptionUseCase } from "@core/use-cases/billing/revoke-subscription";
+import type { LoggerPort } from "@core/ports/services/logger.port";
 import type { SoftDeleteUserUseCaseInput } from "./soft-delete-user-usecase.input";
 
 /**
@@ -21,12 +22,14 @@ export class SoftDeleteUserUseCase {
      * @param passwordService - Service for password verification
      * @param emailService - Service for sending emails
      * @param revokeSubscriptionUseCase - Stops the account being charged
+     * @param logger - Records a cancellation that could not be completed
      */
     constructor(
         private readonly userRepository: IUserRepository,
         private readonly passwordService: PasswordPort,
         private readonly emailService: EmailPort,
         private readonly revokeSubscriptionUseCase: RevokeSubscriptionUseCase,
+        private readonly logger: LoggerPort,
     ) {}
 
     /**
@@ -64,9 +67,18 @@ export class SoftDeleteUserUseCase {
         // the provider immediately rather than at the end of the period,
         // because the account is going away either way.
         //
-        // The nightly reconcile retries anything the provider refused, which
-        // is why a failure here does not have to stop the deletion.
-        await this.revokeSubscriptionUseCase.execute(input.id);
+        // Caught, though. The account is already soft-deleted by this point,
+        // so letting this throw would report a 500 for a deletion that in fact
+        // happened, and skip the confirmation email as well. The nightly
+        // reconcile retries anything left behind.
+        try {
+            await this.revokeSubscriptionUseCase.execute(input.id);
+        } catch (error: unknown) {
+            this.logger.error(
+                { err: error, userId: input.id },
+                "Failed to cancel the subscription of a deleted account",
+            );
+        }
 
         await this.emailService.sendDeleteUserEmail({
             to: user.email,

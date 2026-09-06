@@ -22,8 +22,8 @@ function subscriptionReconcilePlugin(fastify: FastifyInstance): void {
         );
     });
 
-    fastify.addHook("onClose", () => {
-        subscriptionReconcileScheduler.stop();
+    fastify.addHook("onClose", async () => {
+        await subscriptionReconcileScheduler.stop();
 
         fastify.log.info(
             {

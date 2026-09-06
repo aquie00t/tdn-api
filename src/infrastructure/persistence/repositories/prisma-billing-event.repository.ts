@@ -46,4 +46,13 @@ export class PrismaBillingEventRepository implements IBillingEventRepository {
             throw error;
         }
     }
+
+    /**
+     * Removes a record, so the delivery it stood for can be retried.
+     *
+     * @param id - The provider's identifier for the delivery.
+     */
+    async forget(id: string): Promise<void> {
+        await this.prisma.billingEvent.deleteMany({ where: { id } });
+    }
 }

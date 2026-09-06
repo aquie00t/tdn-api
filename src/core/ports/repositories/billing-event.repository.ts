@@ -36,4 +36,15 @@ export interface IBillingEventRepository {
      * @returns True when this caller recorded it, false when it was a repeat.
      */
     recordIfNew(event: BillingEventRecord): Promise<boolean>;
+
+    /**
+     * Removes a record, so the delivery it stood for can be retried.
+     *
+     * The record is written before the work - that is what makes it a claim -
+     * so work that then fails has to give it back. Without this a provider's
+     * redelivery would be dismissed as a duplicate and the event lost.
+     *
+     * @param id - The provider's identifier for the delivery.
+     */
+    forget(id: string): Promise<void>;
 }

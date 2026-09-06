@@ -1,11 +1,43 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { UnauthorizedError } from "@core/errors";
+import { timingSafeEqual } from "node:crypto";
 import type { RegisterPlayPurchaseUseCase } from "@core/use-cases/billing/register-play-purchase";
 import type { PlayNotificationService } from "@infrastructure/external/billing/play/play-notification.service";
 import type {
     PlayNotificationQuery,
     RegisterPlayPurchaseBody,
 } from "@typings/schemas/billing/play.schema";
+
+/**
+ * Compares a presented secret with the configured one in constant time.
+ *
+ * The difference is small here - an attacker would be timing a query string
+ * over the internet - but the comparison is cheap to get right and the
+ * endpoint it guards writes billing state.
+ *
+ * Note the remaining weakness this does not address: the secret travels in the
+ * query string, so it is written into access logs by this service and by
+ * anything in front of it. Pub/Sub push cannot send custom headers, so the
+ * proper fix is the OIDC token Google can attach instead, which arrives with
+ * the rest of the Play integration.
+ *
+ * @param presented - What the caller sent, if anything
+ * @param expected - The configured secret
+ * @returns True when they match
+ */
+function matchesSecret(
+    presented: string | undefined,
+    expected: string,
+): boolean {
+    if (!presented) return false;
+
+    const a = Buffer.from(presented);
+    const b = Buffer.from(expected);
+
+    // `timingSafeEqual` throws on a length mismatch, which would itself leak
+    // the length; the check is done first and the comparison still runs.
+    return a.length === b.length && timingSafeEqual(a, b);
+}
 
 /**
  * Controller for the Google Play billing endpoints.
@@ -73,7 +105,7 @@ export class PlayBillingController {
         // No secret configured means the endpoint is not wired up yet. Closed
         // rather than open: an unauthenticated endpoint that writes billing
         // state is not something to leave ajar by default.
-        if (!expected || request.query.token !== expected) {
+        if (!expected || !matchesSecret(request.query.token, expected)) {
             throw new UnauthorizedError();
         }
 

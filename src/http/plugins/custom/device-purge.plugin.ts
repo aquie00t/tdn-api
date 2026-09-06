@@ -22,8 +22,8 @@ function devicePurgePlugin(fastify: FastifyInstance): void {
         );
     });
 
-    fastify.addHook("onClose", () => {
-        devicePurgeScheduler.stop();
+    fastify.addHook("onClose", async () => {
+        await devicePurgeScheduler.stop();
 
         fastify.log.info(
             {
