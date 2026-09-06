@@ -12,6 +12,7 @@ import { ReportController } from "@controllers/report.controller";
 import { MetaController } from "@controllers/meta.controller";
 import { DeviceController } from "@controllers/device.controller";
 import { BillingController } from "@controllers/billing.controller";
+import { PlayBillingController } from "@controllers/play-billing.controller";
 import { CommentController } from "@controllers/comment.controller";
 import { BookmarkController } from "@controllers/bookmark.controller";
 import { TrendController } from "@controllers/trend.controller";
@@ -62,6 +63,7 @@ export const controllersModule = {
     metaController: asClass(MetaController).singleton(),
     deviceController: asClass(DeviceController).singleton(),
     billingController: asClass(BillingController).singleton(),
+    playBillingController: asClass(PlayBillingController).singleton(),
     notificationController: asClass(NotificationController).singleton(),
     postController: asClass(PostController).singleton(),
     commentController: asClass(CommentController).singleton(),

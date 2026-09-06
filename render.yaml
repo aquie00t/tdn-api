@@ -189,6 +189,11 @@ projects:
         sync: false
       - key: DEVICE_PURGE_CRON
         sync: false
+      # Shared secret on the Play notification push URL. Empty keeps that
+      # endpoint closed, which is the right default for an unauthenticated
+      # route that writes billing state.
+      - key: PLAY_NOTIFICATIONS_TOKEN
+        sync: false
       # The paid verification badge. Both have defaults; they are declared
       # because the reconcile pass is what notices a ban, and turning it off or
       # slowing it down is a decision somebody should have to make on purpose.

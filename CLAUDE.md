@@ -210,6 +210,10 @@ A monthly paid subscription, and the only way to get a tick — no official badg
 
 `NoopBillingService` stands in until there is a store, and deliberately never reports a subscription as active — a stub that granted entitlements would be free badges on any misconfigured environment.
 
+**Google Play** enters through two endpoints. `POST /billing/play/purchases` is authenticated and is the *only* place the link between a purchase and an account is learned — Google's notifications name a token and a product and nothing else. It trusts the client for nothing: the token is verified with Google and what comes back is stored, so a purchase that cannot be confirmed links as `PENDING` with no badge. `POST /billing/play/notifications` takes the Pub/Sub push, guarded by a shared secret on the URL (`PLAY_NOTIFICATIONS_TOKEN`, empty = closed). A notification is a **nudge, never state**: it says a purchase changed, and the state is then read from Google, because deliveries are unordered and redelivered. It answers 204 for anything it understood — a redelivery, or a purchase no account claims — since Pub/Sub retries every non-2xx and retrying those achieves nothing. `mapPlayState` is the single place Google's vocabulary becomes ours, and an unrecognised state reads as *not* entitling.
+
+`GooglePlayBillingService` does not exist yet: `NoopBillingService` stands in until the Play Console side is configured.
+
 `docs/verified-badge.md` is the contract and the operator's SQL.
 
 ### Realtime and background jobs

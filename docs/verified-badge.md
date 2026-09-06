@@ -116,12 +116,70 @@ A provider that answers "I do not know this subscription" is left alone. That
 is not the same as "it ended", and guessing between them is how a paying user
 loses a badge; the expiry already on the row retires it if it really is over.
 
+## Google Play
+
+Two endpoints, and a deliberate split between what the client is trusted for
+and what it is not.
+
+**`POST /api/v1/billing/play/purchases`** — authenticated. The app calls it
+right after Play reports a successful purchase, with the `purchaseToken` the
+billing library produced and the product id.
+
+```json
+{ "purchaseToken": "…", "productId": "verified_monthly" }
+```
+
+This call is the **only** place the link between a purchase and an account is
+ever learned: Google's notifications name a token and a product and nothing
+else. It grants nothing on the client's word — the token goes straight to
+Google for verification and what comes back is what gets stored, so a
+fabricated token buys a row that says `PENDING` and no badge. A purchase Google
+cannot confirm right now is still linked, as `PENDING`, because without the row
+nothing would ever connect that token to that account again; the nightly
+reconcile finishes it.
+
+**`POST /api/v1/billing/play/notifications`** — where Pub/Sub pushes Google's
+notifications. No session, guarded by a shared secret on the URL
+(`?token=…`, `PLAY_NOTIFICATIONS_TOKEN`). **Empty means the endpoint is
+closed**, which is the right default for an unauthenticated route that writes
+billing state.
+
+The notification is treated as a **nudge, never as state**. It says a purchase
+changed; what it changed to is then read from the Play Developer API, and that
+answer is what gets stored. Notifications arrive out of order and are
+redelivered, so believing their contents would mean reinstating subscriptions
+that have ended.
+
+It answers `204` for everything it understood — including a redelivery and a
+purchase no account claims yet, since Pub/Sub retries anything that is not a
+2xx and retrying either of those achieves nothing. A genuine failure escapes as
+a 5xx, which is exactly the answer that makes Google try again.
+
+Google's state maps onto ours in one place, `mapPlayState`. `ACTIVE` and
+`IN_GRACE_PERIOD` entitle; `PAUSED`, `ON_HOLD`, `CANCELED` and `EXPIRED` do
+not — none of them are being paid for — and a state we do not recognise reads
+as *not* entitling, because Google adds values over time and the safe reading
+of "I do not know this" is that the badge is off.
+
+### Not done yet
+
+`GooglePlayBillingService` — the `BillingPort` implementation that actually
+calls the Play Developer API to verify a purchase and to cancel one. Until it
+exists `NoopBillingService` stands in, so purchases link as `PENDING` and no
+badge is granted. It needs the Play Console work: a subscription product, a
+service account with "View financial data" and "Manage orders and
+subscriptions", and the Pub/Sub topic.
+
+Verifying the OIDC token Google can attach to a push is the stronger
+alternative to the shared secret, and belongs with that same work.
+
 ## Settings
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `SUBSCRIPTION_RECONCILE_CRON` | `0 3 * * *` | When the repair pass runs. |
 | `SUBSCRIPTION_RECONCILE_BATCH_SIZE` | `500` | Rows examined per pass. |
+| `PLAY_NOTIFICATIONS_TOKEN` | _(empty)_ | Shared secret on the push URL. Empty closes the endpoint. |
 
 There is no provider yet. `NoopBillingService` stands in, and it deliberately
 never reports a subscription as active — a stub that granted entitlements would
