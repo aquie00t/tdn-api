@@ -64,7 +64,10 @@ export function commentRoutes(fastify: FastifyInstance): void {
                 response: { 201: CreateCommentResponseSchema },
                 tags: ["Comment"],
             },
-            config: { rateLimit: RateLimitPolicies.STANDARD },
+            config: {
+                idempotency: true,
+                rateLimit: RateLimitPolicies.STANDARD,
+            },
         },
         commentController.create.bind(commentController),
     );

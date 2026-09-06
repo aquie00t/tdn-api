@@ -25,6 +25,7 @@ import reportRoutes from "@routes/report.routes";
 import metaRoutes from "@routes/meta.routes";
 import deviceRoutes from "@routes/device.routes";
 import billingRoutes from "@routes/billing.routes";
+import idempotencyPlugin from "@plugins/idempotency/idempotency.plugin";
 import websocketPlugin from "./http/plugins/websocket.plugin";
 import realtimeRoutes from "@routes/realtime.routes";
 import notificationRoutes from "@routes/notification.routes";
@@ -115,6 +116,11 @@ export class App {
         this.server.register(dependencyInjectionPlugin);
 
         await this.server.after();
+
+        // After the container, before the routes: the hooks it installs need
+        // the cache service, and they have to be in place before anything
+        // registers a route that opts into them.
+        this.server.register(idempotencyPlugin);
 
         this.server.register(refreshTokenPurgePlugin);
         this.server.register(userPurgePlugin);

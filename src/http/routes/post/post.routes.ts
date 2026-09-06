@@ -73,7 +73,10 @@ export function postRoutes(fastify: FastifyInstance): void {
                 response: { 201: CreatePostResponseSchema },
                 tags: ["Post"],
             },
-            config: { rateLimit: RateLimitPolicies.SENSITIVE },
+            config: {
+                idempotency: true,
+                rateLimit: RateLimitPolicies.SENSITIVE,
+            },
         },
         postController.create.bind(postController),
     );
@@ -86,7 +89,10 @@ export function postRoutes(fastify: FastifyInstance): void {
         "/media",
         {
             onRequest: [fastify.authenticate],
-            config: { rateLimit: RateLimitPolicies.SENSITIVE },
+            config: {
+                idempotency: true,
+                rateLimit: RateLimitPolicies.SENSITIVE,
+            },
             schema: {
                 response: { 200: UploadMediaResponseSchema },
                 tags: ["Post"],

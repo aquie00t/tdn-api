@@ -87,6 +87,18 @@ The target is stored against a random `state` (`BeginOAuthUseCase`, 10-minute TT
 
 `GET /meta/client` reports the build floor (`MOBILE_MIN_SUPPORTED_BUILD`, zero meaning none) so a published app can be told it is too old. A web bundle is replaced every morning; an app version lives on phones for months, and without this there is no safe way to make a breaking change.
 
+### Retried writes
+
+A client that loses the *response* to a request cannot know whether the request landed, and on a mobile network that is routine. `Idempotency-Key` makes the retry safe: the claim is a single `SET NX EX` through `CachePort.setIfAbsent`, so the store decides the race rather than the API reading and then writing.
+
+Opt-in per route (`config: { idempotency: true }`) on the seven writes where a duplicate is real damage — posts, both comment endpoints, articles, messages and the two upload endpoints. Everything else is already repeatable: likes, follows and bookmarks are idempotent, a report has a unique constraint, a device registration is an upsert.
+
+The record key carries the **account** (`idem:v1:<userId>:<method>:<route>:<key>`) because a key is a value the client invents and two people can pick the same one. It also carries a fingerprint of the body, so a key reused with a different request is a 409 rather than a wrong answer replayed. Only 2xx responses are stored — a 4xx is deterministic and a 5xx must stay retryable, so neither spends the key.
+
+**It fails open:** an unreachable Redis logs and lets the request through, because this is a safety net over a write that already works and a hard dependency would turn a cache blip into "nobody can post". An endpoint that moves money should revisit that trade rather than inherit it.
+
+`docs/idempotency.md` is the client-facing contract.
+
 ### Rate limiting
 
 `RateLimitPolicies` in `src/http/plugins/rate-limit.plugin.ts`: `STRICT` (3/15 min, `continueExceeding`) for login/register, `SENSITIVE` (5/min) for password reset, verification, and write/social actions, `STANDARD` (60/min) for authenticated reads, `PUBLIC` (100/min). Global default is 100/min. Requests with `Authorization: Bot <token>` are allow-listed after a sha256 lookup against `user.botToken` — suspended bots (`bannedAt`) are excluded from that lookup.
