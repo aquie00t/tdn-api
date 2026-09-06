@@ -1,3 +1,11 @@
+# [1.27.0](https://github.com/the-developer-network/tdn-api/compare/v1.26.0...v1.27.0) (2026-09-06)
+
+
+### Features
+
+* **billing:** take Google Play purchases and notifications ([#282](https://github.com/the-developer-network/tdn-api/issues/282)) ([a4975fc](https://github.com/the-developer-network/tdn-api/commit/a4975fca129f83ae8bdcf2df83ef19e294e0a215))
+* **http:** make a retried write safe to send twice ([#281](https://github.com/the-developer-network/tdn-api/issues/281)) ([43c0c97](https://github.com/the-developer-network/tdn-api/commit/43c0c97c9eac6da45941af45ce11e831409e0f8b))
+
 # [1.26.0](https://github.com/the-developer-network/tdn-api/compare/v1.25.0...v1.26.0) (2026-09-06)
 
 
